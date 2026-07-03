@@ -75,6 +75,12 @@ export function nextOccurrenceAfter(dueDate: string, rrule: Rrule, today: string
   return next;
 }
 
+/** Nächster Samstag (heute, falls Samstag) — für den „Wochenende"-Chip. */
+export function nextWeekend(today: string): string {
+  const dow = parseDateStr(today).getDay();
+  return addDays(today, (6 - dow + 7) % 7);
+}
+
 /** 'HH:MM'-Vergleichbarkeit ist lexikografisch gegeben; hier nur Validierung/Format. */
 export function formatTime(t: string): string {
   return `${t} Uhr`;

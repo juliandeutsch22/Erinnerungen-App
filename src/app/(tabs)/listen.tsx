@@ -1,15 +1,147 @@
-// listen.tsx — Grid aus Glass-Karten (Icon, Name, offene Anzahl).
-// M0: Gerüst — Inhalt folgt in M2.
-import React from 'react';
+// listen.tsx — Grid aus Glass-Karten (Icon, Name, offene Anzahl); Tap = Liste,
+// Long-Press = bearbeiten; „+ Neue Liste" als gestrichelte Geister-Karte.
+// Darüber die Smart-Ansichten Geplant / Alle (Fahrplan §3.3).
+import { useRouter } from 'expo-router';
+import { CalendarDays, Layers, Plus } from 'lucide-react-native';
+import React, { useMemo, useState } from 'react';
+import { View } from 'react-native';
 
+import { Glass } from '@/components/Glass';
+import { ListEditorSheet } from '@/components/ListEditorSheet';
+import { listIcon } from '@/components/listMeta';
+import { PressableScale } from '@/components/PressableScale';
+import { Reveal } from '@/components/Reveal';
 import { Screen } from '@/components/Screen';
 import { Type } from '@/components/Type';
+import { useLists, useTasks } from '@/data/queries';
+import type { List } from '@/data/types';
+import { isOpen } from '@/lib/taskLogic';
+import { hapticSelect } from '@/lib/haptics';
+import { useColors } from '@/theme/ThemeProvider';
+import { R, Shadow, Spacing } from '@/theme/theme.tokens';
 
 export default function ListenScreen() {
+  const colors = useColors();
+  const router = useRouter();
+  const { data: lists } = useLists();
+  const { data: tasks } = useTasks();
+
+  // undefined = Sheet zu, null = neue Liste, List = bearbeiten.
+  const [editorList, setEditorList] = useState<List | null | undefined>(undefined);
+
+  const openByList = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const t of tasks ?? []) {
+      if (isOpen(t)) map.set(t.listId, (map.get(t.listId) ?? 0) + 1);
+    }
+    return map;
+  }, [tasks]);
+  const openTotal = useMemo(() => (tasks ?? []).filter(isOpen).length, [tasks]);
+  const openPlanned = useMemo(() => (tasks ?? []).filter((t) => isOpen(t) && t.dueDate !== null).length, [tasks]);
+
   return (
     <Screen>
-      <Type variant="title">Listen</Type>
-      <Type tone="text2">Deine Listen erscheinen hier (M2).</Type>
+      <Reveal>
+        <Type variant="title">Listen</Type>
+      </Reveal>
+
+      {/* Smart-Ansichten */}
+      <Reveal delay={60}>
+        <View style={{ flexDirection: 'row', gap: Spacing.md }}>
+          <SmartCard
+            title="Geplant"
+            count={openPlanned}
+            icon={<CalendarDays size={20} color={colors.teal} strokeWidth={2} />}
+            onPress={() => router.push('/liste/geplant')}
+          />
+          <SmartCard
+            title="Alle"
+            count={openTotal}
+            icon={<Layers size={20} color={colors.indigo} strokeWidth={2} />}
+            onPress={() => router.push('/liste/alle')}
+          />
+        </View>
+      </Reveal>
+
+      {/* Listen-Grid */}
+      <Reveal delay={120}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md }}>
+          {(lists ?? []).map((l) => {
+            const Icon = listIcon(l.icon);
+            return (
+              <PressableScale
+                key={l.id}
+                accessibilityLabel={`Liste ${l.name} öffnen`}
+                onPress={() => router.push(`/liste/${l.id}`)}
+                onLongPress={() => {
+                  hapticSelect();
+                  setEditorList(l);
+                }}
+                style={{ width: '47%', flexGrow: 1 }}
+              >
+                <Glass variant="card" radius={R.xl} style={Shadow.md} contentStyle={{ padding: Spacing.md, gap: Spacing.sm }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <View
+                      style={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: R.md,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: `${l.color}1F`,
+                      }}
+                    >
+                      <Icon size={19} color={l.color} strokeWidth={2} />
+                    </View>
+                    <Type variant="heading" tabular tone="text2">{openByList.get(l.id) ?? 0}</Type>
+                  </View>
+                  <Type variant="label" numberOfLines={1}>{l.name}</Type>
+                </Glass>
+              </PressableScale>
+            );
+          })}
+
+          {/* Geister-Karte: Neue Liste */}
+          <PressableScale
+            accessibilityLabel="Neue Liste anlegen"
+            onPress={() => setEditorList(null)}
+            style={{ width: '47%', flexGrow: 1 }}
+          >
+            <View
+              style={{
+                borderRadius: R.xl,
+                borderWidth: 1.5,
+                borderStyle: 'dashed',
+                borderColor: colors.border2,
+                padding: Spacing.md,
+                gap: Spacing.sm,
+                minHeight: 106,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Plus size={22} color={colors.text3} strokeWidth={2} />
+              <Type variant="label" tone="text3">Neue Liste</Type>
+            </View>
+          </PressableScale>
+        </View>
+      </Reveal>
+
+      {editorList !== undefined && <ListEditorSheet list={editorList} onClose={() => setEditorList(undefined)} />}
     </Screen>
+  );
+}
+
+function SmartCard({ title, count, icon, onPress }: { title: string; count: number; icon: React.ReactNode; onPress: () => void }) {
+  return (
+    <PressableScale accessibilityLabel={`${title} öffnen`} onPress={onPress} style={{ flex: 1 }}>
+      <Glass variant="card" radius={R.xl} style={Shadow.md} contentStyle={{ padding: Spacing.md, gap: Spacing.xs }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          {icon}
+          <Type variant="heading" tabular tone="text2">{count}</Type>
+        </View>
+        <Type variant="label">{title}</Type>
+      </Glass>
+    </PressableScale>
   );
 }
