@@ -25,8 +25,10 @@ const HEAD_BOLD = 'Sora_700Bold';
 
 const VARIANT_STYLE: Record<Variant, TextStyle> = {
   // Sora-Headings mit negativem Letterspacing (Premium-Look).
-  hero: { fontFamily: HEAD_EXTRABOLD, fontSize: T.hero, lineHeight: T.hero * 1.08, letterSpacing: -1 },
-  title: { fontFamily: HEAD_EXTRABOLD, fontSize: 32, lineHeight: 38, letterSpacing: -0.8 },
+  // lineHeight großzügiger als Cairn-Original: Soras hohe Ober-/Unterlängen
+  // werden auf iOS sonst abgeschnitten (RN clippt bei zu enger lineHeight).
+  hero: { fontFamily: HEAD_EXTRABOLD, fontSize: T.hero, lineHeight: T.hero * 1.2, letterSpacing: -1 },
+  title: { fontFamily: HEAD_EXTRABOLD, fontSize: 32, lineHeight: 42, letterSpacing: -0.8 },
   heading: { fontFamily: HEAD_BOLD, fontSize: T.xl, lineHeight: T.xl * 1.25, letterSpacing: -0.4 },
   // Body: System-Font (kein fontFamily gesetzt → System).
   body: { fontSize: T.md, lineHeight: T.md * 1.45 },

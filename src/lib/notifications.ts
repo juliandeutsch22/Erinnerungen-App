@@ -159,7 +159,7 @@ async function rescheduleSummary(tasks: Task[]): Promise<void> {
 
   const id = await Notifications.scheduleNotificationAsync({
     content: {
-      title: 'Stille',
+      title: 'Erinnerungen',
       body: summaryBody(count),
       data: { url: '/heute' },
     },

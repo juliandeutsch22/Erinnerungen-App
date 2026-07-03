@@ -71,9 +71,10 @@ export default function HeuteScreen() {
     <Screen contentContainerStyle={{ paddingBottom: TAB_BAR_SAFE_BOTTOM + 84 }}>
       <Reveal>
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-          <View style={{ gap: Spacing.xs }}>
+          {/* flex:1 + adjustsFontSize: Begrüßung kann nie vom Zahnrad abgeschnitten werden. */}
+          <View style={{ gap: Spacing.xs, flex: 1, paddingRight: Spacing.sm }}>
             <Type variant="eyebrow" tone="text3">{dateLine}</Type>
-            <Type variant="title">{greeting}</Type>
+            <Type variant="title" numberOfLines={1} adjustsFontSizeToFit>{greeting}</Type>
           </View>
           <PressableScale
             accessibilityLabel="Einstellungen öffnen"
@@ -90,7 +91,7 @@ export default function HeuteScreen() {
           {isLoading && total === 0 ? (
             <LoadingState />
           ) : total === 0 ? (
-            <EmptyState title="Nichts für heute" body="Kopf frei. Neues landet über das Plus — oder du genießt die Stille." />
+            <EmptyState title="Nichts für heute" body="Kopf frei. Neues landet über das Plus — oder du genießt die Ruhe." />
           ) : (
             <>
               {groups.overdue.length > 0 && (

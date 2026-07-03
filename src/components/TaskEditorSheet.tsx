@@ -86,14 +86,16 @@ export function TaskEditorSheet({
 
   const save = () => {
     if (!canSave) return;
+    // Nur gültige Uhrzeiten übernehmen — halbe Eingaben („9:3", Text) verfallen.
+    const validTime = dueTime && /^\d{2}:\d{2}$/.test(dueTime) ? dueTime : null;
     // Uhrzeit ohne Datum → heute; Wiederholung braucht ein Datum.
-    const finalDate = dueDate ?? (dueTime || rrule ? today : null);
+    const finalDate = dueDate ?? (validTime || rrule ? today : null);
     const payload = {
       title: title.trim(),
       note: note.trim() ? note.trim() : null,
       listId,
       dueDate: finalDate,
-      dueTime: finalDate ? dueTime : null,
+      dueTime: finalDate ? validTime : null,
       rrule: finalDate ? rrule : null,
       flagged,
     };
@@ -152,7 +154,10 @@ export function TaskEditorSheet({
       <Section label="Fällig">
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm }}>
           {dateChips.map((c) => {
-            const active = dueDate === c.date && (c.key !== 'abend' || dueTime === '18:00');
+            // „Heute" und „Heute Abend" schließen sich gegenseitig aus.
+            const active =
+              dueDate === c.date &&
+              (c.key === 'abend' ? dueTime === '18:00' : c.key === 'heute' ? dueTime !== '18:00' : true);
             return (
               <Chip
                 key={c.key}

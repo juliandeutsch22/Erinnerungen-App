@@ -91,12 +91,12 @@ jobs:
           test -n "$APP"
           mkdir -p Payload
           cp -R "$APP" Payload/
-          zip -qry stille-unsigned.ipa Payload
-          ls -la stille-unsigned.ipa
+          zip -qry erinnerungen-unsigned.ipa Payload
+          ls -la erinnerungen-unsigned.ipa
 
       - uses: actions/upload-artifact@v4
         with:
-          name: stille-unsigned-ipa
-          path: stille-unsigned.ipa
+          name: erinnerungen-unsigned-ipa
+          path: erinnerungen-unsigned.ipa
           if-no-files-found: error
           retention-days: 14

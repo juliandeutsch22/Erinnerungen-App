@@ -63,7 +63,7 @@ export async function importBackup(json: string): Promise<{ lists: number; tasks
     throw new Error('Kein gültiges JSON.');
   }
   if (!isRecord(parsed) || parsed.app !== 'stille' || parsed.schemaVersion !== 1) {
-    throw new Error('Kein Stille-Backup (app/schemaVersion fehlt).');
+    throw new Error('Kein Erinnerungen-Backup (app/schemaVersion fehlt).');
   }
   const rawLists = Array.isArray(parsed.lists) ? parsed.lists : [];
   const rawTasks = Array.isArray(parsed.tasks) ? parsed.tasks : [];

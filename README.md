@@ -1,4 +1,4 @@
-# Stille
+# Erinnerungen
 
 Persönliche Erinnerungen-App im Cairn-Design (Liquid Glass, Teal/Indigo) —
 ein Nutzer, ein Gerät, alles lokal, kein Backend.
@@ -22,12 +22,12 @@ InMemory im Web) · TanStack Query · zustand · expo-notifications (lokal, kein
 
 ## Aufs iPhone (ohne Developer-Account, Fahrplan §6)
 
-**Option A — mit Mac:** `npx expo prebuild -p ios`, `ios/Stille.xcworkspace` in
+**Option A — mit Mac:** `npx expo prebuild -p ios`, `ios/Erinnerungen.xcworkspace` in
 Xcode öffnen, Team = „(Personal Team)", iPhone per Kabel, ▶︎ Run.
 Alle ≤ 7 Tage neu signieren (anstecken, ▶︎ — 30 Sekunden).
 
 **Option B — ohne Mac:** GitHub-Action **iOS IPA** manuell starten
-(Actions → „iOS IPA" → Run workflow) → Artifact `stille-unsigned-ipa`
+(Actions → „iOS IPA" → Run workflow) → Artifact `erinnerungen-unsigned.ipa`
 herunterladen → mit [Sideloadly](https://sideloadly.io) (oder AltStore) und der
 kostenlosen Apple-ID signieren & übers Kabel installieren. Erneuern ≤ 7 Tage:
 gleiches Spiel, 1 Klick.

@@ -78,6 +78,6 @@ describe('Backup', () => {
 
   it('lehnt fremdes/ungültiges JSON ab', async () => {
     await expect(importBackup('kein json')).rejects.toThrow('Kein gültiges JSON.');
-    await expect(importBackup('{"app":"cairn","schemaVersion":1}')).rejects.toThrow('Kein Stille-Backup');
+    await expect(importBackup('{"app":"cairn","schemaVersion":1}')).rejects.toThrow('Kein Erinnerungen-Backup');
   });
 });
