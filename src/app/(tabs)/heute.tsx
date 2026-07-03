@@ -9,6 +9,7 @@ import { View } from 'react-native';
 import { GlassButton } from '@/components/GlassButton';
 import { GlassPanel } from '@/components/GlassPanel';
 import { PressableScale } from '@/components/PressableScale';
+import { QuickAdd } from '@/components/QuickAdd';
 import { RescheduleSheet } from '@/components/RescheduleSheet';
 import { Reveal } from '@/components/Reveal';
 import { Screen } from '@/components/Screen';
@@ -21,6 +22,7 @@ import { useCompleteTask, useLists, useReopenTask, useTasks } from '@/data/queri
 import type { Task } from '@/data/types';
 import { todayStr } from '@/lib/dates';
 import { groupToday } from '@/lib/taskLogic';
+import { TAB_BAR_SAFE_BOTTOM } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
 import { Spacing } from '@/theme/theme.tokens';
 
@@ -65,7 +67,8 @@ export default function HeuteScreen() {
     ));
 
   return (
-    <Screen>
+    <View style={{ flex: 1 }}>
+    <Screen contentContainerStyle={{ paddingBottom: TAB_BAR_SAFE_BOTTOM + 84 }}>
       <Reveal>
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
           <View style={{ gap: Spacing.xs }}>
@@ -127,5 +130,9 @@ export default function HeuteScreen() {
       )}
       {rescheduleTask && <RescheduleSheet task={rescheduleTask} onClose={() => setRescheduleTask(null)} />}
     </Screen>
+
+    {/* Quick-Add klebt über der Tab-Bar — Gedanke rein, Kopf frei (§1). */}
+    <QuickAdd />
+    </View>
   );
 }
