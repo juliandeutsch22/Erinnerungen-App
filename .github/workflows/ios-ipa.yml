@@ -23,17 +23,31 @@ jobs:
         run: npm ci
 
       # Erzeugt den ios/-Ordner aus app.json (Config Plugins inklusive).
+      # Der Workspace entsteht erst durch `pod install` (nächster Schritt).
       - name: Prebuild (iOS)
-        run: npx expo prebuild --platform ios --no-install
+        run: |
+          set -euxo pipefail
+          npx expo prebuild --platform ios --no-install
+          ls -la ios/
         env:
           CI: '1'
 
       - name: Pods
-        run: npx pod-install ios
+        working-directory: ios
+        run: |
+          set -euxo pipefail
+          pod --version
+          pod install
+        env:
+          # Hermes/RN-Core als Prebuilts (schneller, wie lokal in Podfile.properties).
+          CI: '1'
 
       - name: Xcode Build (Release, unsigniert)
         run: |
-          WORKSPACE=$(ls ios/*.xcworkspace | head -1)
+          set -euxo pipefail
+          WORKSPACE=$(find ios -maxdepth 1 -name '*.xcworkspace' -print -quit)
+          test -n "$WORKSPACE"
+          test -f "$WORKSPACE/contents.xcworkspacedata"
           SCHEME=$(basename "$WORKSPACE" .xcworkspace)
           xcodebuild -workspace "$WORKSPACE" \
             -scheme "$SCHEME" \
@@ -46,10 +60,13 @@ jobs:
 
       - name: IPA packen (Payload/*.app → .ipa)
         run: |
-          APP=$(ls -d build/Build/Products/Release-iphoneos/*.app | head -1)
+          set -euxo pipefail
+          APP=$(find build/Build/Products/Release-iphoneos -maxdepth 1 -name '*.app' -print -quit)
+          test -n "$APP"
           mkdir -p Payload
           cp -R "$APP" Payload/
           zip -qry stille-unsigned.ipa Payload
+          ls -la stille-unsigned.ipa
 
       - uses: actions/upload-artifact@v4
         with:
