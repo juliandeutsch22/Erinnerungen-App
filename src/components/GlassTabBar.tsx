@@ -3,15 +3,14 @@
 // (Spring.snappy beim Wechsel), Reduced-Motion-gegated.
 import { ListTodo, type LucideIcon, Search, Sun } from 'lucide-react-native';
 import React from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Glass } from '@/components/Glass';
 import { Type } from '@/components/Type';
-import { PressableScale } from '@/components/PressableScale';
 import { hapticSelect } from '@/lib/haptics';
-import { springConfig } from '@/theme/motion.tokens';
+import { Dur, springConfig } from '@/theme/motion.tokens';
 import { useColors, useReducedMotion } from '@/theme/ThemeProvider';
 import { TAB_BAR_HEIGHT } from '@/theme/layout';
 import { Shadow, Spacing } from '@/theme/theme.tokens';
@@ -97,22 +96,35 @@ function TabButton({
   onPress: () => void;
 }) {
   const reduced = useReducedMotion();
-  const scale = useSharedValue(focused ? 1 : 0.92);
+  // Bewusst KEIN Scale auf dem Icon: iOS rastert SVGs beim Skalieren als
+  // Bitmap → Icons wirken während der Animation kurz verpixelt. Stattdessen
+  // dezenter Lift (translateY) beim Fokus + Opacity-Feedback beim Drücken.
+  const lift = useSharedValue(focused ? 0 : 1.5);
+  const pressed = useSharedValue(0);
 
   React.useEffect(() => {
-    const target = focused ? 1 : 0.92;
-    scale.value = reduced ? target : withSpring(target, springConfig('snappy'));
-  }, [focused, reduced, scale]);
+    const target = focused ? 0 : 1.5;
+    lift.value = reduced ? target : withSpring(target, springConfig('snappy'));
+  }, [focused, reduced, lift]);
 
-  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: lift.value }],
+    opacity: 1 - pressed.value * 0.35,
+  }));
   const color = focused ? activeColor : inactiveColor;
 
   return (
-    <PressableScale
+    <Pressable
       accessibilityRole="tab"
       accessibilityState={{ selected: focused }}
       accessibilityLabel={label}
       onPress={onPress}
+      onPressIn={() => {
+        pressed.value = withTiming(1, { duration: Dur.press });
+      }}
+      onPressOut={() => {
+        pressed.value = withTiming(0, { duration: Dur.pressOut });
+      }}
       style={styles.tab}
     >
       <Animated.View style={[styles.tabInner, animatedStyle]}>
@@ -121,7 +133,7 @@ function TabButton({
           {label}
         </Type>
       </Animated.View>
-    </PressableScale>
+    </Pressable>
   );
 }
 

@@ -1,12 +1,12 @@
-// heute.tsx — Startscreen (Fahrplan §4): Datum-Eyebrow + Begrüßung; darunter
-// überfällig (Indigo, ruhig) → heute mit Uhrzeit → heute ohne Uhrzeit auf
-// EINER Glass-Fläche mit Seams. Abhaken = Teal-Puls + Haptik.
+// heute.tsx — Startscreen (Fahrplan §4): Datum-Eyebrow + Begrüßung mit Tages-
+// Bilanz; darunter überfällig (Indigo, ruhig) → heute mit Uhrzeit → heute ohne
+// Uhrzeit auf EINER Glass-Fläche mit Seams, plus dünne Fortschrittslinie und
+// einklappbare „Erledigt heute"-Sektion. Abhaken = Teal-Puls + Haptik.
 import { useRouter } from 'expo-router';
-import { Plus, Settings } from 'lucide-react-native';
+import { ChevronDown, ChevronRight, Plus, Settings, Sun } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { View } from 'react-native';
 
-import { GlassButton } from '@/components/GlassButton';
 import { GlassPanel } from '@/components/GlassPanel';
 import { PressableScale } from '@/components/PressableScale';
 import { QuickAdd } from '@/components/QuickAdd';
@@ -20,8 +20,9 @@ import { TaskRow } from '@/components/TaskRow';
 import { Type } from '@/components/Type';
 import { useCompleteTask, useLists, useReopenTask, useTasks } from '@/data/queries';
 import type { Task } from '@/data/types';
-import { todayStr } from '@/lib/dates';
+import { toDateStr, todayStr } from '@/lib/dates';
 import { groupToday } from '@/lib/taskLogic';
+import { hapticSelect } from '@/lib/haptics';
 import { TAB_BAR_SAFE_BOTTOM } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
 import { Spacing } from '@/theme/theme.tokens';
@@ -37,16 +38,36 @@ export default function HeuteScreen() {
   // undefined = Editor zu, null = neue Aufgabe, Task = bearbeiten.
   const [editorTask, setEditorTask] = useState<Task | null | undefined>(undefined);
   const [rescheduleTask, setRescheduleTask] = useState<Task | null>(null);
+  const [showCompleted, setShowCompleted] = useState(false);
 
   const today = todayStr();
   const groups = useMemo(() => groupToday(tasks ?? [], today), [tasks, today]);
   const listById = useMemo(() => new Map((lists ?? []).map((l) => [l.id, l])), [lists]);
-  const total = groups.overdue.length + groups.timed.length + groups.untimed.length;
+  const open = groups.overdue.length + groups.timed.length + groups.untimed.length;
+
+  // Heute Erledigtes (lokales Datum!) — neueste zuerst, für Bilanz + Sektion.
+  const doneToday = useMemo(
+    () =>
+      (tasks ?? [])
+        .filter((t) => t.completedAt !== null && toDateStr(new Date(t.completedAt)) === today)
+        .sort((a, b) => (a.completedAt! < b.completedAt! ? 1 : -1)),
+    [tasks, today],
+  );
+  const dayTotal = open + doneToday.length;
+  const allDone = dayTotal > 0 && open === 0;
 
   const now = new Date();
   const hour = now.getHours();
   const greeting = hour < 5 ? 'Gute Nacht' : hour < 11 ? 'Guten Morgen' : hour < 18 ? 'Guten Tag' : 'Guten Abend';
   const dateLine = now.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
+
+  // Ruhige Tages-Bilanz unter der Begrüßung.
+  const summary =
+    dayTotal === 0
+      ? 'Nichts geplant für heute.'
+      : allDone
+        ? 'Alles für heute erledigt.'
+        : `${open} offen${doneToday.length > 0 ? ` · ${doneToday.length} erledigt` : ''}`;
 
   const toggle = (task: Task) => (next: boolean) => {
     if (next) complete.mutate(task);
@@ -71,29 +92,62 @@ export default function HeuteScreen() {
     <Screen contentContainerStyle={{ paddingBottom: TAB_BAR_SAFE_BOTTOM + 84 }}>
       <Reveal>
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-          {/* flex:1 + adjustsFontSize: Begrüßung kann nie vom Zahnrad abgeschnitten werden. */}
+          {/* flex:1 + adjustsFontSize: Begrüßung kann nie abgeschnitten werden. */}
           <View style={{ gap: Spacing.xs, flex: 1, paddingRight: Spacing.sm }}>
             <Type variant="eyebrow" tone="text3">{dateLine}</Type>
             <Type variant="title" numberOfLines={1} adjustsFontSizeToFit>{greeting}</Type>
+            <Type variant="caption" tone={allDone ? 'teal' : 'text3'} tabular>{summary}</Type>
           </View>
-          <PressableScale
-            accessibilityLabel="Einstellungen öffnen"
-            onPress={() => router.push('/einstellungen')}
-            style={{ padding: Spacing.sm }}
-          >
-            <Settings size={21} color={colors.text3} strokeWidth={2} />
-          </PressableScale>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <PressableScale
+              accessibilityLabel="Neue Aufgabe"
+              onPress={() => setEditorTask(null)}
+              style={{ padding: Spacing.sm }}
+            >
+              <Plus size={22} color={colors.teal} strokeWidth={2.2} />
+            </PressableScale>
+            <PressableScale
+              accessibilityLabel="Einstellungen öffnen"
+              onPress={() => router.push('/einstellungen')}
+              style={{ padding: Spacing.sm }}
+            >
+              <Settings size={21} color={colors.text3} strokeWidth={2} />
+            </PressableScale>
+          </View>
         </View>
       </Reveal>
 
       <Reveal delay={90}>
         <GlassPanel>
-          {isLoading && total === 0 ? (
+          {/* Dünne Fortschrittslinie: der Tag bekommt einen Körper. */}
+          {dayTotal > 0 && (
+            <View style={{ height: 3, borderRadius: 999, backgroundColor: colors.chip, marginBottom: Spacing.md, overflow: 'hidden' }}>
+              <View
+                style={{
+                  height: 3,
+                  width: `${Math.round((doneToday.length / dayTotal) * 100)}%`,
+                  backgroundColor: colors.teal,
+                  borderRadius: 999,
+                }}
+              />
+            </View>
+          )}
+
+          {isLoading && dayTotal === 0 ? (
             <LoadingState />
-          ) : total === 0 ? (
-            <EmptyState title="Nichts für heute" body="Kopf frei. Neues landet über das Plus — oder du genießt die Ruhe." />
+          ) : dayTotal === 0 ? (
+            <EmptyState
+              icon={<Sun size={20} color={colors.teal} strokeWidth={2} />}
+              title="Nichts für heute"
+              body="Kopf frei. Neues landet unten in der Eingabezeile — oder du genießt die Ruhe."
+            />
           ) : (
             <>
+              {allDone && (
+                <Type variant="body" tone="text2">
+                  Alles erledigt — der Tag gehört dir.
+                </Type>
+              )}
               {groups.overdue.length > 0 && (
                 <>
                   <Type variant="eyebrow" tone="indigo">Überfällig</Type>
@@ -114,16 +168,32 @@ export default function HeuteScreen() {
                   <View style={{ marginTop: Spacing.xs }}>{renderRows(groups.untimed)}</View>
                 </>
               )}
+
+              {/* Erledigt heute — einklappbar, Abhaken bleibt sichtbar + rückholbar. */}
+              {doneToday.length > 0 && (
+                <>
+                  {!allDone && <Seam marginVertical={Spacing.md} />}
+                  <PressableScale
+                    accessibilityLabel={showCompleted ? 'Erledigte ausblenden' : 'Erledigte anzeigen'}
+                    onPress={() => {
+                      hapticSelect();
+                      setShowCompleted((v) => !v);
+                    }}
+                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: allDone ? Spacing.md : 0 }}
+                  >
+                    <Type variant="eyebrow" tone="text3">Erledigt · {doneToday.length}</Type>
+                    {showCompleted ? (
+                      <ChevronDown size={16} color={colors.text3} strokeWidth={2} />
+                    ) : (
+                      <ChevronRight size={16} color={colors.text3} strokeWidth={2} />
+                    )}
+                  </PressableScale>
+                  {showCompleted && <View style={{ marginTop: Spacing.xs }}>{renderRows(doneToday)}</View>}
+                </>
+              )}
             </>
           )}
         </GlassPanel>
-      </Reveal>
-
-      <Reveal delay={160}>
-        <GlassButton accessibilityLabel="Neue Aufgabe" onPress={() => setEditorTask(null)}>
-          <Plus size={18} color="#FFFFFF" strokeWidth={2.4} />
-          <Type variant="label" style={{ color: '#FFFFFF' }}>Neue Aufgabe</Type>
-        </GlassButton>
       </Reveal>
 
       {editorTask !== undefined && (
