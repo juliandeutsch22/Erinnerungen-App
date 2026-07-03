@@ -4,16 +4,39 @@ import { Sora_700Bold, Sora_800ExtraBold, useFonts } from '@expo-google-fonts/so
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { setOnTasksChanged } from '@/data/queries';
+import {
+  ensureNotificationPermission,
+  registerNotificationCategories,
+  requestReschedule,
+  useNotificationResponses,
+} from '@/lib/notifications';
+import { useSettings } from '@/theme/settings.store';
 import { ThemeProvider, useColors, useScheme } from '@/theme/ThemeProvider';
 
 function RootStack() {
   const colors = useColors();
   const scheme = useScheme();
+  useNotificationResponses();
+
+  // Erinnerungs-Engine: bei App-Start + nach jeder Datenänderung wird das
+  // Planungsfenster neu aufgebaut (64er-Limit, Fahrplan §5). No-Op im Web.
+  const hydrated = useSettings((s) => s._hasHydrated);
+  useEffect(() => {
+    if (!hydrated) return;
+    void (async () => {
+      await registerNotificationCategories();
+      await ensureNotificationPermission();
+      requestReschedule();
+    })();
+    setOnTasksChanged(requestReschedule);
+    return () => setOnTasksChanged(null);
+  }, [hydrated]);
 
   return (
     <>
