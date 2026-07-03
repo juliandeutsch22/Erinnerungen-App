@@ -1,0 +1,58 @@
+// Backdrop.tsx — Aurora-Hintergrund mit Tiefe: Basis-Verlauf + zwei Radial-Glows
+// (Teal oben-links, Indigo unten-rechts). Gibt dem Liquid Glass etwas zum Brechen.
+// Optional mit Scroll-Parallax: das Feld bewegt sich langsamer als der Inhalt →
+// die Glasflächen schweben sichtbar ÜBER einem lebendigen Grund.
+import { LinearGradient } from 'expo-linear-gradient';
+import React from 'react';
+import { StyleSheet, View } from 'react-native';
+import Animated, { SharedValue, useAnimatedStyle } from 'react-native-reanimated';
+import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
+
+import { useColors, useReducedMotion, useScheme } from '@/theme/ThemeProvider';
+
+// Wie stark die Aurora dem Scroll folgt (klein = weit hinten).
+const PARALLAX_FACTOR = 0.12;
+// Über-Ausdehnung oben/unten, damit die Bewegung keine Ränder freilegt.
+const BLEED = 80;
+
+export function Backdrop({ scrollY }: { scrollY?: SharedValue<number> }) {
+  const colors = useColors();
+  const isDark = useScheme() === 'dark';
+  const reduced = useReducedMotion();
+  // Light kräftiger, damit echte Farbe durch das frostige Glas bricht (iOS-Look);
+  // Dark seit den transluzenteren Panels ebenfalls etwas farbiger.
+  const tealOp = isDark ? 0.28 : 0.42;
+  const indigoOp = isDark ? 0.24 : 0.36;
+
+  // Basis-Verlauf: kühl oben → warm/violett unten. Light bewusst eine Stufe
+  // tiefer/satter, damit die Frost-Platten hell DAGEGEN leuchten (Figur-Grund).
+  const base: [string, string, string] = isDark ? ['#05100E', '#000000', '#05080F'] : ['#CCE4DE', '#D9DEE9', '#D5C8E6'];
+
+  const parallax = useAnimatedStyle(() => {
+    if (!scrollY || reduced) return { transform: [{ translateY: 0 }] };
+    const shift = Math.max(-BLEED, Math.min(BLEED, -scrollY.value * PARALLAX_FACTOR));
+    return { transform: [{ translateY: shift }] };
+  });
+
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <Animated.View style={[StyleSheet.absoluteFill, { top: -BLEED, bottom: -BLEED }, parallax]}>
+        <LinearGradient colors={base} start={{ x: 0, y: 0 }} end={{ x: 0.6, y: 1 }} style={StyleSheet.absoluteFill} />
+        <Svg width="100%" height="100%">
+          <Defs>
+            <RadialGradient id="aurora-teal" cx="16%" cy="10%" r="65%">
+              <Stop offset="0" stopColor={colors.teal} stopOpacity={tealOp} />
+              <Stop offset="1" stopColor={colors.teal} stopOpacity={0} />
+            </RadialGradient>
+            <RadialGradient id="aurora-indigo" cx="92%" cy="94%" r="70%">
+              <Stop offset="0" stopColor={colors.indigo} stopOpacity={indigoOp} />
+              <Stop offset="1" stopColor={colors.indigo} stopOpacity={0} />
+            </RadialGradient>
+          </Defs>
+          <Rect x="0" y="0" width="100%" height="100%" fill="url(#aurora-teal)" />
+          <Rect x="0" y="0" width="100%" height="100%" fill="url(#aurora-indigo)" />
+        </Svg>
+      </Animated.View>
+    </View>
+  );
+}
