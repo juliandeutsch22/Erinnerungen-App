@@ -14,6 +14,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Wurzel der Exit-65-Fehlschläge: das Default-Xcode des Runners (16.4,
+      # Swift 6.1) ist zu alt — Expo SDK 56 braucht Swift-Tools 6.2
+      # ("package 'apple' is using Swift tools version 6.2.0 but the installed
+      # version is 6.1.0"). Deshalb das neueste installierte Xcode aktivieren.
+      - name: Neuestes Xcode wählen
+        run: |
+          set -euxo pipefail
+          ls -d /Applications/Xcode*.app
+          LATEST=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          sudo xcode-select -s "$LATEST/Contents/Developer"
+          xcodebuild -version
+          swift --version
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -31,24 +44,6 @@ jobs:
           ls -la ios/
         env:
           CI: '1'
-
-      # Expos vorkompilierte Module (SDK 54+) + RN-Prebuilts bauen im CI über
-      # nested-xcodebuild-Script-Phasen ("Build ExpoModulesJSI xcframework"), die
-      # auf GitHub-Runnern reproduzierbar mit Exit 65 fehlschlagen. Alles aus dem
-      # Quellcode bauen ist langsamer, aber zuverlässig. Flags landen in
-      # Podfile.properties.json und werden vom Podfile respektiert.
-      - name: Aus Quellcode bauen (Precompiled Modules aus)
-        run: |
-          set -euxo pipefail
-          node -e '
-            const fs = require("fs");
-            const p = "ios/Podfile.properties.json";
-            const j = JSON.parse(fs.readFileSync(p, "utf8"));
-            j["EXPO_USE_PRECOMPILED_MODULES"] = "false";
-            j["ios.buildReactNativeFromSource"] = "true";
-            fs.writeFileSync(p, JSON.stringify(j, null, 2));
-            console.log(j);
-          '
 
       - name: Pods
         working-directory: ios
