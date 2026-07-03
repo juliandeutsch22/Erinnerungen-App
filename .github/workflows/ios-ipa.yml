@@ -10,7 +10,7 @@ on:
 jobs:
   build:
     runs-on: macos-15
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
@@ -32,6 +32,24 @@ jobs:
         env:
           CI: '1'
 
+      # Expos vorkompilierte Module (SDK 54+) + RN-Prebuilts bauen im CI über
+      # nested-xcodebuild-Script-Phasen ("Build ExpoModulesJSI xcframework"), die
+      # auf GitHub-Runnern reproduzierbar mit Exit 65 fehlschlagen. Alles aus dem
+      # Quellcode bauen ist langsamer, aber zuverlässig. Flags landen in
+      # Podfile.properties.json und werden vom Podfile respektiert.
+      - name: Aus Quellcode bauen (Precompiled Modules aus)
+        run: |
+          set -euxo pipefail
+          node -e '
+            const fs = require("fs");
+            const p = "ios/Podfile.properties.json";
+            const j = JSON.parse(fs.readFileSync(p, "utf8"));
+            j["EXPO_USE_PRECOMPILED_MODULES"] = "false";
+            j["ios.buildReactNativeFromSource"] = "true";
+            fs.writeFileSync(p, JSON.stringify(j, null, 2));
+            console.log(j);
+          '
+
       - name: Pods
         working-directory: ios
         run: |
@@ -39,12 +57,11 @@ jobs:
           pod --version
           pod install
         env:
-          # Hermes/RN-Core als Prebuilts (schneller, wie lokal in Podfile.properties).
           CI: '1'
 
       - name: Xcode Build (Release, unsigniert)
         run: |
-          set -euxo pipefail
+          set -uxo pipefail
           WORKSPACE=$(find ios -maxdepth 1 -name '*.xcworkspace' -print -quit)
           test -n "$WORKSPACE"
           test -f "$WORKSPACE/contents.xcworkspacedata"
@@ -56,7 +73,21 @@ jobs:
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY=""
+            CODE_SIGN_IDENTITY="" 2>&1 | tee xcodebuild.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            echo "===== Fehlerzeilen aus dem Build ====="
+            grep -nE "error:|fatal error|Command .* failed|BUILD FAILED" xcodebuild.log | tail -80 || true
+            exit "$status"
+          fi
+
+      - name: Build-Log sichern (bei Fehlschlag)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-log
+          path: xcodebuild.log
+          if-no-files-found: ignore
 
       - name: IPA packen (Payload/*.app → .ipa)
         run: |
