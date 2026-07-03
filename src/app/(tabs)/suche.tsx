@@ -59,7 +59,8 @@ export default function SucheScreen() {
   };
 
   return (
-    <Screen>
+    // Tastatur-Insets: lange Trefferlisten bleiben bei offener Tastatur scrollbar.
+    <Screen automaticallyAdjustKeyboardInsets>
       <Reveal>
         <Type variant="title">Suche</Type>
       </Reveal>

@@ -4,7 +4,7 @@
 // der Screen wechselt nicht, der Fokus bleibt.
 import { CalendarDays, Clock, Plus, Repeat, X } from 'lucide-react-native';
 import React, { useMemo, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, TextInput, View } from 'react-native';
+import { TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Glass } from '@/components/Glass';
@@ -15,6 +15,7 @@ import { DEFAULT_LIST_ID } from '@/data/ListRepository';
 import { formatDueDate, todayStr } from '@/lib/dates';
 import { hapticSuccess } from '@/lib/haptics';
 import { parseQuickAdd } from '@/lib/quickAddParser';
+import { useKeyboardHeight } from '@/lib/useKeyboardHeight';
 import { MAX_CONTENT_WIDTH, TAB_BAR_HEIGHT, webNoOutline } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
 import { R, Shadow, Spacing, T } from '@/theme/theme.tokens';
@@ -61,19 +62,20 @@ export function QuickAdd({ listId = DEFAULT_LIST_ID }: { listId?: string }) {
   if (dueTime) chips.push({ key: 'time', icon: Clock, label: dueTime });
   if (rrule) chips.push({ key: 'rrule', icon: Repeat, label: RRULE_LABEL[rrule] });
 
+  // Tastatur: gemessene Höhe statt KeyboardAvoidingView (bei position:absolute
+  // unzuverlässig — die Pill wanderte an unlogische Stellen). Tastatur offen →
+  // Pill sitzt direkt darüber; zu → über der schwebenden Tab-Bar.
+  const keyboard = useKeyboardHeight();
+  const restingBottom = Math.max(insets.bottom, Spacing.md) + TAB_BAR_HEIGHT + Spacing.sm;
+
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'position' : undefined}
-      pointerEvents="box-none"
-      style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }}
-    >
+    <View pointerEvents="box-none" style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }}>
       <View
         pointerEvents="box-none"
         style={{
           alignItems: 'center',
           paddingHorizontal: Spacing.lg,
-          // Direkt über der schwebenden Tab-Bar parken.
-          paddingBottom: Math.max(insets.bottom, Spacing.md) + TAB_BAR_HEIGHT + Spacing.sm,
+          paddingBottom: keyboard > 0 ? keyboard + Spacing.sm : restingBottom,
         }}
       >
         <View style={{ width: '100%', maxWidth: MAX_CONTENT_WIDTH, gap: Spacing.xs }}>
@@ -151,6 +153,6 @@ export function QuickAdd({ listId = DEFAULT_LIST_ID }: { listId?: string }) {
           </Glass>
         </View>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }

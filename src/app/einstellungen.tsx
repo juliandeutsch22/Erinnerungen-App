@@ -81,7 +81,9 @@ export default function EinstellungenScreen() {
   };
 
   return (
-    <Screen withTabBar={false}>
+    // Import-Feld liegt am Seitenende → iOS-Tastatur-Insets, damit es beim
+    // Tippen sichtbar bleibt (scrollt automatisch über die Tastatur).
+    <Screen withTabBar={false} automaticallyAdjustKeyboardInsets>
       <Reveal>
         <PressableScale accessibilityLabel="Zurück" onPress={() => router.back()} style={{ padding: Spacing.sm, marginLeft: -Spacing.sm, alignSelf: 'flex-start' }}>
           <ChevronLeft size={24} color={colors.text2} strokeWidth={2} />
