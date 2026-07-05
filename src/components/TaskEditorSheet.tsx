@@ -1,20 +1,23 @@
-// TaskEditorSheet.tsx — Aufgaben-Editor als Glass-Bottom-Sheet (Fahrplan §4):
-// Titel, Notiz, Listen-Chips, Datums-Chips (+ Mini-Kalender), Uhrzeit-Chips,
-// Wiederholungs-Chips, Flagge. Destruktives Löschen zweistufig.
-import { CalendarDays, Flag, Moon, Sun, Trash2 } from 'lucide-react-native';
+// TaskEditorSheet.tsx — Aufgaben-Editor als Glass-Bottom-Sheet (Fahrplan §4).
+// Aufbau nach iOS-Muster: Titel + Notiz immer sichtbar, darunter kompakte
+// Detail-Zeilen (Liste / Fällig / Wiederholung / Flagge) mit aktuellem Wert,
+// die erst beim Antippen ihre Chips aufklappen — keine Chip-Wand. Der
+// Primär-Button sitzt fest im Sheet-Footer. Löschen zweistufig.
+import { CalendarDays, ChevronDown, ChevronRight, Flag, type LucideIcon, Moon, Repeat, Sun, Trash2 } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
-import { TextInput, View } from 'react-native';
+import { StyleSheet, TextInput, View } from 'react-native';
 
 import { BottomSheet } from '@/components/BottomSheet';
 import { Chip } from '@/components/Chip';
 import { GlassButton } from '@/components/GlassButton';
+import { listIcon } from '@/components/listMeta';
 import { MiniCalendar } from '@/components/MiniCalendar';
 import { PressableScale } from '@/components/PressableScale';
 import { Type } from '@/components/Type';
 import { useCreateTask, useDeleteTask, useLists, useUpdateTask } from '@/data/queries';
 import type { Rrule, Task } from '@/data/types';
 import { addDays, formatDueDate, nextWeekend, todayStr } from '@/lib/dates';
-import { hapticSuccess } from '@/lib/haptics';
+import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { webNoOutline } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
 import { useSettings } from '@/theme/settings.store';
@@ -28,15 +31,15 @@ const RRULES: { value: Rrule; label: string }[] = [
   { value: 'monthly', label: 'Monatlich' },
   { value: 'yearly', label: 'Jährlich' },
 ];
+const RRULE_LABEL: Record<Rrule, string> = {
+  daily: 'Täglich',
+  weekdays: 'Werktags',
+  weekly: 'Wöchentlich',
+  monthly: 'Monatlich',
+  yearly: 'Jährlich',
+};
 
-function Section({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <View style={{ gap: Spacing.sm, marginBottom: Spacing.lg }}>
-      <Type variant="label" tone="text2">{label}</Type>
-      {children}
-    </View>
-  );
-}
+type Section = 'list' | 'due' | 'repeat';
 
 export function TaskEditorSheet({
   task,
@@ -68,21 +71,33 @@ export function TaskEditorSheet({
   const [showCalendar, setShowCalendar] = useState(false);
   const [customTime, setCustomTime] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // Neue Aufgabe: Fällig direkt offen (häufigste Aktion); Bearbeiten: alles kompakt.
+  const [section, setSection] = useState<Section | null>(task === null ? 'due' : null);
 
   const canSave = title.trim().length > 0;
   const isEdit = task !== null;
+
+  const toggleSection = (s: Section) => {
+    hapticSelect();
+    setSection((cur) => (cur === s ? null : s));
+    setShowCalendar(false);
+  };
+
+  const currentList = useMemo(() => (lists ?? []).find((l) => l.id === listId), [lists, listId]);
 
   // Datums-Chips: Heute / Heute Abend / Morgen / Wochenende / Kalender.
   const weekend = nextWeekend(today);
   const dateChips = useMemo(
     () => [
-      { key: 'heute', label: 'Heute', icon: Sun, date: today, time: undefined as string | null | undefined },
-      { key: 'abend', label: 'Heute Abend', icon: Moon, date: today, time: '18:00' as string | null },
+      { key: 'heute', label: 'Heute', icon: Sun as LucideIcon | undefined, date: today, time: undefined as string | null | undefined },
+      { key: 'abend', label: 'Heute Abend', icon: Moon as LucideIcon | undefined, date: today, time: '18:00' as string | null },
       { key: 'morgen', label: 'Morgen', icon: undefined, date: addDays(today, 1), time: undefined },
       { key: 'wochenende', label: 'Wochenende', icon: undefined, date: weekend, time: undefined },
     ],
     [today, weekend],
   );
+
+  const dueLabel = dueDate ? formatDueDate(dueDate, today) + (dueTime ? `, ${dueTime}` : '') : 'Kein Datum';
 
   const save = () => {
     if (!canSave) return;
@@ -108,8 +123,37 @@ export function TaskEditorSheet({
     onClose();
   };
 
+  const footer = (
+    <View>
+      <GlassButton accessibilityLabel={isEdit ? 'Änderungen sichern' : 'Aufgabe hinzufügen'} onPress={save} disabled={!canSave}>
+        <Type variant="label" style={{ color: '#FFFFFF' }}>{isEdit ? 'Sichern' : 'Hinzufügen'}</Type>
+      </GlassButton>
+      {isEdit && (
+        <PressableScale
+          accessibilityLabel={confirmDelete ? 'Endgültig löschen' : 'Aufgabe löschen'}
+          onPress={() => {
+            if (!confirmDelete) {
+              setConfirmDelete(true);
+              return;
+            }
+            deleteTask.mutate(task.id);
+            onClose();
+          }}
+          style={{ alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, paddingVertical: Spacing.sm, paddingHorizontal: Spacing.md, marginTop: Spacing.xs }}
+        >
+          <Trash2 size={15} color={confirmDelete ? colors.indigo : colors.text3} strokeWidth={2} />
+          <Type variant="label" tone={confirmDelete ? 'indigo' : 'text3'}>
+            {confirmDelete ? 'Wirklich löschen? Tippe erneut.' : 'Löschen'}
+          </Type>
+        </PressableScale>
+      )}
+    </View>
+  );
+
+  const ListIcon = currentList ? listIcon(currentList.icon) : undefined;
+
   return (
-    <BottomSheet visible title={isEdit ? 'Aufgabe bearbeiten' : 'Neue Aufgabe'} onClose={onClose}>
+    <BottomSheet visible title={isEdit ? 'Aufgabe bearbeiten' : 'Neue Aufgabe'} onClose={onClose} footer={footer}>
       {/* Titel */}
       <TextInput
         value={title}
@@ -121,7 +165,7 @@ export function TaskEditorSheet({
         onSubmitEditing={save}
         accessibilityLabel="Titel"
         style={[
-          { fontSize: T.lg, color: colors.text, paddingVertical: Spacing.sm, borderBottomWidth: 1, borderColor: colors.border2, marginBottom: Spacing.md },
+          { fontSize: T.lg, color: colors.text, paddingVertical: Spacing.sm, borderBottomWidth: 1, borderColor: colors.border2 },
           webNoOutline,
         ]}
       />
@@ -134,109 +178,140 @@ export function TaskEditorSheet({
         multiline
         accessibilityLabel="Notiz"
         style={[
-          { fontSize: T.md, color: colors.text2, paddingVertical: Spacing.sm, marginBottom: Spacing.lg, minHeight: 40 },
+          { fontSize: T.md, color: colors.text2, paddingVertical: Spacing.sm, marginBottom: Spacing.sm, minHeight: 36 },
           webNoOutline,
         ]}
       />
 
-      {/* Liste */}
+      {/* Liste — nur wenn es mehr als eine gibt. */}
       {(lists?.length ?? 0) > 1 && (
-        <Section label="Liste">
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm }}>
-            {(lists ?? []).map((l) => (
-              <Chip key={l.id} label={l.name} active={listId === l.id} onPress={() => setListId(l.id)} />
-            ))}
-          </View>
-        </Section>
+        <>
+          <DetailRow
+            icon={ListIcon ?? CalendarDays}
+            iconColor={currentList?.color ?? colors.text3}
+            label="Liste"
+            value={currentList?.name ?? '—'}
+            valueTone="text2"
+            expanded={section === 'list'}
+            onPress={() => toggleSection('list')}
+          />
+          {section === 'list' && (
+            <ChipWrap>
+              {(lists ?? []).map((l) => (
+                <Chip key={l.id} label={l.name} active={listId === l.id} onPress={() => setListId(l.id)} />
+              ))}
+            </ChipWrap>
+          )}
+          <Hairline />
+        </>
       )}
 
-      {/* Datum */}
-      <Section label="Fällig">
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm }}>
-          {dateChips.map((c) => {
-            // „Heute" und „Heute Abend" schließen sich gegenseitig aus.
-            const active =
-              dueDate === c.date &&
-              (c.key === 'abend' ? dueTime === '18:00' : c.key === 'heute' ? dueTime !== '18:00' : true);
-            return (
+      {/* Fällig: Datum + Uhrzeit gemeinsam (gehören zusammen). */}
+      <DetailRow
+        icon={CalendarDays}
+        iconColor={dueDate ? colors.teal : colors.text3}
+        label="Fällig"
+        value={dueLabel}
+        valueTone={dueDate ? 'teal' : 'text3'}
+        expanded={section === 'due'}
+        onPress={() => toggleSection('due')}
+      />
+      {section === 'due' && (
+        <View style={{ gap: Spacing.md, paddingBottom: Spacing.md }}>
+          <ChipWrap>
+            {dateChips.map((c) => {
+              // „Heute" und „Heute Abend" schließen sich gegenseitig aus.
+              const active =
+                dueDate === c.date &&
+                (c.key === 'abend' ? dueTime === '18:00' : c.key === 'heute' ? dueTime !== '18:00' : true);
+              return (
+                <Chip
+                  key={c.key}
+                  label={c.label}
+                  icon={c.icon}
+                  active={active}
+                  onPress={() => {
+                    setDueDate(c.date);
+                    if (c.time !== undefined) setDueTime(c.time);
+                    setShowCalendar(false);
+                  }}
+                />
+              );
+            })}
+            <Chip label="Kalender" icon={CalendarDays} active={showCalendar} onPress={() => setShowCalendar((v) => !v)} />
+            {dueDate && (
               <Chip
-                key={c.key}
-                label={c.label}
-                icon={c.icon}
-                active={active}
+                label="Kein Datum ✕"
+                accessibilityLabel="Datum entfernen"
                 onPress={() => {
-                  setDueDate(c.date);
-                  if (c.time !== undefined) setDueTime(c.time);
+                  setDueDate(null);
+                  setDueTime(null);
+                  setRrule(null);
                   setShowCalendar(false);
                 }}
               />
-            );
-          })}
-          <Chip label="Kalender" icon={CalendarDays} active={showCalendar} onPress={() => setShowCalendar((v) => !v)} />
-          {dueDate && (
-            <Chip
-              label={`${formatDueDate(dueDate, today)} ✕`}
-              accessibilityLabel="Datum entfernen"
-              onPress={() => {
-                setDueDate(null);
-                setDueTime(null);
-                setRrule(null);
-                setShowCalendar(false);
-              }}
-            />
+            )}
+          </ChipWrap>
+          {showCalendar && (
+            <View style={{ borderRadius: R.lg, borderWidth: 1, borderColor: colors.chipBorder, backgroundColor: colors.chip, padding: Spacing.sm }}>
+              <MiniCalendar
+                selected={dueDate}
+                onSelect={(d) => {
+                  setDueDate(d);
+                  setShowCalendar(false);
+                }}
+              />
+            </View>
           )}
-        </View>
-        {showCalendar && (
-          <View style={{ borderRadius: R.lg, borderWidth: 1, borderColor: colors.chipBorder, backgroundColor: colors.chip, padding: Spacing.sm, marginTop: Spacing.xs }}>
-            <MiniCalendar
-              selected={dueDate}
-              onSelect={(d) => {
-                setDueDate(d);
-                setShowCalendar(false);
-              }}
-            />
+          <View style={{ gap: Spacing.sm }}>
+            <Type variant="caption" tone="text3">Uhrzeit</Type>
+            <ChipWrap>
+              {TIME_PRESETS.map((t) => (
+                <Chip
+                  key={t}
+                  label={t}
+                  active={dueTime === t && !customTime}
+                  onPress={() => {
+                    setCustomTime(false);
+                    setDueTime(dueTime === t ? null : t);
+                  }}
+                />
+              ))}
+              <Chip label="Eigene" active={customTime} onPress={() => setCustomTime((v) => !v)} />
+              {customTime && (
+                <TextInput
+                  value={dueTime ?? ''}
+                  onChangeText={(v) => {
+                    setDueTime(/^\d{1,2}:\d{2}$/.test(v) ? v.padStart(5, '0') : v.length === 0 ? null : v);
+                  }}
+                  placeholder={defaultDueTime}
+                  placeholderTextColor={colors.text3}
+                  keyboardType="numbers-and-punctuation"
+                  accessibilityLabel="Eigene Uhrzeit (HH:MM)"
+                  style={[
+                    { fontSize: T.md, color: colors.text, borderBottomWidth: 1, borderColor: colors.border2, minWidth: 64, paddingVertical: Spacing.xs },
+                    webNoOutline,
+                  ]}
+                />
+              )}
+            </ChipWrap>
           </View>
-        )}
-      </Section>
-
-      {/* Uhrzeit — nur sinnvoll mit Datum (setzt sonst automatisch heute). */}
-      <Section label="Uhrzeit">
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, alignItems: 'center' }}>
-          {TIME_PRESETS.map((t) => (
-            <Chip
-              key={t}
-              label={t}
-              active={dueTime === t && !customTime}
-              onPress={() => {
-                setCustomTime(false);
-                setDueTime(dueTime === t ? null : t);
-              }}
-            />
-          ))}
-          <Chip label="Eigene" active={customTime} onPress={() => setCustomTime((v) => !v)} />
-          {customTime && (
-            <TextInput
-              value={dueTime ?? ''}
-              onChangeText={(v) => {
-                // nur H:MM/HH:MM übernehmen; sonst Eingabe stehen lassen.
-                setDueTime(/^\d{1,2}:\d{2}$/.test(v) ? v.padStart(5, '0') : v.length === 0 ? null : v);
-              }}
-              placeholder={defaultDueTime}
-              placeholderTextColor={colors.text3}
-              keyboardType="numbers-and-punctuation"
-              accessibilityLabel="Eigene Uhrzeit (HH:MM)"
-              style={[
-                { fontSize: T.md, color: colors.text, borderBottomWidth: 1, borderColor: colors.border2, minWidth: 64, paddingVertical: Spacing.xs },
-                webNoOutline,
-              ]}
-            />
-          )}
         </View>
-      </Section>
+      )}
+      <Hairline />
 
       {/* Wiederholung */}
-      <Section label="Wiederholung">
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm }}>
+      <DetailRow
+        icon={Repeat}
+        iconColor={rrule ? colors.teal : colors.text3}
+        label="Wiederholung"
+        value={rrule ? RRULE_LABEL[rrule] : 'Nie'}
+        valueTone={rrule ? 'teal' : 'text3'}
+        expanded={section === 'repeat'}
+        onPress={() => toggleSection('repeat')}
+      />
+      {section === 'repeat' && (
+        <ChipWrap>
           {RRULES.map((r) => (
             <Chip
               key={r.value}
@@ -245,40 +320,80 @@ export function TaskEditorSheet({
               onPress={() => setRrule(rrule === r.value ? null : r.value)}
             />
           ))}
-        </View>
-      </Section>
-
-      {/* Flagge */}
-      <Section label="Markierung">
-        <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
-          <Chip label="Flagge" icon={Flag} active={flagged} onPress={() => setFlagged((v) => !v)} />
-        </View>
-      </Section>
-
-      <GlassButton accessibilityLabel={isEdit ? 'Änderungen sichern' : 'Aufgabe hinzufügen'} onPress={save} disabled={!canSave}>
-        <Type variant="label" style={{ color: '#FFFFFF' }}>{isEdit ? 'Sichern' : 'Hinzufügen'}</Type>
-      </GlassButton>
-
-      {/* Löschen — zweistufig (Fahrplan §4). */}
-      {isEdit && (
-        <PressableScale
-          accessibilityLabel={confirmDelete ? 'Endgültig löschen' : 'Aufgabe löschen'}
-          onPress={() => {
-            if (!confirmDelete) {
-              setConfirmDelete(true);
-              return;
-            }
-            deleteTask.mutate(task.id);
-            onClose();
-          }}
-          style={{ alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, padding: Spacing.md, marginTop: Spacing.sm }}
-        >
-          <Trash2 size={15} color={confirmDelete ? colors.indigo : colors.text3} strokeWidth={2} />
-          <Type variant="label" tone={confirmDelete ? 'indigo' : 'text3'}>
-            {confirmDelete ? 'Wirklich löschen? Tippe erneut.' : 'Löschen'}
-          </Type>
-        </PressableScale>
+        </ChipWrap>
       )}
+      <Hairline />
+
+      {/* Flagge: direkter Schalter, kein Aufklappen nötig. */}
+      <PressableScale
+        accessibilityRole="switch"
+        accessibilityState={{ checked: flagged }}
+        accessibilityLabel={flagged ? 'Flagge entfernen' : 'Flagge setzen'}
+        onPress={() => {
+          hapticSelect();
+          setFlagged((v) => !v);
+        }}
+        pressedScale={0.99}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.md }}
+      >
+        <Flag
+          size={18}
+          color={flagged ? colors.indigo : colors.text3}
+          fill={flagged ? colors.indigo : 'transparent'}
+          strokeWidth={2}
+        />
+        <Type variant="body" style={{ flex: 1 }}>Flagge</Type>
+        <Type variant="label" tone={flagged ? 'indigo' : 'text3'}>{flagged ? 'Gesetzt' : 'Aus'}</Type>
+      </PressableScale>
     </BottomSheet>
   );
+}
+
+/** Kompakte Detail-Zeile: Icon · Label · aktueller Wert · Chevron. */
+function DetailRow({
+  icon: Icon,
+  iconColor,
+  label,
+  value,
+  valueTone,
+  expanded,
+  onPress,
+}: {
+  icon: LucideIcon;
+  iconColor: string;
+  label: string;
+  value: string;
+  valueTone: 'teal' | 'text2' | 'text3';
+  expanded: boolean;
+  onPress: () => void;
+}) {
+  const colors = useColors();
+  return (
+    <PressableScale
+      accessibilityRole="button"
+      accessibilityState={{ expanded }}
+      accessibilityLabel={`${label}: ${value}`}
+      onPress={onPress}
+      pressedScale={0.99}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.md }}
+    >
+      <Icon size={18} color={iconColor} strokeWidth={2} />
+      <Type variant="body" style={{ flex: 1 }}>{label}</Type>
+      <Type variant="label" tone={valueTone} numberOfLines={1} style={{ maxWidth: 170 }}>{value}</Type>
+      {expanded ? (
+        <ChevronDown size={16} color={colors.text3} strokeWidth={2} />
+      ) : (
+        <ChevronRight size={16} color={colors.text3} strokeWidth={2} />
+      )}
+    </PressableScale>
+  );
+}
+
+function ChipWrap({ children }: { children: React.ReactNode }) {
+  return <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, paddingBottom: Spacing.sm }}>{children}</View>;
+}
+
+function Hairline() {
+  const colors = useColors();
+  return <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border }} />;
 }

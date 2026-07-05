@@ -28,11 +28,14 @@ export function BottomSheet({
   onClose,
   title,
   children,
+  footer,
 }: {
   visible: boolean;
   onClose: () => void;
   title: string;
   children: React.ReactNode;
+  /** Fixer Bereich unter dem Scroll-Inhalt (Primär-Button) — scrollt nie weg. */
+  footer?: React.ReactNode;
 }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -40,7 +43,8 @@ export function BottomSheet({
   const { height: windowHeight } = useWindowDimensions();
 
   // Sichtbarer Raum über der Tastatur; der Inhalt scrollt innerhalb davon.
-  const available = windowHeight - keyboard - insets.top - CHROME_HEIGHT - Spacing.xl;
+  const footerAllowance = footer ? 84 : 0;
+  const available = windowHeight - keyboard - insets.top - CHROME_HEIGHT - footerAllowance - Spacing.xl;
   const contentMaxHeight = Math.max(160, Math.min(520, available));
   const bottomPad = keyboard > 0 ? Spacing.md : Math.max(insets.bottom, Spacing.sm) + Spacing.lg;
 
@@ -88,6 +92,7 @@ export function BottomSheet({
             >
               {children}
             </ScrollView>
+            {footer && <View style={{ paddingTop: Spacing.md }}>{footer}</View>}
           </Glass>
         </View>
       </View>
