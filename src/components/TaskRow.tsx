@@ -36,7 +36,8 @@ export function TaskRow({
   today: string;
   /** Liste anzeigen (in Smart-Ansichten); in der Listen-Detailansicht weglassen. */
   list?: List;
-  showDue?: boolean;
+  /** 'time-only': nur Uhrzeit zeigen (Tagesgruppen — das Datum steht im Header). */
+  showDue?: boolean | 'time-only';
   onToggle: (next: boolean) => void;
   onPress: () => void;
   onReschedule?: () => void;
@@ -47,7 +48,9 @@ export function TaskRow({
   const swipeRef = useRef<SwipeableMethods>(null);
 
   const metaParts: { text: string; tone: 'indigo' | 'teal' | 'text3' }[] = [];
-  if (showDue && task.dueDate) {
+  if (showDue === 'time-only') {
+    if (task.dueTime) metaParts.push({ text: task.dueTime, tone: 'text3' });
+  } else if (showDue && task.dueDate) {
     metaParts.push({
       text: formatDueDate(task.dueDate, today) + (task.dueTime ? `, ${task.dueTime}` : ''),
       tone: done ? 'text3' : overdue ? 'indigo' : task.dueDate === today ? 'teal' : 'text3',

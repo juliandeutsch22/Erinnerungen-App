@@ -20,8 +20,8 @@ import { TaskRow } from '@/components/TaskRow';
 import { Type } from '@/components/Type';
 import { useCompleteTask, useLists, useReopenTask, useTasks } from '@/data/queries';
 import type { Task } from '@/data/types';
-import { toDateStr, todayStr } from '@/lib/dates';
-import { groupToday } from '@/lib/taskLogic';
+import { formatDayHeading, toDateStr, todayStr } from '@/lib/dates';
+import { groupToday, groupUpcomingDays } from '@/lib/taskLogic';
 import { hapticSelect } from '@/lib/haptics';
 import { TAB_BAR_SAFE_BOTTOM } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
@@ -39,6 +39,7 @@ export default function HeuteScreen() {
   const [editorTask, setEditorTask] = useState<Task | null | undefined>(undefined);
   const [rescheduleTask, setRescheduleTask] = useState<Task | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
+  const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
 
   const today = todayStr();
   const groups = useMemo(() => groupToday(tasks ?? [], today), [tasks, today]);
@@ -55,6 +56,9 @@ export default function HeuteScreen() {
   );
   const dayTotal = open + doneToday.length;
   const allDone = dayTotal > 0 && open === 0;
+
+  // Wochenvorschau: die nächsten 6 Tage, nur wenn dort etwas ansteht.
+  const upcoming = useMemo(() => groupUpcomingDays(tasks ?? [], today), [tasks, today]);
 
   const now = new Date();
   const hour = now.getHours();
@@ -195,6 +199,63 @@ export default function HeuteScreen() {
           )}
         </GlassPanel>
       </Reveal>
+
+      {/* Wochenvorschau: kommende Tage, aufklappbar — nur Tage mit Erinnerungen. */}
+      {upcoming.length > 0 && (
+        <Reveal delay={160}>
+          <GlassPanel>
+            <Type variant="eyebrow" tone="text3">Nächste Tage</Type>
+            {upcoming.map((day, i) => {
+              const expanded = expandedDays.has(day.date);
+              return (
+                <View key={day.date}>
+                  {i > 0 && <Seam marginVertical={Spacing.sm} />}
+                  <PressableScale
+                    accessibilityLabel={`${formatDayHeading(day.date, today)} ${expanded ? 'einklappen' : 'aufklappen'}`}
+                    onPress={() => {
+                      hapticSelect();
+                      setExpandedDays((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(day.date)) next.delete(day.date);
+                        else next.add(day.date);
+                        return next;
+                      });
+                    }}
+                    pressedScale={0.99}
+                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: Spacing.sm, marginTop: i === 0 ? Spacing.xs : 0 }}
+                  >
+                    <Type variant="label">{formatDayHeading(day.date, today)}</Type>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+                      <Type variant="caption" tone="text3" tabular>{day.tasks.length}</Type>
+                      {expanded ? (
+                        <ChevronDown size={16} color={colors.text3} strokeWidth={2} />
+                      ) : (
+                        <ChevronRight size={16} color={colors.text3} strokeWidth={2} />
+                      )}
+                    </View>
+                  </PressableScale>
+                  {expanded && (
+                    <View>
+                      {day.tasks.map((t) => (
+                        <TaskRow
+                          key={t.id}
+                          task={t}
+                          today={today}
+                          showDue="time-only"
+                          list={t.listId !== 'default' ? listById.get(t.listId) : undefined}
+                          onToggle={toggle(t)}
+                          onPress={() => setEditorTask(t)}
+                          onReschedule={() => setRescheduleTask(t)}
+                        />
+                      ))}
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </GlassPanel>
+        </Reveal>
+      )}
 
       {editorTask !== undefined && (
         <TaskEditorSheet task={editorTask} defaultDueDate={today} onClose={() => setEditorTask(undefined)} />

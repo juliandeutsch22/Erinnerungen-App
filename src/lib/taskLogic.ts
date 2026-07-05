@@ -68,6 +68,27 @@ export function groupToday(tasks: Task[], today: string): TodayGroups {
   };
 }
 
+export type DayGroup = { date: string; tasks: Task[] };
+
+/**
+ * Wochenvorschau (Startscreen): offene Aufgaben der nächsten `days` Tage
+ * NACH heute, gruppiert nach Tag — nur Tage, für die etwas ansteht.
+ */
+export function groupUpcomingDays(tasks: Task[], today: string, days: number = 6): DayGroup[] {
+  const horizon = addDays(today, days);
+  const byDate = new Map<string, Task[]>();
+  for (const t of tasks) {
+    if (!isOpen(t) || t.dueDate === null) continue;
+    if (t.dueDate <= today || t.dueDate > horizon) continue;
+    const arr = byDate.get(t.dueDate) ?? [];
+    arr.push(t);
+    byDate.set(t.dueDate, arr);
+  }
+  return [...byDate.entries()]
+    .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+    .map(([date, dayTasks]) => ({ date, tasks: dayTasks.sort(byTimeThenCreation) }));
+}
+
 export type PlannedGroup = { key: 'heute' | 'morgen' | 'woche' | 'spaeter'; title: string; tasks: Task[] };
 
 /** „Geplant"-Gruppierung: Heute / Morgen / Diese Woche (7 Tage) / Später. */

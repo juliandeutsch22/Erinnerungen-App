@@ -1,6 +1,6 @@
 // taskLogic.test.ts — Überfällig-Ableitung, Abhak-Semantik, Gruppierungen.
 import type { Task } from '@/data/types';
-import { groupPlanned, groupToday, isDueToday, isOverdue, recentlyCompleted, resolveCompletion } from './taskLogic';
+import { groupPlanned, groupToday, groupUpcomingDays, isDueToday, isOverdue, recentlyCompleted, resolveCompletion } from './taskLogic';
 
 const TODAY = '2026-07-03';
 
@@ -77,6 +77,25 @@ describe('recentlyCompleted', () => {
     const older = task({ id: 'b', completedAt: '2026-06-10T10:00:00.000Z' });
     const ancient = task({ id: 'c', completedAt: '2026-05-01T10:00:00.000Z' });
     expect(recentlyCompleted([older, ancient, fresh], TODAY).map((t) => t.id)).toEqual(['a', 'b']);
+  });
+});
+
+describe('groupUpcomingDays', () => {
+  it('nur kommende Tage im Fenster, gruppiert + chronologisch, Uhrzeit zuerst', () => {
+    const heute = task({ id: 'a', dueDate: TODAY });
+    const morgenSpaet = task({ id: 'b', dueDate: '2026-07-04', dueTime: '18:00' });
+    const morgenFrueh = task({ id: 'c', dueDate: '2026-07-04', dueTime: '09:00' });
+    const inDreiTagen = task({ id: 'd', dueDate: '2026-07-06' });
+    const zuWeit = task({ id: 'e', dueDate: '2026-07-15' });
+    const erledigt = task({ id: 'f', dueDate: '2026-07-04', completedAt: '2026-07-01T10:00:00.000Z' });
+    const groups = groupUpcomingDays([heute, morgenSpaet, morgenFrueh, inDreiTagen, zuWeit, erledigt], TODAY);
+    expect(groups.map((g) => g.date)).toEqual(['2026-07-04', '2026-07-06']);
+    expect(groups[0].tasks.map((t) => t.id)).toEqual(['c', 'b']);
+    expect(groups[1].tasks.map((t) => t.id)).toEqual(['d']);
+  });
+
+  it('leer ohne kommende Aufgaben', () => {
+    expect(groupUpcomingDays([task({ dueDate: TODAY }), task({})], TODAY)).toEqual([]);
   });
 });
 

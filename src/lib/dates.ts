@@ -87,6 +87,14 @@ export function formatTime(t: string): string {
 }
 
 const WEEKDAYS_SHORT = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+const WEEKDAYS_LONG = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+
+/** Tages-Überschrift der Wochenvorschau: „Morgen · 4.7." bzw. „Montag · 6.7.". */
+export function formatDayHeading(date: string, today: string): string {
+  const d = parseDateStr(date);
+  const dayLabel = date === addDays(today, 1) ? 'Morgen' : WEEKDAYS_LONG[d.getDay()];
+  return `${dayLabel} · ${d.getDate()}.${d.getMonth() + 1}.`;
+}
 
 /** Kompakte deutsche Datumsanzeige relativ zu heute: „Heute", „Morgen", „Mi 15.10.". */
 export function formatDueDate(dueDate: string, today: string): string {
