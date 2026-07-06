@@ -8,6 +8,7 @@ import { View } from 'react-native';
 
 import { CalendarMonth, type MonthAnchor, monthGridRange } from '@/components/CalendarMonth';
 import { EventEditorSheet } from '@/components/EventEditorSheet';
+import { EventRow } from '@/components/EventRow';
 import { GlassPanel } from '@/components/GlassPanel';
 import { PressableScale } from '@/components/PressableScale';
 import { RescheduleSheet } from '@/components/RescheduleSheet';
@@ -148,28 +149,15 @@ export default function KalenderScreen() {
           )}
           {granted && dayEvents.length > 0 && (
             <View style={{ marginTop: Spacing.xs }}>
-              {dayEvents.map((ev) => {
-                const cal = calendarById.get(ev.calendarId);
-                return (
-                  <PressableScale
-                    key={ev.key}
-                    accessibilityLabel={`Termin ${ev.title} bearbeiten`}
-                    onPress={() => setEditorEvent(ev)}
-                    pressedScale={0.99}
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.sm + 2 }}
-                  >
-                    {/* Farbbalken des Quell-Kalenders */}
-                    <View style={{ width: 4, alignSelf: 'stretch', borderRadius: R.pill, backgroundColor: cal?.color ?? colors.indigo }} />
-                    <View style={{ flex: 1, gap: 1 }}>
-                      <Type variant="body" numberOfLines={2}>{ev.title}</Type>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
-                        <Type variant="caption" tone="text3">{eventTimeLabel(ev, selected)}</Type>
-                        {cal && <Type variant="caption" tone="text3" numberOfLines={1}>{cal.title}</Type>}
-                      </View>
-                    </View>
-                  </PressableScale>
-                );
-              })}
+              {dayEvents.map((ev) => (
+                <EventRow
+                  key={ev.key}
+                  event={ev}
+                  calendar={calendarById.get(ev.calendarId)}
+                  day={selected}
+                  onPress={() => setEditorEvent(ev)}
+                />
+              ))}
             </View>
           )}
 

@@ -35,6 +35,14 @@ function mod(): typeof import('expo-calendar') {
   return require('expo-calendar') as typeof import('expo-calendar');
 }
 
+/** Nur prüfen, nie fragen — fürs Dashboard (der Prompt gehört in den Kalender-Tab). */
+export async function hasCalendarPermission(): Promise<boolean> {
+  if (!deviceCalendarAvailable) return false;
+  const Calendar = mod();
+  const current = await Calendar.getCalendarPermissions();
+  return current.granted;
+}
+
 export async function ensureCalendarPermission(): Promise<boolean> {
   if (!deviceCalendarAvailable) return false;
   const Calendar = mod();

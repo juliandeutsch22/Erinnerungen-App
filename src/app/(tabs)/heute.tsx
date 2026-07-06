@@ -4,9 +4,11 @@
 // einklappbare „Erledigt heute"-Sektion. Abhaken = Teal-Puls + Haptik.
 import { useRouter } from 'expo-router';
 import { ChevronDown, ChevronRight, Plus, Settings, Sun } from 'lucide-react-native';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 
+import { EventEditorSheet } from '@/components/EventEditorSheet';
+import { EventRow } from '@/components/EventRow';
 import { GlassPanel } from '@/components/GlassPanel';
 import { PressableScale } from '@/components/PressableScale';
 import { QuickAdd } from '@/components/QuickAdd';
@@ -18,9 +20,12 @@ import { EmptyState, LoadingState } from '@/components/StateView';
 import { TaskEditorSheet } from '@/components/TaskEditorSheet';
 import { TaskRow } from '@/components/TaskRow';
 import { Type } from '@/components/Type';
+import { useDeviceCalendars, useDeviceEvents } from '@/data/calendarQueries';
 import { useCompleteTask, useLists, useReopenTask, useTasks } from '@/data/queries';
 import type { Task } from '@/data/types';
-import { formatDayHeading, toDateStr, todayStr } from '@/lib/dates';
+import { bucketEventsByDay } from '@/lib/calendarLogic';
+import { addDays, formatDayHeading, toDateStr, todayStr } from '@/lib/dates';
+import { type DeviceEvent, hasCalendarPermission } from '@/lib/deviceCalendar';
 import { groupToday, groupUpcomingDays } from '@/lib/taskLogic';
 import { hapticSelect } from '@/lib/haptics';
 import { TAB_BAR_SAFE_BOTTOM } from '@/theme/layout';
@@ -38,8 +43,16 @@ export default function HeuteScreen() {
   // undefined = Editor zu, null = neue Aufgabe, Task = bearbeiten.
   const [editorTask, setEditorTask] = useState<Task | null | undefined>(undefined);
   const [rescheduleTask, setRescheduleTask] = useState<Task | null>(null);
+  const [editorEvent, setEditorEvent] = useState<DeviceEvent | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
+
+  // Termine erscheinen nur, wenn der Kalender-Zugriff schon gewährt wurde —
+  // der Permission-Prompt selbst gehört in den Kalender-Tab.
+  const [calGranted, setCalGranted] = useState(false);
+  useEffect(() => {
+    void hasCalendarPermission().then(setCalGranted);
+  }, []);
 
   const today = todayStr();
   const groups = useMemo(() => groupToday(tasks ?? [], today), [tasks, today]);
@@ -57,21 +70,45 @@ export default function HeuteScreen() {
   const dayTotal = open + doneToday.length;
   const allDone = dayTotal > 0 && open === 0;
 
-  // Wochenvorschau: die nächsten 6 Tage, nur wenn dort etwas ansteht.
-  const upcoming = useMemo(() => groupUpcomingDays(tasks ?? [], today), [tasks, today]);
+  // Termine (heute + nächste 6 Tage) aus dem Gerätekalender.
+  const horizon = addDays(today, 6);
+  const { data: calendars } = useDeviceCalendars(calGranted);
+  const { data: events } = useDeviceEvents(today, horizon, calGranted);
+  const calendarById = useMemo(() => new Map((calendars ?? []).map((c) => [c.id, c])), [calendars]);
+  const eventsByDay = useMemo(() => bucketEventsByDay(events ?? [], today, horizon), [events, today, horizon]);
+  const todayEvents = eventsByDay.get(today) ?? [];
+
+  // Wochenvorschau: die nächsten 6 Tage — Erinnerungen + Termine vereint,
+  // nur Tage, an denen etwas ansteht.
+  const upcoming = useMemo(() => {
+    const taskGroups = new Map(groupUpcomingDays(tasks ?? [], today).map((g) => [g.date, g.tasks]));
+    const dates = new Set<string>(taskGroups.keys());
+    for (const day of eventsByDay.keys()) {
+      if (day > today) dates.add(day);
+    }
+    return [...dates].sort().map((date) => ({
+      date,
+      tasks: taskGroups.get(date) ?? [],
+      events: eventsByDay.get(date) ?? [],
+    }));
+  }, [tasks, today, eventsByDay]);
 
   const now = new Date();
   const hour = now.getHours();
   const greeting = hour < 5 ? 'Gute Nacht' : hour < 11 ? 'Guten Morgen' : hour < 18 ? 'Guten Tag' : 'Guten Abend';
   const dateLine = now.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
 
-  // Ruhige Tages-Bilanz unter der Begrüßung.
+  // Ruhige Tages-Bilanz unter der Begrüßung (inkl. Termine).
+  const eventSuffix =
+    todayEvents.length > 0 ? ` · ${todayEvents.length} ${todayEvents.length === 1 ? 'Termin' : 'Termine'}` : '';
   const summary =
-    dayTotal === 0
-      ? 'Nichts geplant für heute.'
+    (dayTotal === 0
+      ? todayEvents.length > 0
+        ? 'Keine Erinnerungen'
+        : 'Nichts geplant für heute.'
       : allDone
         ? 'Alles für heute erledigt.'
-        : `${open} offen${doneToday.length > 0 ? ` · ${doneToday.length} erledigt` : ''}`;
+        : `${open} offen${doneToday.length > 0 ? ` · ${doneToday.length} erledigt` : ''}`) + eventSuffix;
 
   const toggle = (task: Task) => (next: boolean) => {
     if (next) complete.mutate(task);
@@ -137,14 +174,36 @@ export default function HeuteScreen() {
             </View>
           )}
 
+          {/* Termine des Tages — aus allen iOS-Kalendern (inkl. Google). */}
+          {todayEvents.length > 0 && (
+            <>
+              <Type variant="eyebrow" tone="text3">Termine</Type>
+              <View style={{ marginTop: Spacing.xs }}>
+                {todayEvents.map((ev) => (
+                  <EventRow
+                    key={ev.key}
+                    event={ev}
+                    calendar={calendarById.get(ev.calendarId)}
+                    day={today}
+                    showCalendarName={false}
+                    onPress={() => setEditorEvent(ev)}
+                  />
+                ))}
+              </View>
+              {dayTotal > 0 && <Seam marginVertical={Spacing.md} />}
+            </>
+          )}
+
           {isLoading && dayTotal === 0 ? (
             <LoadingState />
           ) : dayTotal === 0 ? (
-            <EmptyState
-              icon={<Sun size={20} color={colors.teal} strokeWidth={2} />}
-              title="Nichts für heute"
-              body="Kopf frei. Neues landet unten in der Eingabezeile — oder du genießt die Ruhe."
-            />
+            todayEvents.length === 0 ? (
+              <EmptyState
+                icon={<Sun size={20} color={colors.teal} strokeWidth={2} />}
+                title="Nichts für heute"
+                body="Kopf frei. Neues landet unten in der Eingabezeile — oder du genießt die Ruhe."
+              />
+            ) : null
           ) : (
             <>
               {allDone && (
@@ -207,6 +266,7 @@ export default function HeuteScreen() {
             <Type variant="eyebrow" tone="text3">Nächste Tage</Type>
             {upcoming.map((day, i) => {
               const expanded = expandedDays.has(day.date);
+              const count = day.tasks.length + day.events.length;
               return (
                 <View key={day.date}>
                   {i > 0 && <Seam marginVertical={Spacing.sm} />}
@@ -226,7 +286,7 @@ export default function HeuteScreen() {
                   >
                     <Type variant="label">{formatDayHeading(day.date, today)}</Type>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
-                      <Type variant="caption" tone="text3" tabular>{day.tasks.length}</Type>
+                      <Type variant="caption" tone="text3" tabular>{count}</Type>
                       {expanded ? (
                         <ChevronDown size={16} color={colors.text3} strokeWidth={2} />
                       ) : (
@@ -236,6 +296,16 @@ export default function HeuteScreen() {
                   </PressableScale>
                   {expanded && (
                     <View>
+                      {day.events.map((ev) => (
+                        <EventRow
+                          key={ev.key}
+                          event={ev}
+                          calendar={calendarById.get(ev.calendarId)}
+                          day={day.date}
+                          showCalendarName={false}
+                          onPress={() => setEditorEvent(ev)}
+                        />
+                      ))}
                       {day.tasks.map((t) => (
                         <TaskRow
                           key={t.id}
@@ -261,6 +331,9 @@ export default function HeuteScreen() {
         <TaskEditorSheet task={editorTask} defaultDueDate={today} onClose={() => setEditorTask(undefined)} />
       )}
       {rescheduleTask && <RescheduleSheet task={rescheduleTask} onClose={() => setRescheduleTask(null)} />}
+      {editorEvent && (
+        <EventEditorSheet event={editorEvent} defaultDate={today} calendars={calendars ?? []} onClose={() => setEditorEvent(null)} />
+      )}
     </Screen>
 
     {/* Quick-Add klebt über der Tab-Bar — Gedanke rein, Kopf frei (§1). */}
