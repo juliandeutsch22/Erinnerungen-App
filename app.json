@@ -41,7 +41,13 @@
         }
       ],
       "expo-sqlite",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Erinnerungen zeigt deine Kalender-Termine neben deinen Aufgaben an — alles bleibt auf dem Gerät."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

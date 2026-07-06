@@ -1,0 +1,221 @@
+// kalender.tsx — Kalender-Tab: Monatsansicht + Tages-Agenda. Zeigt Termine
+// ALLER in iOS eingerichteten Kalender (iCloud, Google, Outlook, … via
+// EventKit) UND die eigenen Erinnerungen des Tages. Termine lassen sich
+// anlegen, bearbeiten und löschen; Erinnerungen öffnen ihren Editor.
+import { CalendarPlus, Sun } from 'lucide-react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { View } from 'react-native';
+
+import { CalendarMonth, type MonthAnchor, monthGridRange } from '@/components/CalendarMonth';
+import { EventEditorSheet } from '@/components/EventEditorSheet';
+import { GlassPanel } from '@/components/GlassPanel';
+import { PressableScale } from '@/components/PressableScale';
+import { RescheduleSheet } from '@/components/RescheduleSheet';
+import { Reveal } from '@/components/Reveal';
+import { Screen } from '@/components/Screen';
+import { Seam } from '@/components/Seam';
+import { EmptyState, LoadingState } from '@/components/StateView';
+import { TaskEditorSheet } from '@/components/TaskEditorSheet';
+import { TaskRow } from '@/components/TaskRow';
+import { Type } from '@/components/Type';
+import { useDeviceCalendars, useDeviceEvents } from '@/data/calendarQueries';
+import { useCompleteTask, useLists, useReopenTask, useTasks } from '@/data/queries';
+import type { Task } from '@/data/types';
+import { bucketEventsByDay, eventTimeLabel } from '@/lib/calendarLogic';
+import { formatDayHeading, parseDateStr, todayStr } from '@/lib/dates';
+import { deviceCalendarAvailable, type DeviceEvent, ensureCalendarPermission } from '@/lib/deviceCalendar';
+import { byTimeThenCreation, isOpen } from '@/lib/taskLogic';
+import { useColors } from '@/theme/ThemeProvider';
+import { R, Spacing } from '@/theme/theme.tokens';
+
+type Permission = 'unknown' | 'granted' | 'denied';
+
+export default function KalenderScreen() {
+  const colors = useColors();
+  const today = todayStr();
+  const t = parseDateStr(today);
+
+  const [permission, setPermission] = useState<Permission>(deviceCalendarAvailable ? 'unknown' : 'denied');
+  const [anchor, setAnchor] = useState<MonthAnchor>({ year: t.getFullYear(), month: t.getMonth() });
+  const [selected, setSelected] = useState(today);
+  const [editorEvent, setEditorEvent] = useState<DeviceEvent | null | undefined>(undefined);
+  const [editorTask, setEditorTask] = useState<Task | null>(null);
+  const [rescheduleTask, setRescheduleTask] = useState<Task | null>(null);
+
+  useEffect(() => {
+    if (!deviceCalendarAvailable) return;
+    void ensureCalendarPermission().then((granted) => setPermission(granted ? 'granted' : 'denied'));
+  }, []);
+
+  const granted = permission === 'granted';
+  const { from, to } = monthGridRange(anchor);
+  const { data: calendars } = useDeviceCalendars(granted);
+  const { data: events, isLoading: eventsLoading } = useDeviceEvents(from, to, granted);
+  const { data: tasks } = useTasks();
+  const { data: lists } = useLists();
+  const complete = useCompleteTask();
+  const reopen = useReopenTask();
+
+  const listById = useMemo(() => new Map((lists ?? []).map((l) => [l.id, l])), [lists]);
+  const calendarById = useMemo(() => new Map((calendars ?? []).map((c) => [c.id, c])), [calendars]);
+
+  // Tages-Buckets für Marker + Agenda.
+  const eventsByDay = useMemo(() => bucketEventsByDay(events ?? [], from, to), [events, from, to]);
+  const openTaskDays = useMemo(() => {
+    const set = new Map<string, Task[]>();
+    for (const task of tasks ?? []) {
+      if (!isOpen(task) || !task.dueDate) continue;
+      if (task.dueDate < from || task.dueDate > to) continue;
+      const arr = set.get(task.dueDate) ?? [];
+      arr.push(task);
+      set.set(task.dueDate, arr);
+    }
+    return set;
+  }, [tasks, from, to]);
+
+  const markers = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const [day, dayEvents] of eventsByDay) {
+      const colorsForDay: string[] = [];
+      for (const ev of dayEvents) {
+        const c = calendarById.get(ev.calendarId)?.color ?? colors.indigo;
+        if (!colorsForDay.includes(c)) colorsForDay.push(c);
+      }
+      map.set(day, colorsForDay);
+    }
+    // Erinnerungen als Teal-Punkt (vorn — die eigene App zuerst).
+    for (const day of openTaskDays.keys()) {
+      map.set(day, [colors.teal, ...(map.get(day) ?? [])]);
+    }
+    return map;
+  }, [eventsByDay, openTaskDays, calendarById, colors.teal, colors.indigo]);
+
+  const dayEvents = eventsByDay.get(selected) ?? [];
+  const dayTasks = useMemo(
+    () => (openTaskDays.get(selected) ?? []).slice().sort(byTimeThenCreation),
+    [openTaskDays, selected],
+  );
+
+  const toggle = (task: Task) => (next: boolean) => {
+    if (next) complete.mutate(task);
+    else reopen.mutate(task.id);
+  };
+
+  const writableExists = (calendars ?? []).some((c) => c.allowsModifications);
+
+  return (
+    <Screen>
+      <Reveal>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+          <Type variant="title">Kalender</Type>
+          {granted && writableExists && (
+            <PressableScale
+              accessibilityLabel="Neuer Termin"
+              onPress={() => setEditorEvent(null)}
+              style={{ padding: Spacing.sm }}
+            >
+              <CalendarPlus size={22} color={colors.teal} strokeWidth={2.2} />
+            </PressableScale>
+          )}
+        </View>
+      </Reveal>
+
+      <Reveal delay={80}>
+        <GlassPanel>
+          <CalendarMonth anchor={anchor} onAnchorChange={setAnchor} selected={selected} onSelect={setSelected} markers={markers} />
+        </GlassPanel>
+      </Reveal>
+
+      <Reveal delay={140}>
+        <GlassPanel>
+          <Type variant="eyebrow" tone="text3">{formatDayHeading(selected, today)}</Type>
+
+          {/* Termine des Tages */}
+          {permission === 'denied' && deviceCalendarAvailable && (
+            <EmptyState
+              title="Kein Kalenderzugriff"
+              body="Erlaube den Zugriff unter iOS-Einstellungen → Erinnerungen → Kalender, dann erscheinen deine Termine hier."
+            />
+          )}
+          {!deviceCalendarAvailable && (
+            <Type variant="caption" tone="text3" style={{ marginTop: Spacing.xs }}>
+              Gerätekalender sind nur in der App auf dem iPhone verfügbar.
+            </Type>
+          )}
+          {granted && eventsLoading && dayEvents.length === 0 && <LoadingState label="Termine werden geladen…" />}
+          {granted && !eventsLoading && dayEvents.length === 0 && dayTasks.length === 0 && (
+            <EmptyState icon={<Sun size={20} color={colors.teal} strokeWidth={2} />} body="Nichts geplant an diesem Tag." />
+          )}
+          {granted && dayEvents.length > 0 && (
+            <View style={{ marginTop: Spacing.xs }}>
+              {dayEvents.map((ev) => {
+                const cal = calendarById.get(ev.calendarId);
+                return (
+                  <PressableScale
+                    key={ev.key}
+                    accessibilityLabel={`Termin ${ev.title} bearbeiten`}
+                    onPress={() => setEditorEvent(ev)}
+                    pressedScale={0.99}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.sm + 2 }}
+                  >
+                    {/* Farbbalken des Quell-Kalenders */}
+                    <View style={{ width: 4, alignSelf: 'stretch', borderRadius: R.pill, backgroundColor: cal?.color ?? colors.indigo }} />
+                    <View style={{ flex: 1, gap: 1 }}>
+                      <Type variant="body" numberOfLines={2}>{ev.title}</Type>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+                        <Type variant="caption" tone="text3">{eventTimeLabel(ev, selected)}</Type>
+                        {cal && <Type variant="caption" tone="text3" numberOfLines={1}>{cal.title}</Type>}
+                      </View>
+                    </View>
+                  </PressableScale>
+                );
+              })}
+            </View>
+          )}
+
+          {/* Erinnerungen des Tages */}
+          {dayTasks.length > 0 && (
+            <>
+              {(dayEvents.length > 0 || permission === 'denied') && <Seam marginVertical={Spacing.md} />}
+              <Type variant="eyebrow" tone="teal">Erinnerungen</Type>
+              <View style={{ marginTop: Spacing.xs }}>
+                {dayTasks.map((task) => (
+                  <TaskRow
+                    key={task.id}
+                    task={task}
+                    today={today}
+                    showDue="time-only"
+                    list={task.listId !== 'default' ? listById.get(task.listId) : undefined}
+                    onToggle={toggle(task)}
+                    onPress={() => setEditorTask(task)}
+                    onReschedule={() => setRescheduleTask(task)}
+                  />
+                ))}
+              </View>
+            </>
+          )}
+        </GlassPanel>
+      </Reveal>
+
+      {granted && (
+        <Reveal delay={200}>
+          <Type variant="caption" tone="text3" style={{ textAlign: 'center' }}>
+            Google-, Outlook- oder andere Kalender? In den iOS-Einstellungen unter Apps → Kalender →
+            Accounts hinzufügen — sie erscheinen hier automatisch.
+          </Type>
+        </Reveal>
+      )}
+
+      {editorEvent !== undefined && (
+        <EventEditorSheet
+          event={editorEvent}
+          defaultDate={selected}
+          calendars={calendars ?? []}
+          onClose={() => setEditorEvent(undefined)}
+        />
+      )}
+      {editorTask && <TaskEditorSheet task={editorTask} onClose={() => setEditorTask(null)} />}
+      {rescheduleTask && <RescheduleSheet task={rescheduleTask} onClose={() => setRescheduleTask(null)} />}
+    </Screen>
+  );
+}
