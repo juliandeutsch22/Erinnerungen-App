@@ -91,14 +91,19 @@ export function BottomSheet({
     })
     .onEnd((e) => {
       if (translateY.value > DISMISS_DISTANCE || (translateY.value > 4 && e.velocityY > DISMISS_VELOCITY)) {
-        translateY.value = withTiming(windowHeight, { duration: 180 });
         runOnJS(hapticSelect)();
-        runOnJS(close)();
+        
+        // NEU: close() wird erst aufgerufen, wenn die Animation zu 100% fertig ist
+        translateY.value = withTiming(windowHeight, { duration: 180 }, (finished) => {
+          if (finished) {
+            runOnJS(close)();
+          }
+        });
       } else {
         translateY.value = withSpring(0, springConfig('snappy'));
       }
     });
-
+  
   const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: translateY.value }] }));
   const backdropStyle = useAnimatedStyle(() => {
     const fade = Math.max(0, 1 - translateY.value / (DISMISS_DISTANCE * 2.4));
