@@ -3,7 +3,7 @@
 // Detail-Zeilen (Liste / Fällig / Wiederholung / Flagge) mit aktuellem Wert,
 // die erst beim Antippen ihre Chips aufklappen — keine Chip-Wand. Der
 // Primär-Button sitzt fest im Sheet-Footer. Löschen zweistufig.
-import { CalendarDays, ChevronDown, ChevronRight, Flag, type LucideIcon, Moon, Repeat, Sun, Trash2 } from 'lucide-react-native';
+import { CalendarDays, ChevronDown, ChevronRight, Flag, ListChecks, type LucideIcon, Moon, Plus, Repeat, Sun, Tag as TagIcon, Trash2, X } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
@@ -13,11 +13,14 @@ import { GlassButton } from '@/components/GlassButton';
 import { listIcon } from '@/components/listMeta';
 import { MiniCalendar } from '@/components/MiniCalendar';
 import { PressableScale } from '@/components/PressableScale';
+import { TaskCheck } from '@/components/TaskCheck';
 import { TimeField } from '@/components/TimeField';
 import { Type } from '@/components/Type';
-import { useCreateTask, useDeleteTask, useLists, useUpdateTask } from '@/data/queries';
-import type { Rrule, Task } from '@/data/types';
+import { useCreateTask, useDeleteTask, useLists, useTasks, useUpdateTask } from '@/data/queries';
+import type { Rrule, Subtask, Task } from '@/data/types';
+import { newId, normalizeTag } from '@/data/types';
 import { addDays, formatDueDate, nextWeekend, todayStr } from '@/lib/dates';
+import { tagCounts } from '@/lib/taskFilters';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { webNoOutline } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
@@ -69,6 +72,10 @@ export function TaskEditorSheet({
   const [dueTime, setDueTime] = useState<string | null>(task?.dueTime ?? null);
   const [rrule, setRrule] = useState<Rrule | null>(task?.rrule ?? null);
   const [flagged, setFlagged] = useState(task?.flagged ?? false);
+  const [tags, setTags] = useState<string[]>(task?.tags ?? []);
+  const [tagDraft, setTagDraft] = useState('');
+  const [subtasks, setSubtasks] = useState<Subtask[]>(task?.subtasks ?? []);
+  const [subDraft, setSubDraft] = useState('');
   const [showCalendar, setShowCalendar] = useState(false);
   const [customTime, setCustomTime] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -100,12 +107,34 @@ export function TaskEditorSheet({
 
   const dueLabel = dueDate ? formatDueDate(dueDate, today) + (dueTime ? `, ${dueTime}` : '') : 'Kein Datum';
 
+  // Tag-Vorschläge aus dem Bestand (die noch nicht gewählt sind).
+  const { data: allTasks } = useTasks();
+  const suggestions = useMemo(
+    () => tagCounts(allTasks ?? []).map((t) => t.tag).filter((t) => !tags.includes(t)).slice(0, 6),
+    [allTasks, tags],
+  );
+
+  const addTag = (raw: string) => {
+    const tag = normalizeTag(raw);
+    if (tag && !tags.includes(tag)) setTags((prev) => [...prev, tag]);
+    setTagDraft('');
+  };
+  const addSubtask = (raw: string) => {
+    const t = raw.trim();
+    if (!t) return;
+    setSubtasks((prev) => [...prev, { id: newId(), title: t, done: false }]);
+    setSubDraft('');
+  };
+
   const save = () => {
     if (!canSave) return;
     // Nur gültige Uhrzeiten übernehmen — halbe Eingaben („9:3", Text) verfallen.
     const validTime = dueTime && /^\d{2}:\d{2}$/.test(dueTime) ? dueTime : null;
     // Uhrzeit ohne Datum → heute; Wiederholung braucht ein Datum.
     const finalDate = dueDate ?? (validTime || rrule ? today : null);
+    // Offener Entwurf im Eingabefeld nicht verschlucken.
+    const finalTags = tagDraft.trim() ? [...tags, normalizeTag(tagDraft)].filter((v, i, a) => v && a.indexOf(v) === i) : tags;
+    const finalSubs = subDraft.trim() ? [...subtasks, { id: newId(), title: subDraft.trim(), done: false }] : subtasks;
     const payload = {
       title: title.trim(),
       note: note.trim() ? note.trim() : null,
@@ -114,6 +143,8 @@ export function TaskEditorSheet({
       dueTime: finalDate ? validTime : null,
       rrule: finalDate ? rrule : null,
       flagged,
+      tags: finalTags,
+      subtasks: finalSubs,
     };
     if (isEdit) {
       updateTask.mutate({ id: task.id, patch: payload });
@@ -183,6 +214,49 @@ export function TaskEditorSheet({
           webNoOutline,
         ]}
       />
+
+      {/* Unteraufgaben — Checkliste innerhalb der Aufgabe. */}
+      <View style={{ gap: Spacing.xs, marginBottom: Spacing.sm }}>
+        {subtasks.map((s) => (
+          <View key={s.id} style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+            <TaskCheck
+              checked={s.done}
+              accessibilityLabel={`${s.title} ${s.done ? 'wieder öffnen' : 'erledigen'}`}
+              onToggle={(next) => setSubtasks((prev) => prev.map((x) => (x.id === s.id ? { ...x, done: next } : x)))}
+            />
+            <Type variant="body" tone={s.done ? 'text3' : 'text'} style={{ flex: 1, textDecorationLine: s.done ? 'line-through' : 'none' }}>
+              {s.title}
+            </Type>
+            <PressableScale
+              accessibilityLabel={`Schritt „${s.title}" entfernen`}
+              onPress={() => setSubtasks((prev) => prev.filter((x) => x.id !== s.id))}
+              style={{ padding: Spacing.xs }}
+            >
+              <X size={15} color={colors.text3} strokeWidth={2} />
+            </PressableScale>
+          </View>
+        ))}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+          <ListChecks size={18} color={colors.text3} strokeWidth={2} />
+          <TextInput
+            value={subDraft}
+            onChangeText={setSubDraft}
+            placeholder="Schritt hinzufügen"
+            placeholderTextColor={colors.text3}
+            returnKeyType="done"
+            blurOnSubmit={false}
+            onSubmitEditing={() => addSubtask(subDraft)}
+            accessibilityLabel="Schritt hinzufügen"
+            style={[{ flex: 1, fontSize: T.md, color: colors.text, paddingVertical: Spacing.xs }, webNoOutline]}
+          />
+          {subDraft.trim().length > 0 && (
+            <PressableScale accessibilityLabel="Schritt übernehmen" onPress={() => addSubtask(subDraft)} style={{ padding: Spacing.xs }}>
+              <Plus size={18} color={colors.teal} strokeWidth={2.4} />
+            </PressableScale>
+          )}
+        </View>
+      </View>
+      <Hairline />
 
       {/* Liste — nur wenn es mehr als eine gibt. */}
       {(lists?.length ?? 0) > 1 && (
@@ -344,6 +418,36 @@ export function TaskEditorSheet({
         <Type variant="body" style={{ flex: 1 }}>Flagge</Type>
         <Type variant="label" tone={flagged ? 'indigo' : 'text3'}>{flagged ? 'Gesetzt' : 'Aus'}</Type>
       </PressableScale>
+      <Hairline />
+
+      {/* Tags — kontextübergreifend, per Eingabe + Vorschläge. */}
+      <View style={{ gap: Spacing.sm, paddingTop: Spacing.md }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md }}>
+          <TagIcon size={18} color={colors.text3} strokeWidth={2} />
+          <TextInput
+            value={tagDraft}
+            onChangeText={(v) => setTagDraft(v.replace(/\s/g, ''))}
+            placeholder="Tag hinzufügen"
+            placeholderTextColor={colors.text3}
+            autoCapitalize="none"
+            returnKeyType="done"
+            blurOnSubmit={false}
+            onSubmitEditing={() => addTag(tagDraft)}
+            accessibilityLabel="Tag hinzufügen"
+            style={[{ flex: 1, fontSize: T.md, color: colors.text, paddingVertical: Spacing.xs }, webNoOutline]}
+          />
+        </View>
+        {(tags.length > 0 || suggestions.length > 0) && (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm }}>
+            {tags.map((t) => (
+              <Chip key={t} label={`#${t} ✕`} active accessibilityLabel={`Tag ${t} entfernen`} onPress={() => setTags((prev) => prev.filter((x) => x !== t))} />
+            ))}
+            {suggestions.map((t) => (
+              <Chip key={t} label={`#${t}`} accessibilityLabel={`Tag ${t} hinzufügen`} onPress={() => addTag(t)} />
+            ))}
+          </View>
+        )}
+      </View>
     </BottomSheet>
   );
 }

@@ -2,7 +2,7 @@
 // Long-Press = bearbeiten; „+ Neue Liste" als gestrichelte Geister-Karte.
 // Darüber die Smart-Ansichten Geplant / Alle (Fahrplan §3.3).
 import { useRouter } from 'expo-router';
-import { CalendarDays, Layers, Plus } from 'lucide-react-native';
+import { CalendarDays, Filter as FilterIcon, Layers, Plus, SlidersHorizontal } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { View } from 'react-native';
 
@@ -12,11 +12,15 @@ import { listIcon } from '@/components/listMeta';
 import { PressableScale } from '@/components/PressableScale';
 import { Reveal } from '@/components/Reveal';
 import { Screen } from '@/components/Screen';
+import { Seam } from '@/components/Seam';
 import { Type } from '@/components/Type';
 import { useLists, useTasks } from '@/data/queries';
 import type { List } from '@/data/types';
+import { applyFilter } from '@/lib/taskFilters';
+import { todayStr } from '@/lib/dates';
 import { isOpen } from '@/lib/taskLogic';
 import { hapticSelect } from '@/lib/haptics';
+import { useSettings } from '@/theme/settings.store';
 import { useColors } from '@/theme/ThemeProvider';
 import { R, Shadow, Spacing } from '@/theme/theme.tokens';
 
@@ -28,6 +32,8 @@ export default function ListenScreen() {
 
   // undefined = Sheet zu, null = neue Liste, List = bearbeiten.
   const [editorList, setEditorList] = useState<List | null | undefined>(undefined);
+  const savedFilters = useSettings((s) => s.savedFilters);
+  const today = todayStr();
 
   const openByList = useMemo(() => {
     const map = new Map<string, number>();
@@ -60,6 +66,38 @@ export default function ListenScreen() {
             icon={<Layers size={20} color={colors.indigo} strokeWidth={2} />}
             onPress={() => router.push('/liste/alle')}
           />
+        </View>
+      </Reveal>
+
+      {/* Filter — gespeicherte Smart-Ansichten + neuer Filter. */}
+      <Reveal delay={90}>
+        <View style={{ gap: Spacing.sm }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Type variant="eyebrow" tone="text3">Filter</Type>
+            <PressableScale accessibilityLabel="Neuer Filter" onPress={() => router.push('/filter')} style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, padding: Spacing.xs }}>
+              <SlidersHorizontal size={14} color={colors.teal} strokeWidth={2} />
+              <Type variant="label" tone="teal">Neuer Filter</Type>
+            </PressableScale>
+          </View>
+          {savedFilters.length > 0 && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm }}>
+              {savedFilters.map((f) => {
+                const count = applyFilter(tasks ?? [], f, today).length;
+                return (
+                  <PressableScale
+                    key={f.id}
+                    accessibilityLabel={`Filter ${f.name} öffnen`}
+                    onPress={() => router.push(`/filter?id=${f.id}`)}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, paddingVertical: Spacing.sm, paddingHorizontal: Spacing.md, borderRadius: R.pill, backgroundColor: colors.chip, borderWidth: 1, borderColor: colors.chipBorder }}
+                  >
+                    <FilterIcon size={13} color={colors.teal} strokeWidth={2} />
+                    <Type variant="label">{f.name}</Type>
+                    <Type variant="caption" tone="text3" tabular>{count}</Type>
+                  </PressableScale>
+                );
+              })}
+            </View>
+          )}
         </View>
       </Reveal>
 

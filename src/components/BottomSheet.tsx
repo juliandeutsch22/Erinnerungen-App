@@ -12,7 +12,7 @@
 import { X } from 'lucide-react-native';
 import React from 'react';
 import { Keyboard, Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -108,6 +108,7 @@ export function BottomSheet({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
+      <GestureHandlerRootView style={{ flex: 1 }}>
       {/* Backdrop dimmt (mit der Zieh-Distanz) und schließt beim Tap. */}
       <Animated.View style={[StyleSheet.absoluteFill, backdropStyle]} pointerEvents="box-none">
         <Pressable accessibilityLabel="Schließen" onPress={close} style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.4)' }]} />
@@ -148,6 +149,7 @@ export function BottomSheet({
           </Animated.View>
         </View>
       </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 }

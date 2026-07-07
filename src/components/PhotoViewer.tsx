@@ -3,7 +3,7 @@
 import { Trash2, X } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -56,6 +56,7 @@ export function PhotoViewer({
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <GestureHandlerRootView style={{ flex: 1 }}>
       <Animated.View style={[{ flex: 1, backgroundColor: '#000' }, bgStyle]}>
         <GestureDetector gesture={swipeDown}>
           <Animated.View style={[{ flex: 1 }, contentStyle]}>
@@ -127,6 +128,7 @@ export function PhotoViewer({
           </PressableScale>
         )}
       </Animated.View>
+      </GestureHandlerRootView>
     </Modal>
   );
 }

@@ -2,6 +2,7 @@
 // „Milch morgen", „Miete am 1. jeden monat", „Anruf mo 9:00" → Datum/Uhrzeit/
 // Wiederholung werden erkannt und aus dem Titel entfernt. Reine Funktion, testbar.
 import type { Rrule } from '@/data/types';
+import { normalizeTag } from '@/data/types';
 import { addDays, parseDateStr, toDateStr } from '@/lib/dates';
 
 export type QuickAddResult = {
@@ -9,6 +10,7 @@ export type QuickAddResult = {
   dueDate: string | null;
   dueTime: string | null;
   rrule: Rrule | null;
+  tags: string[];
 };
 
 const WEEKDAYS: Record<string, number> = {
@@ -59,6 +61,7 @@ export function parseQuickAdd(input: string, today: string): QuickAddResult {
   let dueDate: string | null = null;
   let dueTime: string | null = null;
   let rrule: Rrule | null = null;
+  const tags: string[] = [];
 
   const strip = (re: RegExp, onMatch: (m: RegExpMatchArray) => void): void => {
     const m = text.match(re);
@@ -67,6 +70,13 @@ export function parseQuickAdd(input: string, today: string): QuickAddResult {
       text = text.replace(re, ' ');
     }
   };
+
+  // 0. Tags: #arbeit, #privat … (überall im Text, aus dem Titel entfernt).
+  text = text.replace(/(?<=\s)#([\p{L}\d][\p{L}\d_-]*)/gu, (_full, raw: string) => {
+    const tag = normalizeTag(raw);
+    if (tag && !tags.includes(tag)) tags.push(tag);
+    return ' ';
+  });
 
   // 1. Wiederholung (vor Wochentag/Datum, weil „jeden montag" beides enthält).
   strip(/(?<=\s)(jeden tag|täglich)(?=[\s,.!]|$)/i, () => { rrule = 'daily'; });
@@ -115,5 +125,5 @@ export function parseQuickAdd(input: string, today: string): QuickAddResult {
   if (!dueDate && (dueTime || rrule)) dueDate = today;
 
   const title = text.replace(/\s+/g, ' ').replace(/\s+([,.!])/g, '$1').trim().replace(/^[,\s]+|[,\s]+$/g, '');
-  return { title, dueDate, dueTime, rrule };
+  return { title, dueDate, dueTime, rrule, tags };
 }

@@ -5,6 +5,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { kvStorage } from '@/data/kvStorage';
+import type { SavedFilter } from '@/lib/taskFilters';
 
 export type ThemePref = 'system' | 'light' | 'dark';
 export type MotionPref = 'system' | 'reduced' | 'full';
@@ -17,6 +18,8 @@ type SettingsState = {
   /** Sammel-Notification „X Dinge für heute" aktiv? (Uhrzeit: summaryTime) */
   summaryEnabled: boolean;
   summaryTime: string;
+  /** Gespeicherte Smart-Filter (Feature: eigene Ansichten). */
+  savedFilters: SavedFilter[];
   /** true, sobald der persistierte Zustand geladen wurde (verhindert Flash). */
   _hasHydrated: boolean;
   setThemePref: (p: ThemePref) => void;
@@ -24,6 +27,8 @@ type SettingsState = {
   setDefaultDueTime: (t: string) => void;
   setSummaryEnabled: (v: boolean) => void;
   setSummaryTime: (t: string) => void;
+  addSavedFilter: (f: SavedFilter) => void;
+  removeSavedFilter: (id: string) => void;
   setHasHydrated: (v: boolean) => void;
 };
 
@@ -35,12 +40,15 @@ export const useSettings = create<SettingsState>()(
       defaultDueTime: '09:00',
       summaryEnabled: true,
       summaryTime: '09:00',
+      savedFilters: [],
       _hasHydrated: false,
       setThemePref: (themePref) => set({ themePref }),
       setMotionPref: (motionPref) => set({ motionPref }),
       setDefaultDueTime: (defaultDueTime) => set({ defaultDueTime }),
       setSummaryEnabled: (summaryEnabled) => set({ summaryEnabled }),
       setSummaryTime: (summaryTime) => set({ summaryTime }),
+      addSavedFilter: (f) => set((s) => ({ savedFilters: [...s.savedFilters, f] })),
+      removeSavedFilter: (id) => set((s) => ({ savedFilters: s.savedFilters.filter((x) => x.id !== id) })),
       setHasHydrated: (_hasHydrated) => set({ _hasHydrated }),
     }),
     {
@@ -53,6 +61,7 @@ export const useSettings = create<SettingsState>()(
         defaultDueTime: s.defaultDueTime,
         summaryEnabled: s.summaryEnabled,
         summaryTime: s.summaryTime,
+        savedFilters: s.savedFilters,
       }),
       // state ist der rehydrierte Store inkl. Actions → kein Bezug auf useSettings
       // während der (ggf. synchronen) Erstellung nötig.

@@ -97,6 +97,12 @@ export async function importBackup(json: string): Promise<{ lists: number; tasks
       completedAt: str(t.completedAt) ? t.completedAt : null,
       // Geplante Notifications gehören zum alten Gerät/Install — neu planen.
       notificationId: null,
+      tags: Array.isArray(t.tags) ? t.tags.filter(str) : [],
+      subtasks: Array.isArray(t.subtasks)
+        ? t.subtasks
+            .filter((s): s is Record<string, unknown> => isRecord(s) && str(s.id) && str(s.title))
+            .map((s) => ({ id: s.id as string, title: s.title as string, done: s.done === true }))
+        : [],
       createdAt: str(t.createdAt) ? t.createdAt : new Date().toISOString(),
       sort: typeof t.sort === 'number' ? t.sort : 0,
     });

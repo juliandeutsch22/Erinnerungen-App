@@ -2,7 +2,7 @@
 // Smart-Ansicht: 'geplant' (chronologisch gruppiert) / 'alle' (nach Liste).
 // Offene zuerst (fällige oben), Erledigt-Sektion einklappbar (30-Tage-Fenster).
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronDown, ChevronLeft, ChevronRight, Pencil, Plus } from 'lucide-react-native';
+import { ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, Pencil, Plus } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { View } from 'react-native';
 
@@ -11,6 +11,7 @@ import { GlassPanel } from '@/components/GlassPanel';
 import { ListEditorSheet } from '@/components/ListEditorSheet';
 import { listIcon } from '@/components/listMeta';
 import { PressableScale } from '@/components/PressableScale';
+import { ReorderSheet } from '@/components/ReorderSheet';
 import { RescheduleSheet } from '@/components/RescheduleSheet';
 import { Reveal } from '@/components/Reveal';
 import { Screen } from '@/components/Screen';
@@ -40,6 +41,7 @@ export default function ListeDetailScreen() {
   const [rescheduleTask, setRescheduleTask] = useState<Task | null>(null);
   const [editList, setEditList] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
+  const [reordering, setReordering] = useState(false);
 
   const today = todayStr();
   const isSmartView = id === 'geplant' || id === 'alle';
@@ -96,11 +98,20 @@ export default function ListeDetailScreen() {
           <PressableScale accessibilityLabel="Zurück" onPress={() => router.back()} style={{ padding: Spacing.sm, marginLeft: -Spacing.sm }}>
             <ChevronLeft size={24} color={colors.text2} strokeWidth={2} />
           </PressableScale>
-          {list && (
-            <PressableScale accessibilityLabel="Liste bearbeiten" onPress={() => setEditList(true)} style={{ padding: Spacing.sm }}>
-              <Pencil size={18} color={colors.text3} strokeWidth={2} />
-            </PressableScale>
-          )}
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            {/* Sortieren nur in echten Listen mit ≥ 2 offenen Aufgaben (Smart-Views
+                haben eine feste chronologische Ordnung). */}
+            {list && open.length > 1 && (
+              <PressableScale accessibilityLabel="Reihenfolge sortieren" onPress={() => setReordering(true)} style={{ padding: Spacing.sm }}>
+                <ArrowUpDown size={18} color={colors.text3} strokeWidth={2} />
+              </PressableScale>
+            )}
+            {list && (
+              <PressableScale accessibilityLabel="Liste bearbeiten" onPress={() => setEditList(true)} style={{ padding: Spacing.sm }}>
+                <Pencil size={18} color={colors.text3} strokeWidth={2} />
+              </PressableScale>
+            )}
+          </View>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.xs }}>
           {ListIcon && list && <ListIcon size={26} color={list.color} strokeWidth={2.2} />}
@@ -169,6 +180,7 @@ export default function ListeDetailScreen() {
       )}
       {rescheduleTask && <RescheduleSheet task={rescheduleTask} onClose={() => setRescheduleTask(null)} />}
       {editList && list && <ListEditorSheet list={list} onClose={() => setEditList(false)} />}
+      {reordering && <ReorderSheet tasks={open} onClose={() => setReordering(false)} />}
     </Screen>
   );
 }

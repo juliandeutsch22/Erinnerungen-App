@@ -12,6 +12,7 @@ describe('parseQuickAdd', () => {
       dueDate: '2026-07-04',
       dueTime: null,
       rrule: null,
+      tags: [],
     });
   });
 
@@ -21,6 +22,7 @@ describe('parseQuickAdd', () => {
       dueDate: '2026-08-01',
       dueTime: null,
       rrule: 'monthly',
+      tags: [],
     });
   });
 
@@ -30,6 +32,7 @@ describe('parseQuickAdd', () => {
       dueDate: '2026-07-06',
       dueTime: '09:00',
       rrule: null,
+      tags: [],
     });
   });
 
@@ -39,6 +42,7 @@ describe('parseQuickAdd', () => {
       dueDate: '2026-08-15',
       dueTime: null,
       rrule: null,
+      tags: [],
     });
   });
 
@@ -56,6 +60,7 @@ describe('parseQuickAdd', () => {
       dueDate: '2026-07-06',
       dueTime: null,
       rrule: 'weekly',
+      tags: [],
     });
   });
 
@@ -65,6 +70,7 @@ describe('parseQuickAdd', () => {
       dueDate: TODAY,
       dueTime: null,
       rrule: 'daily',
+      tags: [],
     });
   });
 
@@ -74,6 +80,7 @@ describe('parseQuickAdd', () => {
       dueDate: TODAY,
       dueTime: '09:00',
       rrule: 'weekdays',
+      tags: [],
     });
   });
 
@@ -83,6 +90,7 @@ describe('parseQuickAdd', () => {
       dueDate: TODAY,
       dueTime: '14:30',
       rrule: null,
+      tags: [],
     });
   });
 
@@ -92,6 +100,7 @@ describe('parseQuickAdd', () => {
       dueDate: '2026-07-05',
       dueTime: null,
       rrule: null,
+      tags: [],
     });
   });
 
@@ -105,6 +114,7 @@ describe('parseQuickAdd', () => {
       dueDate: null,
       dueTime: null,
       rrule: null,
+      tags: [],
     });
   });
 
@@ -114,6 +124,17 @@ describe('parseQuickAdd', () => {
       dueDate: null,
       dueTime: null,
       rrule: null,
+      tags: [],
+    });
+  });
+
+  it('#tags werden erkannt, normalisiert und aus dem Titel entfernt', () => {
+    expect(parseQuickAdd('Angebot schreiben #Arbeit #dringend morgen', TODAY)).toEqual({
+      title: 'Angebot schreiben',
+      dueDate: '2026-07-04',
+      dueTime: null,
+      rrule: null,
+      tags: ['arbeit', 'dringend'],
     });
   });
 

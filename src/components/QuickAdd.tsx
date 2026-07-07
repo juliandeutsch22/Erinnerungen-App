@@ -49,7 +49,7 @@ export function QuickAdd({ listId = DEFAULT_LIST_ID }: { listId?: string }) {
   const submit = () => {
     const title = parsed.title;
     if (!title) return;
-    createTask.mutate({ listId, title, dueDate, dueTime, rrule });
+    createTask.mutate({ listId, title, dueDate, dueTime, rrule, tags: parsed.tags });
     hapticSuccess();
     setText('');
     setRemoved(NOTHING_REMOVED);

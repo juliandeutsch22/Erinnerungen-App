@@ -18,6 +18,8 @@ function task(overrides: Partial<Task>): Task {
     flagged: false,
     completedAt: null,
     notificationId: null,
+    tags: [],
+    subtasks: [],
     createdAt: '2026-07-01T08:00:00.000Z',
     sort: 1,
     ...overrides,

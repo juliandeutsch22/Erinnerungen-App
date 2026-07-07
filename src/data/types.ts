@@ -7,6 +7,13 @@
 /** Wiederholung als einfaches Enum statt echter RRULE (deckt 95 % des Alltags ab). */
 export type Rrule = 'daily' | 'weekdays' | 'weekly' | 'monthly' | 'yearly';
 
+/** Ein Schritt innerhalb einer Aufgabe (Checkliste). */
+export type Subtask = {
+  id: string;
+  title: string;
+  done: boolean;
+};
+
 export type List = {
   id: string;
   name: string;
@@ -31,6 +38,10 @@ export type Task = {
   completedAt: string | null; // ISO
   /** geplante lokale Notification (zum Ersetzen/Abbrechen), null = keine geplant. */
   notificationId: string | null;
+  /** Frei vergebbare Tags (kleingeschrieben, ohne #) — kontextübergreifend filterbar. */
+  tags: string[];
+  /** Checkliste innerhalb der Aufgabe (eine Ebene). */
+  subtasks: Subtask[];
   createdAt: string; // ISO
   sort: number;
 };
@@ -44,7 +55,14 @@ export type NewTask = {
   dueTime?: string | null;
   rrule?: Rrule | null;
   flagged?: boolean;
+  tags?: string[];
+  subtasks?: Subtask[];
 };
+
+/** Tag normalisieren: klein, ohne führendes #, keine Leerzeichen. */
+export function normalizeTag(raw: string): string {
+  return raw.trim().replace(/^#+/, '').toLowerCase().replace(/\s+/g, '-');
+}
 
 export type NewList = {
   name: string;

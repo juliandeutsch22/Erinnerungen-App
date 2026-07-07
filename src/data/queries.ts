@@ -52,6 +52,8 @@ export function useCreateTask() {
         flagged: input.flagged ?? false,
         completedAt: null,
         notificationId: null,
+        tags: input.tags ?? [],
+        subtasks: input.subtasks ?? [],
         createdAt: now.toISOString(),
         sort: now.getTime(),
       };
@@ -96,6 +98,21 @@ export function useDeleteTask() {
   const invalidate = useInvalidate();
   return useMutation({
     mutationFn: (id: string) => getTaskRepository().remove(id),
+    onSuccess: invalidate,
+  });
+}
+
+/** Manuelle Reihenfolge festschreiben: sort nach der übergebenen id-Folge setzen. */
+export function useReorderTasks() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async (orderedIds: string[]) => {
+      const repo = getTaskRepository();
+      // Große Abstände lassen später Platz zum Einfügen ohne Rundungsprobleme.
+      for (let i = 0; i < orderedIds.length; i++) {
+        await repo.update(orderedIds[i], { sort: i * 1000 });
+      }
+    },
     onSuccess: invalidate,
   });
 }
