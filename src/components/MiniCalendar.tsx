@@ -15,7 +15,16 @@ const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'A
 const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 const CELL = 36;
 
-export function MiniCalendar({ selected, onSelect }: { selected: string | null; onSelect: (date: string) => void }) {
+export function MiniCalendar({
+  selected,
+  onSelect,
+  minDate,
+}: {
+  selected: string | null;
+  onSelect: (date: string) => void;
+  /** Tage vor diesem Datum ('YYYY-MM-DD') sind nicht wählbar (ausgegraut). */
+  minDate?: string;
+}) {
   const colors = useColors();
   const today = todayStr();
   const anchor = selected ? parseDateStr(selected) : parseDateStr(today);
@@ -63,10 +72,13 @@ export function MiniCalendar({ selected, onSelect }: { selected: string | null; 
             const dateStr = toDateStr(new Date(year, month, day));
             const isSelected = dateStr === selected;
             const isToday = dateStr === today;
+            const disabled = minDate !== undefined && dateStr < minDate;
             return (
               <View key={i} style={{ flex: 1, alignItems: 'center' }}>
                 <PressableScale
                   accessibilityLabel={`${day}. ${MONTHS[month]} wählen`}
+                  accessibilityState={{ disabled }}
+                  disabled={disabled}
                   onPress={() => onSelect(dateStr)}
                   style={{
                     width: CELL,
@@ -74,6 +86,7 @@ export function MiniCalendar({ selected, onSelect }: { selected: string | null; 
                     borderRadius: R.pill,
                     alignItems: 'center',
                     justifyContent: 'center',
+                    opacity: disabled ? 0.3 : 1,
                     backgroundColor: isSelected ? colors.teal : 'transparent',
                     borderWidth: isToday && !isSelected ? 1 : 0,
                     borderColor: colors.teal,

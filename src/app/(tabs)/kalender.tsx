@@ -2,7 +2,8 @@
 // ALLER in iOS eingerichteten Kalender (iCloud, Google, Outlook, … via
 // EventKit) UND die eigenen Erinnerungen des Tages. Termine lassen sich
 // anlegen, bearbeiten und löschen; Erinnerungen öffnen ihren Editor.
-import { CalendarPlus, Sun } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { CalendarPlus, Images, Sun } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 
@@ -19,22 +20,25 @@ import { EmptyState, LoadingState } from '@/components/StateView';
 import { TaskEditorSheet } from '@/components/TaskEditorSheet';
 import { TaskRow } from '@/components/TaskRow';
 import { Type } from '@/components/Type';
+import { usePhotoCounts } from '@/data/photoQueries';
 import { useDeviceCalendars, useDeviceEvents } from '@/data/calendarQueries';
 import { useCompleteTask, useLists, useReopenTask, useTasks } from '@/data/queries';
 import type { Task } from '@/data/types';
-import { bucketEventsByDay, eventTimeLabel } from '@/lib/calendarLogic';
+import { bucketEventsByDay } from '@/lib/calendarLogic';
 import { formatDayHeading, parseDateStr, todayStr } from '@/lib/dates';
 import { deviceCalendarAvailable, type DeviceEvent, ensureCalendarPermission } from '@/lib/deviceCalendar';
 import { byTimeThenCreation, isOpen } from '@/lib/taskLogic';
 import { useColors } from '@/theme/ThemeProvider';
-import { R, Spacing } from '@/theme/theme.tokens';
+import { Spacing } from '@/theme/theme.tokens';
 
 type Permission = 'unknown' | 'granted' | 'denied';
 
 export default function KalenderScreen() {
   const colors = useColors();
+  const router = useRouter();
   const today = todayStr();
   const t = parseDateStr(today);
+  const photoCounts = usePhotoCounts();
 
   const [permission, setPermission] = useState<Permission>(deviceCalendarAvailable ? 'unknown' : 'denied');
   const [anchor, setAnchor] = useState<MonthAnchor>({ year: t.getFullYear(), month: t.getMonth() });
@@ -109,15 +113,24 @@ export default function KalenderScreen() {
       <Reveal>
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
           <Type variant="title">Kalender</Type>
-          {granted && writableExists && (
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <PressableScale
-              accessibilityLabel="Neuer Termin"
-              onPress={() => setEditorEvent(null)}
+              accessibilityLabel="Rückblick öffnen"
+              onPress={() => router.push('/rueckblick')}
               style={{ padding: Spacing.sm }}
             >
-              <CalendarPlus size={22} color={colors.teal} strokeWidth={2.2} />
+              <Images size={21} color={colors.text3} strokeWidth={2} />
             </PressableScale>
-          )}
+            {granted && writableExists && (
+              <PressableScale
+                accessibilityLabel="Neuer Termin"
+                onPress={() => setEditorEvent(null)}
+                style={{ padding: Spacing.sm }}
+              >
+                <CalendarPlus size={22} color={colors.teal} strokeWidth={2.2} />
+              </PressableScale>
+            )}
+          </View>
         </View>
       </Reveal>
 
@@ -155,6 +168,7 @@ export default function KalenderScreen() {
                   event={ev}
                   calendar={calendarById.get(ev.calendarId)}
                   day={selected}
+                  photoCount={photoCounts.get(ev.id) ?? 0}
                   onPress={() => setEditorEvent(ev)}
                 />
               ))}

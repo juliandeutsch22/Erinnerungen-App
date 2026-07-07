@@ -13,6 +13,7 @@ import { GlassButton } from '@/components/GlassButton';
 import { listIcon } from '@/components/listMeta';
 import { MiniCalendar } from '@/components/MiniCalendar';
 import { PressableScale } from '@/components/PressableScale';
+import { TimeField } from '@/components/TimeField';
 import { Type } from '@/components/Type';
 import { useCreateTask, useDeleteTask, useLists, useUpdateTask } from '@/data/queries';
 import type { Rrule, Task } from '@/data/types';
@@ -277,24 +278,22 @@ export function TaskEditorSheet({
                   }}
                 />
               ))}
-              <Chip label="Eigene" active={customTime} onPress={() => setCustomTime((v) => !v)} />
-              {customTime && (
-                <TextInput
-                  value={dueTime ?? ''}
-                  onChangeText={(v) => {
-                    setDueTime(/^\d{1,2}:\d{2}$/.test(v) ? v.padStart(5, '0') : v.length === 0 ? null : v);
-                  }}
-                  placeholder={defaultDueTime}
-                  placeholderTextColor={colors.text3}
-                  keyboardType="numbers-and-punctuation"
-                  accessibilityLabel="Eigene Uhrzeit (HH:MM)"
-                  style={[
-                    { fontSize: T.md, color: colors.text, borderBottomWidth: 1, borderColor: colors.border2, minWidth: 64, paddingVertical: Spacing.xs },
-                    webNoOutline,
-                  ]}
-                />
-              )}
+              <Chip
+                label="Eigene"
+                active={customTime}
+                onPress={() => {
+                  setCustomTime((v) => !v);
+                  if (!dueTime) setDueTime(defaultDueTime);
+                }}
+              />
             </ChipWrap>
+            {customTime && (
+              <TimeField
+                value={dueTime ?? defaultDueTime}
+                onChange={setDueTime}
+                accessibilityLabel="Eigene Uhrzeit wählen"
+              />
+            )}
           </View>
         </View>
       )}

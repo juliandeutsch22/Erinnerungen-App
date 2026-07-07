@@ -1,6 +1,7 @@
 // EventEditorSheet.tsx — Termin anlegen/bearbeiten im Gerätekalender, in der
 // Formsprache des Aufgaben-Editors: Titel + Notiz oben, kompakte Detail-Zeilen
-// (Kalender / Wann), Primär-Button fest im Footer. Löschen zweistufig.
+// (Kalender / Beginnt / Endet), Primär-Button fest im Footer. Termine können
+// sich über mehrere Tage erstrecken; Uhrzeiten über natives iOS-Rad.
 import { CalendarDays, ChevronDown, ChevronRight, Trash2 } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
@@ -9,7 +10,9 @@ import { BottomSheet } from '@/components/BottomSheet';
 import { Chip } from '@/components/Chip';
 import { GlassButton } from '@/components/GlassButton';
 import { MiniCalendar } from '@/components/MiniCalendar';
+import { PhotoStrip } from '@/components/PhotoStrip';
 import { PressableScale } from '@/components/PressableScale';
+import { TimeField } from '@/components/TimeField';
 import { Type } from '@/components/Type';
 import { useCreateEvent, useDeleteEvent, useUpdateEvent } from '@/data/calendarQueries';
 import { addDays, formatDueDate, parseDateStr, toDateStr, todayStr } from '@/lib/dates';
@@ -18,13 +21,6 @@ import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { webNoOutline } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
 import { R, Spacing, T } from '@/theme/theme.tokens';
-
-const START_PRESETS = ['09:00', '12:00', '15:00', '18:00'];
-const DURATIONS: { label: string; minutes: number }[] = [
-  { label: '30 Min', minutes: 30 },
-  { label: '1 Std', minutes: 60 },
-  { label: '2 Std', minutes: 120 },
-];
 
 function hm(d: Date): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -38,6 +34,7 @@ function timeToDate(day: string, time: string): Date {
 }
 
 const VALID_TIME = /^\d{2}:\d{2}$/;
+type WhenRow = 'start' | 'end';
 
 export function EventEditorSheet({
   event,
@@ -60,43 +57,64 @@ export function EventEditorSheet({
   const writable = useMemo(() => calendars.filter((c) => c.allowsModifications), [calendars]);
   const isEdit = event !== null;
 
+  // Ende ganztägiger Termine wird exklusiv gespeichert (00:00 Folgetag) →
+  // für die Anzeige einen Tag zurück, damit „bis" den letzten echten Tag zeigt.
+  const initialEndDay = event
+    ? event.allDay
+      ? toDateStr(new Date(event.end.getTime() - 1))
+      : toDateStr(event.end)
+    : defaultDate;
+
   const [title, setTitle] = useState(event?.title ?? '');
   const [notes, setNotes] = useState(event?.notes ?? '');
   const [calendarId, setCalendarId] = useState(event?.calendarId ?? writable[0]?.id ?? '');
-  const [day, setDay] = useState(event ? toDateStr(event.start) : defaultDate);
+  const [startDay, setStartDay] = useState(event ? toDateStr(event.start) : defaultDate);
+  const [endDay, setEndDay] = useState(initialEndDay);
   const [allDay, setAllDay] = useState(event?.allDay ?? false);
   const [startTime, setStartTime] = useState(event && !event.allDay ? hm(event.start) : '09:00');
   const [endTime, setEndTime] = useState(event && !event.allDay ? hm(event.end) : '10:00');
-  const [showCalendarGrid, setShowCalendarGrid] = useState(false);
-  const [customStart, setCustomStart] = useState(false);
-  const [customEnd, setCustomEnd] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [section, setSection] = useState<'calendar' | 'when' | null>(isEdit ? null : 'when');
+  const [section, setSection] = useState<'calendar' | WhenRow | null>(isEdit ? null : 'start');
 
   const canSave = title.trim().length > 0 && calendarId.length > 0;
   const currentCalendar = calendars.find((c) => c.id === calendarId);
+  const multiDay = endDay !== startDay;
 
-  const toggleSection = (s: 'calendar' | 'when') => {
+  const toggleSection = (s: 'calendar' | WhenRow) => {
     hapticSelect();
     setSection((cur) => (cur === s ? null : s));
-    setShowCalendarGrid(false);
   };
 
-  const whenLabel = allDay
-    ? `${formatDueDate(day, today)}, Ganztägig`
-    : `${formatDueDate(day, today)}, ${startTime} – ${endTime}`;
+  // Ende nie vor Beginn: schiebt den Endtag mit, wenn der Beginn danach liegt.
+  const setStartDaySafe = (d: string) => {
+    setStartDay(d);
+    if (endDay < d) setEndDay(d);
+  };
+  const setEndDaySafe = (d: string) => {
+    setEndDay(d < startDay ? startDay : d);
+  };
+
+  const startLabel = allDay
+    ? formatDueDate(startDay, today)
+    : `${formatDueDate(startDay, today)}, ${startTime}`;
+  const endLabel = allDay
+    ? formatDueDate(endDay, today)
+    : `${formatDueDate(endDay, today)}, ${endTime}`;
 
   const save = () => {
     if (!canSave) return;
-    const validStart = VALID_TIME.test(startTime) ? startTime : '09:00';
     let start: Date;
     let end: Date;
     if (allDay) {
-      start = timeToDate(day, '00:00');
-      end = timeToDate(addDays(day, 1), '00:00');
+      start = timeToDate(startDay, '00:00');
+      // Ende exklusiv: der Tag NACH dem letzten ganztägigen Tag.
+      end = timeToDate(addDays(endDay, 1), '00:00');
     } else {
-      start = timeToDate(day, validStart);
-      end = VALID_TIME.test(endTime) ? timeToDate(day, endTime) : new Date(start.getTime() + 60 * 60 * 1000);
+      const s = VALID_TIME.test(startTime) ? startTime : '09:00';
+      const e = VALID_TIME.test(endTime) ? endTime : '10:00';
+      start = timeToDate(startDay, s);
+      end = timeToDate(endDay, e);
+      // Gleicher Tag + Ende ≤ Beginn → mindestens eine Stunde.
       if (end.getTime() <= start.getTime()) end = new Date(start.getTime() + 60 * 60 * 1000);
     }
     const draft = { title: title.trim(), notes: notes.trim() ? notes.trim() : null, allDay, start, end };
@@ -170,7 +188,7 @@ export function EventEditorSheet({
         </Type>
       )}
 
-      {/* Kalender-Wahl (nur beim Anlegen; bestehende Termine bleiben in ihrem Kalender). */}
+      {/* Kalender-Wahl (nur beim Anlegen). */}
       {!isEdit && writable.length > 1 && (
         <>
           <PressableScale
@@ -195,111 +213,147 @@ export function EventEditorSheet({
               ))}
             </View>
           )}
-          <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border }} />
+          <Hairline />
         </>
       )}
 
-      {/* Wann: Datum + Ganztägig + Zeiten. */}
+      {/* Ganztägig-Schalter */}
       <PressableScale
-        accessibilityLabel={`Wann: ${whenLabel}`}
-        onPress={() => toggleSection('when')}
+        accessibilityRole="switch"
+        accessibilityState={{ checked: allDay }}
+        accessibilityLabel={allDay ? 'Ganztägig aus' : 'Ganztägig an'}
+        onPress={() => {
+          hapticSelect();
+          setAllDay((v) => !v);
+        }}
         pressedScale={0.99}
         style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.md }}
       >
         <CalendarDays size={18} color={colors.teal} strokeWidth={2} />
-        <Type variant="body" style={{ flex: 1 }}>Wann</Type>
-        <Type variant="label" tone="teal" numberOfLines={1} style={{ maxWidth: 190 }}>{whenLabel}</Type>
-        {section === 'when' ? (
+        <Type variant="body" style={{ flex: 1 }}>Ganztägig</Type>
+        <Type variant="label" tone={allDay ? 'teal' : 'text3'}>{allDay ? 'An' : 'Aus'}</Type>
+      </PressableScale>
+      <Hairline />
+
+      {/* Beginnt */}
+      <WhenRowView
+        label="Beginnt"
+        value={startLabel}
+        expanded={section === 'start'}
+        onPress={() => toggleSection('start')}
+        day={startDay}
+        onSelectDay={setStartDaySafe}
+        allDay={allDay}
+        time={startTime}
+        onChangeTime={setStartTime}
+        today={today}
+      />
+      <Hairline />
+
+      {/* Endet */}
+      <WhenRowView
+        label="Endet"
+        value={endLabel}
+        expanded={section === 'end'}
+        onPress={() => toggleSection('end')}
+        day={endDay}
+        onSelectDay={setEndDaySafe}
+        allDay={allDay}
+        time={endTime}
+        onChangeTime={setEndTime}
+        today={today}
+        minDay={startDay}
+      />
+
+      {multiDay && (
+        <Type variant="caption" tone="text3" style={{ marginTop: Spacing.sm }}>
+          Erstreckt sich über mehrere Tage.
+        </Type>
+      )}
+
+      {/* Fotos: erst für gespeicherte Termine (brauchen eine Event-ID). */}
+      {isEdit && event && (
+        <View style={{ marginTop: Spacing.md }}>
+          <Hairline />
+          <View style={{ marginTop: Spacing.md }}>
+            <PhotoStrip eventId={event.id} />
+          </View>
+        </View>
+      )}
+    </BottomSheet>
+  );
+}
+
+function WhenRowView({
+  label,
+  value,
+  expanded,
+  onPress,
+  day,
+  onSelectDay,
+  allDay,
+  time,
+  onChangeTime,
+  today,
+  minDay,
+}: {
+  label: string;
+  value: string;
+  expanded: boolean;
+  onPress: () => void;
+  day: string;
+  onSelectDay: (d: string) => void;
+  allDay: boolean;
+  time: string;
+  onChangeTime: (t: string) => void;
+  today: string;
+  minDay?: string;
+}) {
+  const colors = useColors();
+  return (
+    <>
+      <PressableScale
+        accessibilityLabel={`${label}: ${value}`}
+        accessibilityState={{ expanded }}
+        onPress={onPress}
+        pressedScale={0.99}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.md }}
+      >
+        <View style={{ width: 18 }} />
+        <Type variant="body" style={{ flex: 1 }}>{label}</Type>
+        <Type variant="label" tone="teal" numberOfLines={1} style={{ maxWidth: 190 }}>{value}</Type>
+        {expanded ? (
           <ChevronDown size={16} color={colors.text3} strokeWidth={2} />
         ) : (
           <ChevronRight size={16} color={colors.text3} strokeWidth={2} />
         )}
       </PressableScale>
-      {section === 'when' && (
+      {expanded && (
         <View style={{ gap: Spacing.md, paddingBottom: Spacing.md }}>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm }}>
-            <Chip label="Heute" active={day === today} onPress={() => setDay(today)} />
-            <Chip label="Morgen" active={day === addDays(today, 1)} onPress={() => setDay(addDays(today, 1))} />
-            <Chip label="Kalender" icon={CalendarDays} active={showCalendarGrid} onPress={() => setShowCalendarGrid((v) => !v)} />
-            <Chip label="Ganztägig" active={allDay} onPress={() => setAllDay((v) => !v)} />
-          </View>
-          {showCalendarGrid && (
-            <View style={{ borderRadius: R.lg, borderWidth: 1, borderColor: colors.chipBorder, backgroundColor: colors.chip, padding: Spacing.sm }}>
-              <MiniCalendar
-                selected={day}
-                onSelect={(d) => {
-                  setDay(d);
-                  setShowCalendarGrid(false);
-                }}
-              />
+          {!allDay && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Type variant="caption" tone="text3">Uhrzeit</Type>
+              <TimeField value={time} onChange={onChangeTime} accessibilityLabel={`${label} Uhrzeit wählen`} />
             </View>
           )}
-          {!allDay && (
-            <>
-              <View style={{ gap: Spacing.sm }}>
-                <Type variant="caption" tone="text3">Beginn</Type>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, alignItems: 'center' }}>
-                  {START_PRESETS.map((t) => (
-                    <Chip
-                      key={t}
-                      label={t}
-                      active={startTime === t && !customStart}
-                      onPress={() => {
-                        setCustomStart(false);
-                        setStartTime(t);
-                      }}
-                    />
-                  ))}
-                  <Chip label="Eigene" active={customStart} onPress={() => setCustomStart((v) => !v)} />
-                  {customStart && (
-                    <TextInput
-                      value={startTime}
-                      onChangeText={(v) => setStartTime(/^\d{1,2}:\d{2}$/.test(v) ? v.padStart(5, '0') : v)}
-                      placeholder="09:00"
-                      placeholderTextColor={colors.text3}
-                      keyboardType="numbers-and-punctuation"
-                      accessibilityLabel="Eigener Beginn (HH:MM)"
-                      style={[{ fontSize: T.md, color: colors.text, borderBottomWidth: 1, borderColor: colors.border2, minWidth: 64, paddingVertical: Spacing.xs }, webNoOutline]}
-                    />
-                  )}
-                </View>
-              </View>
-              <View style={{ gap: Spacing.sm }}>
-                <Type variant="caption" tone="text3">Dauer / Ende</Type>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, alignItems: 'center' }}>
-                  {DURATIONS.map((d) => {
-                    const base = VALID_TIME.test(startTime) ? startTime : '09:00';
-                    const end = hm(new Date(timeToDate(today, base).getTime() + d.minutes * 60 * 1000));
-                    return (
-                      <Chip
-                        key={d.label}
-                        label={d.label}
-                        active={endTime === end && !customEnd}
-                        onPress={() => {
-                          setCustomEnd(false);
-                          setEndTime(end);
-                        }}
-                      />
-                    );
-                  })}
-                  <Chip label="Eigene" active={customEnd} onPress={() => setCustomEnd((v) => !v)} />
-                  {customEnd && (
-                    <TextInput
-                      value={endTime}
-                      onChangeText={(v) => setEndTime(/^\d{1,2}:\d{2}$/.test(v) ? v.padStart(5, '0') : v)}
-                      placeholder="10:00"
-                      placeholderTextColor={colors.text3}
-                      keyboardType="numbers-and-punctuation"
-                      accessibilityLabel="Eigenes Ende (HH:MM)"
-                      style={[{ fontSize: T.md, color: colors.text, borderBottomWidth: 1, borderColor: colors.border2, minWidth: 64, paddingVertical: Spacing.xs }, webNoOutline]}
-                    />
-                  )}
-                </View>
-              </View>
-            </>
-          )}
+          <View style={{ borderRadius: R.lg, borderWidth: 1, borderColor: colors.chipBorder, backgroundColor: colors.chip, padding: Spacing.sm }}>
+            <MiniCalendar
+              selected={day}
+              onSelect={onSelectDay}
+              minDate={minDay}
+            />
+          </View>
+          <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+            <Chip label="Heute" active={day === today} onPress={() => onSelectDay(today)} />
+            <Chip label="Morgen" active={day === addDays(today, 1)} onPress={() => onSelectDay(addDays(today, 1))} />
+          </View>
         </View>
       )}
-    </BottomSheet>
+    </>
   );
+}
+
+function Hairline() {
+  const colors = useColors();
+  return <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border }} />;
 }

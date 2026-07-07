@@ -1,5 +1,7 @@
 // EventRow.tsx — kompakte Termin-Zeile (Kalender-Tab + Dashboard): Farbbalken
-// des Quell-Kalenders, Titel, Zeit-Label; Tap öffnet den Termin-Editor.
+// des Quell-Kalenders, Titel, Zeit-Label, optionaler Foto-Indikator; Tap öffnet
+// den Termin-Editor.
+import { ImageIcon } from 'lucide-react-native';
 import React from 'react';
 import { View } from 'react-native';
 
@@ -15,6 +17,7 @@ export function EventRow({
   calendar,
   day,
   showCalendarName = true,
+  photoCount = 0,
   onPress,
 }: {
   event: DeviceEvent;
@@ -22,6 +25,8 @@ export function EventRow({
   /** Angezeigter Tag ('YYYY-MM-DD') — bestimmt das Zeit-Label bei mehrtägigen Terminen. */
   day: string;
   showCalendarName?: boolean;
+  /** Anzahl angehängter Rückblick-Fotos (kleiner Teal-Indikator). */
+  photoCount?: number;
   onPress: () => void;
 }) {
   const colors = useColors();
@@ -39,6 +44,12 @@ export function EventRow({
           <Type variant="caption" tone="text3">{eventTimeLabel(event, day)}</Type>
           {showCalendarName && calendar && (
             <Type variant="caption" tone="text3" numberOfLines={1}>{calendar.title}</Type>
+          )}
+          {photoCount > 0 && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+              <ImageIcon size={11} color={colors.teal} strokeWidth={2} />
+              <Type variant="caption" tone="teal" tabular>{photoCount}</Type>
+            </View>
           )}
         </View>
       </View>

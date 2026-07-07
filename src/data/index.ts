@@ -3,10 +3,12 @@
 import { Platform } from 'react-native';
 
 import { InMemoryListRepository, ListRepository } from './ListRepository';
+import { InMemoryPhotoRepository, PhotoRepository } from './PhotoRepository';
 import { InMemoryTaskRepository, TaskRepository } from './TaskRepository';
 
 let listSingleton: ListRepository | null = null;
 let taskSingleton: TaskRepository | null = null;
+let photoSingleton: PhotoRepository | null = null;
 
 export function getListRepository(): ListRepository {
   if (listSingleton) return listSingleton;
@@ -31,6 +33,17 @@ export function getTaskRepository(): TaskRepository {
   return taskSingleton;
 }
 
+export function getPhotoRepository(): PhotoRepository {
+  if (photoSingleton) return photoSingleton;
+  if (Platform.OS === 'web') {
+    photoSingleton = new InMemoryPhotoRepository();
+  } else {
+    const { SqlitePhotoRepository } = require('./SqlitePhotoRepository') as typeof import('./SqlitePhotoRepository');
+    photoSingleton = new SqlitePhotoRepository();
+  }
+  return photoSingleton;
+}
+
 /** Nur für Tests: erlaubt das Einsetzen eigener Repository-Instanzen. */
 export function __setListRepositoryForTests(repo: ListRepository | null) {
   listSingleton = repo;
@@ -38,6 +51,10 @@ export function __setListRepositoryForTests(repo: ListRepository | null) {
 export function __setTaskRepositoryForTests(repo: TaskRepository | null) {
   taskSingleton = repo;
 }
+export function __setPhotoRepositoryForTests(repo: PhotoRepository | null) {
+  photoSingleton = repo;
+}
 
 export type { ListRepository } from './ListRepository';
 export type { TaskRepository } from './TaskRepository';
+export type { PhotoRepository } from './PhotoRepository';

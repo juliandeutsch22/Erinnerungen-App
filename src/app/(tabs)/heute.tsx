@@ -21,6 +21,7 @@ import { TaskEditorSheet } from '@/components/TaskEditorSheet';
 import { TaskRow } from '@/components/TaskRow';
 import { Type } from '@/components/Type';
 import { useDeviceCalendars, useDeviceEvents } from '@/data/calendarQueries';
+import { usePhotoCounts } from '@/data/photoQueries';
 import { useCompleteTask, useLists, useReopenTask, useTasks } from '@/data/queries';
 import type { Task } from '@/data/types';
 import { bucketEventsByDay } from '@/lib/calendarLogic';
@@ -74,6 +75,7 @@ export default function HeuteScreen() {
   const horizon = addDays(today, 6);
   const { data: calendars } = useDeviceCalendars(calGranted);
   const { data: events } = useDeviceEvents(today, horizon, calGranted);
+  const photoCounts = usePhotoCounts();
   const calendarById = useMemo(() => new Map((calendars ?? []).map((c) => [c.id, c])), [calendars]);
   const eventsByDay = useMemo(() => bucketEventsByDay(events ?? [], today, horizon), [events, today, horizon]);
   const todayEvents = eventsByDay.get(today) ?? [];
@@ -83,8 +85,8 @@ export default function HeuteScreen() {
   const upcoming = useMemo(() => {
     const taskGroups = new Map(groupUpcomingDays(tasks ?? [], today).map((g) => [g.date, g.tasks]));
     const dates = new Set<string>(taskGroups.keys());
-    for (const day of eventsByDay.keys()) {
-      if (day > today) dates.add(day);
+    for (const d of eventsByDay.keys()) {
+      if (d > today) dates.add(d);
     }
     return [...dates].sort().map((date) => ({
       date,
@@ -186,6 +188,7 @@ export default function HeuteScreen() {
                     calendar={calendarById.get(ev.calendarId)}
                     day={today}
                     showCalendarName={false}
+                    photoCount={photoCounts.get(ev.id) ?? 0}
                     onPress={() => setEditorEvent(ev)}
                   />
                 ))}
@@ -266,7 +269,6 @@ export default function HeuteScreen() {
             <Type variant="eyebrow" tone="text3">Nächste Tage</Type>
             {upcoming.map((day, i) => {
               const expanded = expandedDays.has(day.date);
-              const count = day.tasks.length + day.events.length;
               return (
                 <View key={day.date}>
                   {i > 0 && <Seam marginVertical={Spacing.sm} />}
@@ -286,7 +288,7 @@ export default function HeuteScreen() {
                   >
                     <Type variant="label">{formatDayHeading(day.date, today)}</Type>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
-                      <Type variant="caption" tone="text3" tabular>{count}</Type>
+                      <Type variant="caption" tone="text3" tabular>{day.tasks.length + day.events.length}</Type>
                       {expanded ? (
                         <ChevronDown size={16} color={colors.text3} strokeWidth={2} />
                       ) : (
@@ -303,6 +305,7 @@ export default function HeuteScreen() {
                           calendar={calendarById.get(ev.calendarId)}
                           day={day.date}
                           showCalendarName={false}
+                          photoCount={photoCounts.get(ev.id) ?? 0}
                           onPress={() => setEditorEvent(ev)}
                         />
                       ))}

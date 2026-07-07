@@ -39,6 +39,13 @@ export function getDb(): Promise<SQLiteDatabase> {
         );
         CREATE INDEX IF NOT EXISTS idx_tasks_list ON tasks (list_id);
         CREATE INDEX IF NOT EXISTS idx_tasks_due ON tasks (due_date);
+        CREATE TABLE IF NOT EXISTS event_photos (
+          id TEXT PRIMARY KEY NOT NULL,
+          event_id TEXT NOT NULL,
+          uri TEXT NOT NULL,
+          added_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_event_photos_event ON event_photos (event_id);
       `);
       // Seed: Standardliste „Erinnerungen" existiert immer.
       const row = await db.getFirstAsync<{ c: number }>('SELECT COUNT(*) AS c FROM lists WHERE id = ?', [DEFAULT_LIST_ID]);
