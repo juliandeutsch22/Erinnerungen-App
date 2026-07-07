@@ -78,9 +78,12 @@ export function BottomSheet({
     onClose();
   };
 
+  // --- WICHTIG: Erstelle ein Gesture-Objekt für die ScrollView. ---
+  const scrollGesture = Gesture.Native();
+
   // Ganzes Sheet ziehbar; läuft gleichzeitig mit der ScrollView (RNGH-Muster).
   const pan = Gesture.Pan()
-    .simultaneousWithExternalGesture(scrollRef)
+    .simultaneousWithExternalGesture(scrollGesture)
     .onChange((e) => {
       const dragging = translateY.value > 0;
       const atTop = scrollY.value <= 0;
@@ -151,17 +154,20 @@ export function BottomSheet({
                 }}
               >
                 {header}
-                <ScrollView
-                  ref={scrollRef}
-                  style={{ maxHeight: contentMaxHeight }}
-                  keyboardShouldPersistTaps="handled"
-                  showsVerticalScrollIndicator={false}
-                  bounces={false}
-                  onScroll={onScroll}
-                  scrollEventThrottle={16}
-                >
-                  {children}
-                </ScrollView>
+                {/* ScrollView in einen GestureDetector für die Native-Scroll-Geste packen */}
+                <GestureDetector gesture={scrollGesture}>
+                  <ScrollView
+                    ref={scrollRef}
+                    style={{ maxHeight: contentMaxHeight }}
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}
+                    bounces={false}
+                    onScroll={onScroll}
+                    scrollEventThrottle={16}
+                  >
+                    {children}
+                  </ScrollView>
+                </GestureDetector>
                 {footer && <View style={{ paddingTop: Spacing.md }}>{footer}</View>}
               </Glass>
             </Animated.View>
