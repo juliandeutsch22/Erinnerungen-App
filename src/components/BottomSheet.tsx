@@ -2,18 +2,21 @@
 // eigener Screen). RN-Modal mit Slide + dimmendem Backdrop; Inhalt auf einer
 // Liquid-Glass-Fläche, deren untere Kanten unter den Screenrand tauchen.
 //
-// Gesten: am Grabber/Kopf nach unten ziehen schließt das Sheet (Spring zurück,
-// wenn unter der Schwelle). Backdrop dimmt mit der Zieh-Distanz.
+// Gesten: das GANZE Sheet lässt sich nach unten ziehen und schließen. Im Inhalt
+// greift die Zieh-Geste nur, wenn oben (Scroll = 0) und nach unten gezogen wird —
+// sonst scrollt der Inhalt normal. Umsetzung über die Gesture-Handler-eigene
+// ScrollView + simultaneousWithExternalGesture (offizielles RNGH-Muster für
+// „Sheet ziehen + Inhalt scrollen"); bewusst OHNE Gesture.Native/Animated.Scroll­
+// View, weil diese Kombination auf dem Gerät abgestürzt ist.
 //
 // Tastatur: bewusst OHNE KeyboardAvoidingView UND ohne automaticallyAdjust­
 // KeyboardInsets — beides schob den Inhalt in Modals ungewollt hoch (das
 // Titelfeld rutschte unter die Kopfzeile). Stattdessen hebt die gemessene
-// Tastaturhöhe das ganze Sheet über die Tastatur; der Inhalt scrollt innerhalb
-// des sichtbaren Rests, das fokussierte Feld bleibt sichtbar.
+// Tastaturhöhe das ganze Sheet über die Tastatur; der Inhalt scrollt im Rest.
 import { X } from 'lucide-react-native';
-import React from 'react';
-import { Keyboard, Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
-import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import React, { useRef } from 'react';
+import { Keyboard, Modal, NativeScrollEvent, NativeSyntheticEvent, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Gesture, GestureDetector, GestureHandlerRootView, ScrollView } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -61,6 +64,13 @@ export function BottomSheet({
 
   // Zieh-Offset des Sheets (0 = Ruhelage). Nur nach unten wirksam.
   const translateY = useSharedValue(0);
+  // Scroll-Position des Inhalts — die Zieh-Geste greift nur bei 0.
+  const scrollY = useSharedValue(0);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- RNGH erwartet einen lockeren Ref-Typ
+  const scrollRef = useRef<any>(null);
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    scrollY.value = e.nativeEvent.contentOffset.y;
+  };
 
   const close = () => {
     // Tastatur zuerst schließen, damit das Sheet nicht kurz nachspringt.
@@ -68,14 +78,19 @@ export function BottomSheet({
     onClose();
   };
 
+  // Ganzes Sheet ziehbar; läuft gleichzeitig mit der ScrollView (RNGH-Muster).
   const pan = Gesture.Pan()
+    .simultaneousWithExternalGesture(scrollRef)
     .onChange((e) => {
-      // Nach unten frei, nach oben mit Widerstand (leichtes Gummiband).
-      const next = translateY.value + e.changeY;
-      translateY.value = next < 0 ? next * 0.25 : next;
+      const dragging = translateY.value > 0;
+      const atTop = scrollY.value <= 0;
+      // Sheet mitziehen, wenn schon am Ziehen ODER oben + nach unten.
+      if (dragging || (atTop && e.changeY > 0)) {
+        translateY.value = Math.max(0, translateY.value + e.changeY);
+      }
     })
     .onEnd((e) => {
-      if (translateY.value > DISMISS_DISTANCE || e.velocityY > DISMISS_VELOCITY) {
+      if (translateY.value > DISMISS_DISTANCE || (translateY.value > 4 && e.velocityY > DISMISS_VELOCITY)) {
         translateY.value = withTiming(windowHeight, { duration: 180 });
         runOnJS(hapticSelect)();
         runOnJS(close)();
@@ -84,27 +99,24 @@ export function BottomSheet({
       }
     });
 
-  const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: Math.max(translateY.value, -40) }] }));
+  const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: translateY.value }] }));
   const backdropStyle = useAnimatedStyle(() => {
     const fade = Math.max(0, 1 - translateY.value / (DISMISS_DISTANCE * 2.4));
     return { opacity: translateY.value > 0 ? fade : 1 };
   });
 
-  // Grabber + Kopfzeile tragen die Zieh-Geste (nicht der Scroll-Bereich).
   const header = (
-    <GestureDetector gesture={pan}>
-      <View>
-        <View style={{ alignItems: 'center', paddingBottom: Spacing.sm, paddingTop: Spacing.xs }}>
-          <View style={{ width: 44, height: 5, borderRadius: 3, backgroundColor: colors.border2 }} />
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.md }}>
-          <Type variant="heading">{title}</Type>
-          <PressableScale accessibilityLabel="Schließen" onPress={close} style={{ padding: Spacing.xs }}>
-            <X size={22} color={colors.text3} strokeWidth={2} />
-          </PressableScale>
-        </View>
+    <View>
+      <View style={{ alignItems: 'center', paddingBottom: Spacing.sm, paddingTop: Spacing.xs }}>
+        <View style={{ width: 44, height: 5, borderRadius: 3, backgroundColor: colors.border2 }} />
       </View>
-    </GestureDetector>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.md }}>
+        <Type variant="heading">{title}</Type>
+        <PressableScale accessibilityLabel="Schließen" onPress={close} style={{ padding: Spacing.xs }}>
+          <X size={22} color={colors.text3} strokeWidth={2} />
+        </PressableScale>
+      </View>
+    </View>
   );
 
   return (
@@ -117,36 +129,43 @@ export function BottomSheet({
       <View style={{ flex: 1, justifyContent: 'flex-end' }} pointerEvents="box-none">
         {/* Tastaturhöhe als Sockel: hebt das Sheet exakt über die Tastatur. */}
         <View style={{ alignItems: 'center', paddingBottom: keyboard }} pointerEvents="box-none">
-          <Animated.View style={[{ width: '100%', maxWidth: MAX_CONTENT_WIDTH }, sheetStyle]}>
-            <Glass
-              variant="card"
-              radius={SHEET_RADIUS}
-              intensity={90}
-              style={[
-                Shadow.lg,
-                {
-                  width: '100%',
-                  // Untere Rundung unter den Screenrand bzw. hinter die Tastatur schieben.
-                  marginBottom: -SHEET_RADIUS,
-                },
-              ]}
-              contentStyle={{
-                paddingHorizontal: Spacing.lg,
-                paddingTop: Spacing.md,
-                paddingBottom: SHEET_RADIUS + bottomPad,
-              }}
-            >
-              {header}
-              <ScrollView
-                style={{ maxHeight: contentMaxHeight }}
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={false}
+          {/* Zieh-Geste liegt auf dem GANZEN Sheet. */}
+          <GestureDetector gesture={pan}>
+            <Animated.View style={[{ width: '100%', maxWidth: MAX_CONTENT_WIDTH }, sheetStyle]}>
+              <Glass
+                variant="card"
+                radius={SHEET_RADIUS}
+                intensity={90}
+                style={[
+                  Shadow.lg,
+                  {
+                    width: '100%',
+                    // Untere Rundung unter den Screenrand bzw. hinter die Tastatur schieben.
+                    marginBottom: -SHEET_RADIUS,
+                  },
+                ]}
+                contentStyle={{
+                  paddingHorizontal: Spacing.lg,
+                  paddingTop: Spacing.md,
+                  paddingBottom: SHEET_RADIUS + bottomPad,
+                }}
               >
-                {children}
-              </ScrollView>
-              {footer && <View style={{ paddingTop: Spacing.md }}>{footer}</View>}
-            </Glass>
-          </Animated.View>
+                {header}
+                <ScrollView
+                  ref={scrollRef}
+                  style={{ maxHeight: contentMaxHeight }}
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+                  bounces={false}
+                  onScroll={onScroll}
+                  scrollEventThrottle={16}
+                >
+                  {children}
+                </ScrollView>
+                {footer && <View style={{ paddingTop: Spacing.md }}>{footer}</View>}
+              </Glass>
+            </Animated.View>
+          </GestureDetector>
         </View>
       </View>
       </GestureHandlerRootView>
