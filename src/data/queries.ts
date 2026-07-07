@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { todayStr } from '@/lib/dates';
-import { resolveCompletion } from '@/lib/taskLogic';
+import { adoptOverdueToToday, resolveCompletion } from '@/lib/taskLogic';
 import { getListRepository, getTaskRepository } from './index';
 import type { List, NewList, NewTask, Task } from './types';
 import { newId } from './types';
@@ -98,6 +98,20 @@ export function useDeleteTask() {
   const invalidate = useInvalidate();
   return useMutation({
     mutationFn: (id: string) => getTaskRepository().remove(id),
+    onSuccess: invalidate,
+  });
+}
+
+/** Auto-Übernahme: alle überfälligen Aufgaben auf heute holen (dueDate → heute). */
+export function useAdoptOverdue() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async (tasks: Task[]) => {
+      const repo = getTaskRepository();
+      const patches = adoptOverdueToToday(tasks, todayStr());
+      for (const { id, dueDate } of patches) await repo.update(id, { dueDate });
+      return patches.length;
+    },
     onSuccess: invalidate,
   });
 }

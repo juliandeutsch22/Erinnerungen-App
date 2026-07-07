@@ -68,6 +68,15 @@ export function groupToday(tasks: Task[], today: string): TodayGroups {
   };
 }
 
+/**
+ * Auto-Übernahme (Fahrplan Horizont 1): überfällige Aufgaben „auf heute holen".
+ * Ergebnis sind die zu setzenden Patches (dueDate → heute); die Uhrzeit bleibt
+ * unangetastet, erledigte/undatierte bleiben außen vor. Reine Funktion.
+ */
+export function adoptOverdueToToday(tasks: Task[], today: string): { id: string; dueDate: string }[] {
+  return tasks.filter((t) => isOverdue(t, today)).map((t) => ({ id: t.id, dueDate: today }));
+}
+
 export type DayGroup = { date: string; tasks: Task[] };
 
 /**

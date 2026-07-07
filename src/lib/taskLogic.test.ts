@@ -1,6 +1,6 @@
 // taskLogic.test.ts — Überfällig-Ableitung, Abhak-Semantik, Gruppierungen.
 import type { Task } from '@/data/types';
-import { groupPlanned, groupToday, groupUpcomingDays, isDueToday, isOverdue, recentlyCompleted, resolveCompletion } from './taskLogic';
+import { adoptOverdueToToday, groupPlanned, groupToday, groupUpcomingDays, isDueToday, isOverdue, recentlyCompleted, resolveCompletion } from './taskLogic';
 
 const TODAY = '2026-07-03';
 
@@ -118,5 +118,21 @@ describe('groupPlanned', () => {
 
   it('Aufgaben ohne Datum tauchen nicht auf', () => {
     expect(groupPlanned([task({})], TODAY)).toEqual([]);
+  });
+});
+
+describe('adoptOverdueToToday', () => {
+  it('holt nur offene überfällige Aufgaben auf heute (Uhrzeit bleibt außen vor)', () => {
+    const tasks = [
+      task({ id: 'a', dueDate: '2026-07-01', dueTime: '09:00' }), // überfällig
+      task({ id: 'b', dueDate: '2026-07-03' }), // heute → nicht betroffen
+      task({ id: 'c', dueDate: '2026-06-30', completedAt: '2026-07-01T10:00:00.000Z' }), // erledigt
+      task({ id: 'd', dueDate: null }), // undatiert
+    ];
+    expect(adoptOverdueToToday(tasks, TODAY)).toEqual([{ id: 'a', dueDate: TODAY }]);
+  });
+
+  it('leere Liste, wenn nichts überfällig ist', () => {
+    expect(adoptOverdueToToday([task({ dueDate: '2026-07-03' })], TODAY)).toEqual([]);
   });
 });

@@ -3,7 +3,7 @@
 // Uhrzeit auf EINER Glass-Fläche mit Seams, plus dünne Fortschrittslinie und
 // einklappbare „Erledigt heute"-Sektion. Abhaken = Teal-Puls + Haptik.
 import { useRouter } from 'expo-router';
-import { ChevronDown, ChevronRight, Plus, Settings, Sun } from 'lucide-react-native';
+import { CalendarCheck, ChevronDown, ChevronRight, Plus, Settings, Sun } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 
@@ -22,13 +22,13 @@ import { TaskRow } from '@/components/TaskRow';
 import { Type } from '@/components/Type';
 import { useDeviceCalendars, useDeviceEvents } from '@/data/calendarQueries';
 import { usePhotoCounts } from '@/data/photoQueries';
-import { useCompleteTask, useLists, useReopenTask, useTasks } from '@/data/queries';
+import { useAdoptOverdue, useCompleteTask, useLists, useReopenTask, useTasks } from '@/data/queries';
 import type { Task } from '@/data/types';
 import { bucketEventsByDay } from '@/lib/calendarLogic';
 import { addDays, formatDayHeading, toDateStr, todayStr } from '@/lib/dates';
 import { type DeviceEvent, hasCalendarPermission } from '@/lib/deviceCalendar';
 import { groupToday, groupUpcomingDays } from '@/lib/taskLogic';
-import { hapticSelect } from '@/lib/haptics';
+import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { TAB_BAR_SAFE_BOTTOM } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
 import { Spacing } from '@/theme/theme.tokens';
@@ -40,6 +40,7 @@ export default function HeuteScreen() {
   const { data: lists } = useLists();
   const complete = useCompleteTask();
   const reopen = useReopenTask();
+  const adoptOverdue = useAdoptOverdue();
 
   // undefined = Editor zu, null = neue Aufgabe, Task = bearbeiten.
   const [editorTask, setEditorTask] = useState<Task | null | undefined>(undefined);
@@ -115,6 +116,11 @@ export default function HeuteScreen() {
   const toggle = (task: Task) => (next: boolean) => {
     if (next) complete.mutate(task);
     else reopen.mutate(task.id);
+  };
+
+  const adoptAll = () => {
+    hapticSuccess();
+    adoptOverdue.mutate(tasks ?? []);
   };
 
   const renderRows = (items: Task[]) =>
@@ -216,7 +222,19 @@ export default function HeuteScreen() {
               )}
               {groups.overdue.length > 0 && (
                 <>
-                  <Type variant="eyebrow" tone="indigo">Überfällig</Type>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Type variant="eyebrow" tone="indigo">Überfällig · {groups.overdue.length}</Type>
+                    {/* Auto-Übernahme: alle überfälligen mit einem Tipp auf heute holen. */}
+                    <PressableScale
+                      accessibilityLabel="Alle überfälligen auf heute holen"
+                      onPress={adoptAll}
+                      pressedScale={0.97}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 4, paddingHorizontal: 8, marginRight: -8 }}
+                    >
+                      <CalendarCheck size={14} color={colors.indigo} strokeWidth={2} />
+                      <Type variant="caption" tone="indigo">Auf heute</Type>
+                    </PressableScale>
+                  </View>
                   <View style={{ marginTop: Spacing.xs }}>{renderRows(groups.overdue)}</View>
                   {(groups.timed.length > 0 || groups.untimed.length > 0) && <Seam marginVertical={Spacing.md} />}
                 </>
