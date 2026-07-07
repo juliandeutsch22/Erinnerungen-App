@@ -5,9 +5,10 @@
 // Gesten: das GANZE Sheet lässt sich nach unten ziehen und schließen. Im Inhalt
 // greift die Zieh-Geste nur, wenn oben (Scroll = 0) und nach unten gezogen wird —
 // sonst scrollt der Inhalt normal. Umsetzung über die Gesture-Handler-eigene
-// ScrollView + simultaneousWithExternalGesture (offizielles RNGH-Muster für
-// „Sheet ziehen + Inhalt scrollen"); bewusst OHNE Gesture.Native/Animated.Scroll­
-// View, weil diese Kombination auf dem Gerät abgestürzt ist.
+// ScrollView + simultaneousHandlers (klassisches RNGH-Muster für
+// „Sheet ziehen + Inhalt scrollen\"); dieses Pattern ist kompatibler mit Expo
+// / managed workflows und vermeidet native ObjC‑Exceptions, die bei direkten
+// Gesture.Native()-Aufrufen auftreten können.
 //
 // Tastatur: bewusst OHNE KeyboardAvoidingView UND ohne automaticallyAdjust­
 // KeyboardInsets — beides schob den Inhalt in Modals ungewollt hoch (das
@@ -16,8 +17,8 @@
 import { X } from 'lucide-react-native';
 import React, { useRef } from 'react';
 import { Keyboard, Modal, NativeScrollEvent, NativeSyntheticEvent, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
-import { Gesture, GestureDetector, GestureHandlerRootView, ScrollView } from 'react-native-gesture-handler';
-import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
+import { PanGestureHandler, NativeViewGestureHandler, GestureHandlerRootView, ScrollView } from 'react-native-gesture-handler';
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming, useAnimatedGestureHandler } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Glass } from '@/components/Glass';
@@ -68,6 +69,9 @@ export function BottomSheet({
   const scrollY = useSharedValue(0);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- RNGH erwartet einen lockeren Ref-Typ
   const scrollRef = useRef<any>(null);
+  const panRef = useRef<any>(null);
+  const nativeViewRef = useRef<any>(null);
+
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     scrollY.value = e.nativeEvent.contentOffset.y;
   };
@@ -78,29 +82,29 @@ export function BottomSheet({
     onClose();
   };
 
-  // --- WICHTIG: Erstelle ein Gesture-Objekt für die ScrollView. ---
-  const scrollGesture = Gesture.Native();
-
-  // Ganzes Sheet ziehbar; läuft gleichzeitig mit der ScrollView (RNGH-Muster).
-  const pan = Gesture.Pan()
-    .simultaneousWithExternalGesture(scrollGesture)
-    .onChange((e) => {
-      const dragging = translateY.value > 0;
+  // Pan-Geste mit Reanimated's handler — läuft gleichzeitig mit der ScrollView
+  // über simultaneousHandlers (klassisches RNGH-Muster).
+  const panGesture = useAnimatedGestureHandler({
+    onStart: (_, ctx: any) => {
+      ctx.startY = translateY.value;
+    },
+    onActive: (event, ctx: any) => {
       const atTop = scrollY.value <= 0;
       // Sheet mitziehen, wenn schon am Ziehen ODER oben + nach unten.
-      if (dragging || (atTop && e.changeY > 0)) {
-        translateY.value = Math.max(0, translateY.value + e.changeY);
+      if (ctx.startY > 0 || (atTop && event.translationY > 0)) {
+        translateY.value = Math.max(0, ctx.startY + event.translationY);
       }
-    })
-    .onEnd((e) => {
-      if (translateY.value > DISMISS_DISTANCE || (translateY.value > 4 && e.velocityY > DISMISS_VELOCITY)) {
+    },
+    onEnd: (event) => {
+      if (translateY.value > DISMISS_DISTANCE || (translateY.value > 4 && event.velocityY > DISMISS_VELOCITY)) {
         translateY.value = withTiming(windowHeight, { duration: 180 });
         runOnJS(hapticSelect)();
         runOnJS(close)();
       } else {
         translateY.value = withSpring(0, springConfig('snappy'));
       }
-    });
+    },
+  });
 
   const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: translateY.value }] }));
   const backdropStyle = useAnimatedStyle(() => {
@@ -133,7 +137,7 @@ export function BottomSheet({
         {/* Tastaturhöhe als Sockel: hebt das Sheet exakt über die Tastatur. */}
         <View style={{ alignItems: 'center', paddingBottom: keyboard }} pointerEvents="box-none">
           {/* Zieh-Geste liegt auf dem GANZEN Sheet. */}
-          <GestureDetector gesture={pan}>
+          <PanGestureHandler ref={panRef} simultaneousHandlers={nativeViewRef} onGestureEvent={panGesture}>
             <Animated.View style={[{ width: '100%', maxWidth: MAX_CONTENT_WIDTH }, sheetStyle]}>
               <Glass
                 variant="card"
@@ -154,8 +158,8 @@ export function BottomSheet({
                 }}
               >
                 {header}
-                {/* ScrollView in einen GestureDetector für die Native-Scroll-Geste packen */}
-                <GestureDetector gesture={scrollGesture}>
+                {/* ScrollView in einen NativeViewGestureHandler packen und mit refs verbinden */}
+                <NativeViewGestureHandler ref={nativeViewRef} simultaneousHandlers={panRef}>
                   <ScrollView
                     ref={scrollRef}
                     style={{ maxHeight: contentMaxHeight }}
@@ -167,11 +171,11 @@ export function BottomSheet({
                   >
                     {children}
                   </ScrollView>
-                </GestureDetector>
+                </NativeViewGestureHandler>
                 {footer && <View style={{ paddingTop: Spacing.md }}>{footer}</View>}
               </Glass>
             </Animated.View>
-          </GestureDetector>
+          </PanGestureHandler>
         </View>
       </View>
       </GestureHandlerRootView>
