@@ -83,7 +83,9 @@ export default function FilterScreen() {
   };
 
   return (
-    <Screen withTabBar={false}>
+    // Tastatur-Insets: das „Name des Filters"-Feld liegt unter den Kriterien —
+    // bei offener Tastatur muss es sichtbar bleiben (scrollt automatisch mit).
+    <Screen withTabBar={false} automaticallyAdjustKeyboardInsets>
       <Reveal>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <PressableScale accessibilityLabel="Zurück" onPress={() => router.back()} style={{ padding: Spacing.sm, marginLeft: -Spacing.sm }}>
