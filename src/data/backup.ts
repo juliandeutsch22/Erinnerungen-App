@@ -1,31 +1,81 @@
 // backup.ts — JSON-Export/-Import (Fahrplan §3.8): damit die Daten den
-// 7-Tage-Signatur-Zyklus (§8.3) garantiert überleben. Muster aus Cairns
-// dataExport/shareExport übernommen.
+// 7-Tage-Signatur-Zyklus (§8.3) UND eine komplette Neuinstallation überleben.
+//
+// Enthalten sind Listen, Aufgaben (inkl. Tags/Unteraufgaben), gespeicherte
+// Smart-Filter und die Termin-Fotos (als eingebettetes Base64, damit der
+// Rückblick portabel ist). Kalendertermine selbst gehören dem Gerätekalender
+// (EventKit) und synchronisieren über iCloud/Google — sie liegen nicht im Backup.
+//
+// Reine Logik: Datei-/Store-Zugriff wird als Quellen/Senken hereingereicht
+// (siehe backupFile.ts, settings.store.ts), damit dieses Modul testbar bleibt.
 import { Platform, Share } from 'react-native';
 
-import { getListRepository, getTaskRepository } from './index';
+import type { FilterRange, SavedFilter } from '@/lib/taskFilters';
+import { getListRepository, getPhotoRepository, getTaskRepository } from './index';
 import { DEFAULT_LIST_ID } from './ListRepository';
+import type { EventPhoto } from './PhotoRepository';
 import type { List, Rrule, Task } from './types';
+import { newId } from './types';
+
+/** Ein Foto im Backup: Verknüpfung + eingebettete Bilddaten (Base64). */
+export type BackupPhoto = {
+  id: string;
+  eventId: string;
+  addedAt: string;
+  ext: string;
+  /** Base64 der Bilddatei; null, wenn beim Export nicht lesbar. */
+  data: string | null;
+};
 
 export type BackupBundle = {
   app: 'stille';
-  schemaVersion: 1;
+  schemaVersion: 2;
   exportedAt: string;
   lists: List[];
   tasks: Task[];
+  savedFilters: SavedFilter[];
+  photos: BackupPhoto[];
 };
 
-export async function buildBackup(now: Date = new Date()): Promise<BackupBundle> {
-  const [lists, tasks] = await Promise.all([getListRepository().getAll(), getTaskRepository().getAll()]);
-  return { app: 'stille', schemaVersion: 1, exportedAt: now.toISOString(), lists, tasks };
+/** Quellen, die nur zur Laufzeit verfügbar sind (Store, Datei-IO). */
+export type BackupSources = {
+  savedFilters: SavedFilter[];
+  /** Liest eine Foto-Datei als Base64 (nativ). Fehlt/liefert null → Foto als reine Verknüpfung. */
+  readPhotoBase64?: (uri: string) => Promise<string | null>;
+  extFromUri?: (uri: string) => string;
+};
+
+export async function buildBackup(sources: BackupSources, now: Date = new Date()): Promise<BackupBundle> {
+  const [lists, tasks, photoLinks] = await Promise.all([
+    getListRepository().getAll(),
+    getTaskRepository().getAll(),
+    getPhotoRepository().getAll(),
+  ]);
+
+  const extOf = sources.extFromUri ?? ((uri: string) => (uri.split('.').pop() || 'jpg').toLowerCase());
+  const photos: BackupPhoto[] = [];
+  for (const p of photoLinks) {
+    const data = sources.readPhotoBase64 ? await sources.readPhotoBase64(p.uri) : null;
+    photos.push({ id: p.id, eventId: p.eventId, addedAt: p.addedAt, ext: extOf(p.uri), data });
+  }
+
+  return {
+    app: 'stille',
+    schemaVersion: 2,
+    exportedAt: now.toISOString(),
+    lists,
+    tasks,
+    savedFilters: sources.savedFilters,
+    photos,
+  };
 }
 
-export async function exportToJsonString(now?: Date): Promise<string> {
-  return JSON.stringify(await buildBackup(now), null, 2);
+export async function exportToJsonString(sources: BackupSources, now?: Date): Promise<string> {
+  return JSON.stringify(await buildBackup(sources, now), null, 2);
 }
 
-/** Web: Datei-Download. Nativ: Share-Sheet (Datei speichern / AirDrop / …). */
-export async function shareBackup(json: string, filename = 'stille-backup.json'): Promise<void> {
+/** Web-Fallback: Datei-Download über einen Blob (nativ nutzt saveAndShareBackup). */
+export async function shareBackup(json: string, filename = 'erinnerungen-backup.json'): Promise<void> {
   if (Platform.OS === 'web') {
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -42,6 +92,7 @@ export async function shareBackup(json: string, filename = 'stille-backup.json')
 }
 
 const RRULES = new Set(['daily', 'weekdays', 'weekly', 'monthly', 'yearly']);
+const RANGES = new Set<FilterRange>(['all', 'today', 'week', 'overdue', 'undated']);
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null;
@@ -51,22 +102,50 @@ function str(v: unknown): v is string {
   return typeof v === 'string';
 }
 
+function parseSavedFilters(raw: unknown): SavedFilter[] {
+  if (!Array.isArray(raw)) return [];
+  const out: SavedFilter[] = [];
+  for (const f of raw) {
+    if (!isRecord(f) || !str(f.id) || !str(f.name)) continue;
+    out.push({
+      id: f.id,
+      name: f.name,
+      tags: Array.isArray(f.tags) ? f.tags.filter(str) : [],
+      flagged: f.flagged === true,
+      range: str(f.range) && RANGES.has(f.range as FilterRange) ? (f.range as FilterRange) : 'all',
+      includeCompleted: f.includeCompleted === true,
+    });
+  }
+  return out;
+}
+
+/** Senken für nur zur Laufzeit verfügbare Ziele (Store, Datei-IO). */
+export type ImportSinks = {
+  setSavedFilters?: (filters: SavedFilter[]) => void;
+  /** Schreibt Base64-Bilddaten als Datei und gibt die neue URI zurück (nativ). */
+  writePhotoFromBase64?: (ext: string, base64: string) => Promise<string | null>;
+};
+
+export type ImportResult = { lists: number; tasks: number; filters: number; photos: number };
+
 /**
  * Validiert + importiert ein Backup. Ersetzt den kompletten Bestand
- * (Wiederherstellung, kein Merge). Wirft bei ungültigem Format.
+ * (Wiederherstellung, kein Merge). Akzeptiert schemaVersion 1 (Listen/Aufgaben)
+ * und 2 (zusätzlich Filter + Fotos). Wirft bei ungültigem Format.
  */
-export async function importBackup(json: string): Promise<{ lists: number; tasks: number }> {
+export async function importBackup(json: string, sinks: ImportSinks = {}): Promise<ImportResult> {
   let parsed: unknown;
   try {
     parsed = JSON.parse(json);
   } catch {
     throw new Error('Kein gültiges JSON.');
   }
-  if (!isRecord(parsed) || parsed.app !== 'stille' || parsed.schemaVersion !== 1) {
+  if (!isRecord(parsed) || parsed.app !== 'stille' || (parsed.schemaVersion !== 1 && parsed.schemaVersion !== 2)) {
     throw new Error('Kein Erinnerungen-Backup (app/schemaVersion fehlt).');
   }
   const rawLists = Array.isArray(parsed.lists) ? parsed.lists : [];
   const rawTasks = Array.isArray(parsed.tasks) ? parsed.tasks : [];
+  const rawPhotos = Array.isArray(parsed.photos) ? parsed.photos : [];
 
   const lists: List[] = [];
   for (const l of rawLists) {
@@ -108,11 +187,34 @@ export async function importBackup(json: string): Promise<{ lists: number; tasks
     });
   }
 
+  const filters = parseSavedFilters(parsed.savedFilters);
+
+  // Fotos: Base64 zurück in echte Container-Dateien schreiben, dann neu verknüpfen.
+  // Ohne Datei-Senke (Web/Test) werden Fotos übersprungen.
+  const photos: EventPhoto[] = [];
+  for (const p of rawPhotos) {
+    if (!isRecord(p) || !str(p.eventId) || !str(p.data) || !p.data) continue;
+    if (!sinks.writePhotoFromBase64) continue;
+    const uri = await sinks.writePhotoFromBase64(str(p.ext) ? p.ext : 'jpg', p.data);
+    if (!uri) continue;
+    photos.push({
+      id: str(p.id) ? p.id : newId(),
+      eventId: p.eventId,
+      uri,
+      addedAt: str(p.addedAt) ? p.addedAt : new Date().toISOString(),
+    });
+  }
+
   const listRepo = getListRepository();
   const taskRepo = getTaskRepository();
+  const photoRepo = getPhotoRepository();
   await taskRepo.clearAll();
   await listRepo.clearAll();
+  await photoRepo.clearAll();
   for (const l of lists) await listRepo.create(l);
   for (const t of tasks) await taskRepo.create(t);
-  return { lists: lists.length, tasks: tasks.length };
+  await photoRepo.restore(photos);
+  sinks.setSavedFilters?.(filters);
+
+  return { lists: lists.length, tasks: tasks.length, filters: filters.length, photos: photos.length };
 }

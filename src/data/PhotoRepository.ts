@@ -17,6 +17,8 @@ export interface PhotoRepository {
   add(eventId: string, uris: string[]): Promise<EventPhoto[]>;
   remove(id: string): Promise<void>;
   clearAll(): Promise<void>;
+  /** Fügt fertige Verknüpfungen ein (Backup-Wiederherstellung, id/addedAt bleiben erhalten). */
+  restore(photos: EventPhoto[]): Promise<void>;
 }
 
 export function makePhotos(eventId: string, uris: string[], now = new Date()): EventPhoto[] {
@@ -52,5 +54,9 @@ export class InMemoryPhotoRepository implements PhotoRepository {
 
   async clearAll(): Promise<void> {
     this.photos = [];
+  }
+
+  async restore(photos: EventPhoto[]): Promise<void> {
+    this.photos.push(...photos);
   }
 }

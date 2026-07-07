@@ -1,9 +1,15 @@
 // backup.test.ts — Export/Import-Roundtrip (Fahrplan §3.8) über die InMemory-Repos.
 import { exportToJsonString, importBackup } from './backup';
-import { __setListRepositoryForTests, __setTaskRepositoryForTests } from './index';
+import {
+  __setListRepositoryForTests,
+  __setPhotoRepositoryForTests,
+  __setTaskRepositoryForTests,
+} from './index';
 import { InMemoryListRepository } from './ListRepository';
+import { InMemoryPhotoRepository } from './PhotoRepository';
 import { InMemoryTaskRepository } from './TaskRepository';
-import { getListRepository, getTaskRepository } from './index';
+import { getListRepository, getPhotoRepository, getTaskRepository } from './index';
+import type { SavedFilter } from '@/lib/taskFilters';
 import type { Task } from './types';
 
 function task(overrides: Partial<Task>): Task {
@@ -26,15 +32,19 @@ function task(overrides: Partial<Task>): Task {
   };
 }
 
+const noPhotos = { savedFilters: [] as SavedFilter[] };
+
 describe('Backup', () => {
   beforeEach(() => {
     __setListRepositoryForTests(new InMemoryListRepository());
     __setTaskRepositoryForTests(new InMemoryTaskRepository());
+    __setPhotoRepositoryForTests(new InMemoryPhotoRepository());
   });
 
   afterEach(() => {
     __setListRepositoryForTests(null);
     __setTaskRepositoryForTests(null);
+    __setPhotoRepositoryForTests(null);
   });
 
   it('Roundtrip: Export → Import stellt Listen + Aufgaben wieder her', async () => {
@@ -42,14 +52,15 @@ describe('Backup', () => {
     await getTaskRepository().create(task({ id: 't1', listId: 'l1', title: 'Milch', dueDate: '2026-07-04', dueTime: '09:00', rrule: 'weekly', notificationId: 'notif-alt' }));
     await getTaskRepository().create(task({ id: 't2', title: 'Steuer', completedAt: '2026-07-02T10:00:00.000Z' }));
 
-    const json = await exportToJsonString(new Date('2026-07-03T12:00:00.000Z'));
+    const json = await exportToJsonString(noPhotos, new Date('2026-07-03T12:00:00.000Z'));
 
     // Frische Repos = neues Gerät.
     __setListRepositoryForTests(new InMemoryListRepository());
     __setTaskRepositoryForTests(new InMemoryTaskRepository());
+    __setPhotoRepositoryForTests(new InMemoryPhotoRepository());
 
     const result = await importBackup(json);
-    expect(result).toEqual({ lists: 2, tasks: 2 }); // Standardliste + Einkauf
+    expect(result).toEqual({ lists: 2, tasks: 2, filters: 0, photos: 0 }); // Standardliste + Einkauf
 
     const tasks = await getTaskRepository().getAll();
     const milch = tasks.find((t) => t.id === 't1')!;
@@ -63,6 +74,73 @@ describe('Backup', () => {
 
     const lists = await getListRepository().getAll();
     expect(lists.map((l) => l.name).sort()).toEqual(['Einkauf', 'Erinnerungen']);
+  });
+
+  it('Roundtrip: Smart-Filter und Fotos (mit Datei-IO) werden wiederhergestellt', async () => {
+    const filter: SavedFilter = { id: 'f1', name: 'Arbeit heute', tags: ['arbeit'], flagged: true, range: 'today', includeCompleted: false };
+    await getPhotoRepository().restore([
+      { id: 'p1', eventId: 'ev-9', uri: 'file:///old/a.png', addedAt: '2026-07-02T10:00:00.000Z' },
+      { id: 'p2', eventId: 'ev-9', uri: 'file:///old/b.jpg', addedAt: '2026-07-02T10:00:01.000Z' },
+    ]);
+
+    // Fake-IO: Base64 pro URI beim Export, neue URI beim Import.
+    const bytes: Record<string, string> = { 'file:///old/a.png': 'AAAA', 'file:///old/b.jpg': 'BBBB' };
+    const written: { ext: string; data: string }[] = [];
+    const json = await exportToJsonString(
+      { savedFilters: [filter], readPhotoBase64: async (uri) => bytes[uri] ?? null, extFromUri: (uri) => uri.split('.').pop()! },
+      new Date('2026-07-03T12:00:00.000Z'),
+    );
+
+    // Neues Gerät.
+    __setListRepositoryForTests(new InMemoryListRepository());
+    __setTaskRepositoryForTests(new InMemoryTaskRepository());
+    __setPhotoRepositoryForTests(new InMemoryPhotoRepository());
+    const restoredFilters: SavedFilter[][] = [];
+
+    const result = await importBackup(json, {
+      setSavedFilters: (f) => restoredFilters.push(f),
+      writePhotoFromBase64: async (ext, data) => {
+        written.push({ ext, data });
+        return `file:///new/${written.length}.${ext}`;
+      },
+    });
+
+    expect(result.filters).toBe(1);
+    expect(result.photos).toBe(2);
+    expect(restoredFilters[0]).toEqual([filter]);
+    // Bytes wurden korrekt durchgereicht (png/jpg unterschieden). getAll liefert
+    // die neuesten zuerst → b.jpg (10:00:01) vor a.png (10:00:00).
+    expect(written).toEqual([
+      { ext: 'jpg', data: 'BBBB' },
+      { ext: 'png', data: 'AAAA' },
+    ]);
+    const photos = await getPhotoRepository().getAll();
+    expect(photos.map((p) => p.eventId)).toEqual(['ev-9', 'ev-9']);
+    expect(photos.every((p) => p.uri.startsWith('file:///new/'))).toBe(true);
+  });
+
+  it('ohne Datei-Senke werden Fotos übersprungen (Web/Einfügen)', async () => {
+    await getPhotoRepository().restore([
+      { id: 'p1', eventId: 'ev-9', uri: 'file:///old/a.png', addedAt: '2026-07-02T10:00:00.000Z' },
+    ]);
+    const json = await exportToJsonString({ savedFilters: [], readPhotoBase64: async () => 'AAAA' });
+
+    __setPhotoRepositoryForTests(new InMemoryPhotoRepository());
+    const result = await importBackup(json); // keine Senken
+    expect(result.photos).toBe(0);
+    expect(await getPhotoRepository().getAll()).toEqual([]);
+  });
+
+  it('liest ältere schemaVersion-1-Backups (ohne Filter/Fotos)', async () => {
+    const json = JSON.stringify({
+      app: 'stille',
+      schemaVersion: 1,
+      exportedAt: '2026-07-03T12:00:00.000Z',
+      lists: [],
+      tasks: [{ id: 'x', listId: 'default', title: 'Alt' }],
+    });
+    const result = await importBackup(json);
+    expect(result).toEqual({ lists: 0, tasks: 1, filters: 0, photos: 0 });
   });
 
   it('Aufgaben mit unbekannter Liste fallen in die Standardliste', async () => {

@@ -2,7 +2,7 @@
 // Standard-Uhrzeit, Sammel-Notification, JSON-Backup (Export/Import §3.8).
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, Download, Upload } from 'lucide-react-native';
+import { ChevronLeft, Download, FolderOpen, Upload } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { TextInput, View } from 'react-native';
 
@@ -15,6 +15,14 @@ import { Screen } from '@/components/Screen';
 import { Seam } from '@/components/Seam';
 import { Type } from '@/components/Type';
 import { exportToJsonString, importBackup, shareBackup } from '@/data/backup';
+import {
+  extFromUri,
+  fileBackupAvailable,
+  pickBackupFile,
+  readPhotoBase64,
+  saveAndShareBackup,
+  writePhotoFromBase64,
+} from '@/lib/backupFile';
 import { queryKeys } from '@/data/queries';
 import { requestReschedule } from '@/lib/notifications';
 import { hapticSuccess } from '@/lib/haptics';
@@ -51,14 +59,49 @@ export default function EinstellungenScreen() {
   const setDefaultDueTime = useSettings((s) => s.setDefaultDueTime);
   const setSummaryEnabled = useSettings((s) => s.setSummaryEnabled);
   const setSummaryTime = useSettings((s) => s.setSummaryTime);
+  const setSavedFilters = useSettings((s) => s.setSavedFilters);
 
   const [importText, setImportText] = useState('');
   const [confirmImport, setConfirmImport] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const doExport = async () => {
-    const json = await exportToJsonString();
-    await shareBackup(json);
+    const json = await exportToJsonString({
+      savedFilters: useSettings.getState().savedFilters,
+      readPhotoBase64,
+      extFromUri,
+    });
+    if (fileBackupAvailable) await saveAndShareBackup(json);
+    else await shareBackup(json);
+  };
+
+  // Gemeinsame Wiederherstellung — aus Datei oder eingefügtem Text.
+  const runImport = async (json: string) => {
+    try {
+      const { lists, tasks, filters, photos } = await importBackup(json, {
+        setSavedFilters,
+        writePhotoFromBase64,
+      });
+      await qc.invalidateQueries();
+      requestReschedule();
+      hapticSuccess();
+      setImportText('');
+      setConfirmImport(false);
+      const extras = [filters ? `${filters} Filter` : '', photos ? `${photos} Fotos` : ''].filter(Boolean);
+      setFeedback(`Wiederhergestellt: ${lists} Listen, ${tasks} Aufgaben${extras.length ? ', ' + extras.join(', ') : ''}.`);
+    } catch (e) {
+      setFeedback(e instanceof Error ? e.message : 'Import fehlgeschlagen.');
+    }
+  };
+
+  const doImportFile = async () => {
+    setFeedback(null);
+    try {
+      const json = await pickBackupFile();
+      if (json) await runImport(json);
+    } catch (e) {
+      setFeedback(e instanceof Error ? e.message : 'Import fehlgeschlagen.');
+    }
   };
 
   const doImport = async () => {
@@ -66,18 +109,7 @@ export default function EinstellungenScreen() {
       setConfirmImport(true);
       return;
     }
-    setConfirmImport(false);
-    try {
-      const { lists, tasks } = await importBackup(importText);
-      await qc.invalidateQueries({ queryKey: queryKeys.tasks });
-      await qc.invalidateQueries({ queryKey: queryKeys.lists });
-      requestReschedule();
-      hapticSuccess();
-      setImportText('');
-      setFeedback(`Wiederhergestellt: ${lists} Listen, ${tasks} Aufgaben.`);
-    } catch (e) {
-      setFeedback(e instanceof Error ? e.message : 'Import fehlgeschlagen.');
-    }
+    await runImport(importText);
   };
 
   return (
@@ -156,7 +188,8 @@ export default function EinstellungenScreen() {
         <GlassPanel>
           <Type variant="label" tone="text2">Backup</Type>
           <Type variant="caption" tone="text3" style={{ marginTop: 2 }}>
-            JSON-Export deiner Listen und Aufgaben — wichtig vor dem Nachsignieren (7-Tage-Zyklus).
+            Sichert Listen, Aufgaben, Filter und Termin-Fotos in einer Datei — wichtig vor dem
+            Nachsignieren (7-Tage-Zyklus) oder einer Neuinstallation.
           </Type>
           <GlassButton
             size="sm"
@@ -165,14 +198,30 @@ export default function EinstellungenScreen() {
             style={{ marginTop: Spacing.md, alignSelf: 'flex-start' }}
           >
             <Download size={15} color="#FFFFFF" strokeWidth={2.2} />
-            <Type variant="label" style={{ color: '#FFFFFF' }}>Exportieren</Type>
+            <Type variant="label" style={{ color: '#FFFFFF' }}>Sichern</Type>
           </GlassButton>
 
           <Seam />
 
           <Type variant="label" tone="text2">Wiederherstellen</Type>
           <Type variant="caption" tone="text3" style={{ marginTop: 2 }}>
-            Backup-JSON hier einfügen. Ersetzt den kompletten Bestand.
+            Ersetzt den kompletten Bestand durch ein Backup.
+          </Type>
+          {fileBackupAvailable && (
+            <GlassButton
+              size="sm"
+              variant="secondary"
+              tone="indigo"
+              accessibilityLabel="Backup aus Datei wählen"
+              onPress={() => void doImportFile()}
+              style={{ marginTop: Spacing.md, alignSelf: 'flex-start' }}
+            >
+              <FolderOpen size={15} color={colors.indigo} strokeWidth={2.2} />
+              <Type variant="label" style={{ color: colors.indigo }}>Aus Datei wählen</Type>
+            </GlassButton>
+          )}
+          <Type variant="caption" tone="text3" style={{ marginTop: Spacing.md }}>
+            Oder Backup-JSON direkt einfügen{fileBackupAvailable ? ' (ohne Fotos)' : ''}.
           </Type>
           <TextInput
             value={importText}

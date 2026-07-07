@@ -48,7 +48,8 @@
           "calendarPermission": "Erinnerungen zeigt deine Kalender-Termine neben deinen Aufgaben an — alles bleibt auf dem Gerät."
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,

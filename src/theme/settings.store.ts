@@ -29,6 +29,8 @@ type SettingsState = {
   setSummaryTime: (t: string) => void;
   addSavedFilter: (f: SavedFilter) => void;
   removeSavedFilter: (id: string) => void;
+  /** Ersetzt alle Filter (Backup-Wiederherstellung). */
+  setSavedFilters: (f: SavedFilter[]) => void;
   setHasHydrated: (v: boolean) => void;
 };
 
@@ -49,6 +51,7 @@ export const useSettings = create<SettingsState>()(
       setSummaryTime: (summaryTime) => set({ summaryTime }),
       addSavedFilter: (f) => set((s) => ({ savedFilters: [...s.savedFilters, f] })),
       removeSavedFilter: (id) => set((s) => ({ savedFilters: s.savedFilters.filter((x) => x.id !== id) })),
+      setSavedFilters: (savedFilters) => set({ savedFilters }),
       setHasHydrated: (_hasHydrated) => set({ _hasHydrated }),
     }),
     {

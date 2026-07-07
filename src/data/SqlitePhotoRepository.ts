@@ -46,4 +46,18 @@ export class SqlitePhotoRepository implements PhotoRepository {
     const db = await getDb();
     await db.execAsync('DELETE FROM event_photos;');
   }
+
+  async restore(photos: EventPhoto[]): Promise<void> {
+    const db = await getDb();
+    await db.withTransactionAsync(async () => {
+      for (const p of photos) {
+        await db.runAsync('INSERT OR REPLACE INTO event_photos (id, event_id, uri, added_at) VALUES (?, ?, ?, ?)', [
+          p.id,
+          p.eventId,
+          p.uri,
+          p.addedAt,
+        ]);
+      }
+    });
+  }
 }
