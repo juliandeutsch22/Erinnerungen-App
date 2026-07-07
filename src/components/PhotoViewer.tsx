@@ -3,6 +3,8 @@
 import { Trash2, X } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PressableScale } from '@/components/PressableScale';
@@ -28,11 +30,35 @@ export function PhotoViewer({
   const [confirm, setConfirm] = useState(false);
 
   const photo = photos[current];
+
+  // Nach unten wischen schließt (nur klar vertikal → bricht das horizontale
+  // Blättern nicht). Backdrop dimmt mit der Distanz.
+  const dragY = useSharedValue(0);
+  const swipeDown = Gesture.Pan()
+    .activeOffsetY(24)
+    .failOffsetX([-24, 24])
+    .onChange((e) => {
+      dragY.value = Math.max(0, dragY.value + e.changeY);
+    })
+    .onEnd((e) => {
+      if (dragY.value > 140 || e.velocityY > 800) {
+        dragY.value = withTiming(height, { duration: 180 });
+        runOnJS(onClose)();
+      } else {
+        dragY.value = withSpring(0, { damping: 22, stiffness: 320 });
+      }
+    });
+
+  const contentStyle = useAnimatedStyle(() => ({ transform: [{ translateY: dragY.value }] }));
+  const bgStyle = useAnimatedStyle(() => ({ opacity: Math.max(0.3, 1 - dragY.value / 500) }));
+
   if (!photo) return null;
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.96)' }}>
+      <Animated.View style={[{ flex: 1, backgroundColor: '#000' }, bgStyle]}>
+        <GestureDetector gesture={swipeDown}>
+          <Animated.View style={[{ flex: 1 }, contentStyle]}>
         <ScrollView
           horizontal
           pagingEnabled
@@ -46,6 +72,8 @@ export function PhotoViewer({
             </Pressable>
           ))}
         </ScrollView>
+          </Animated.View>
+        </GestureDetector>
 
         {/* Schließen */}
         <PressableScale
@@ -98,7 +126,7 @@ export function PhotoViewer({
             <Type variant="label" style={{ color: '#FFFFFF' }}>{confirm ? 'Wirklich löschen?' : 'Löschen'}</Type>
           </PressableScale>
         )}
-      </View>
+      </Animated.View>
     </Modal>
   );
 }

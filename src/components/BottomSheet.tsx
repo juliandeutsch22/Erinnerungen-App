@@ -2,26 +2,36 @@
 // eigener Screen). RN-Modal mit Slide + dimmendem Backdrop; Inhalt auf einer
 // Liquid-Glass-Fläche, deren untere Kanten unter den Screenrand tauchen.
 //
+// Gesten: am Grabber/Kopf nach unten ziehen schließt das Sheet (Spring zurück,
+// wenn unter der Schwelle). Backdrop dimmt mit der Zieh-Distanz.
+//
 // Tastatur: bewusst OHNE KeyboardAvoidingView (in Modals unzuverlässig —
 // Sheet wanderte aus dem Sichtfeld). Stattdessen hebt die gemessene
 // Tastaturhöhe das Sheet an und der Inhalt schrumpft auf den sichtbaren
 // Bereich, sodass das fokussierte Feld nie verdeckt wird.
 import { X } from 'lucide-react-native';
 import React from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Keyboard, Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Glass } from '@/components/Glass';
 import { PressableScale } from '@/components/PressableScale';
 import { Type } from '@/components/Type';
+import { hapticSelect } from '@/lib/haptics';
 import { useKeyboardHeight } from '@/lib/useKeyboardHeight';
 import { MAX_CONTENT_WIDTH } from '@/theme/layout';
+import { springConfig } from '@/theme/motion.tokens';
 import { useColors } from '@/theme/ThemeProvider';
 import { Shadow, Spacing } from '@/theme/theme.tokens';
 
 const SHEET_RADIUS = 32;
 // Platz für Grabber + Kopfzeile + Paddings innerhalb des Sheets.
 const CHROME_HEIGHT = 120;
+// Ab dieser Zieh-Distanz (oder mit Schwung) schließt das Sheet.
+const DISMISS_DISTANCE = 130;
+const DISMISS_VELOCITY = 900;
 
 export function BottomSheet({
   visible,
@@ -48,52 +58,94 @@ export function BottomSheet({
   const contentMaxHeight = Math.max(160, Math.min(520, available));
   const bottomPad = keyboard > 0 ? Spacing.md : Math.max(insets.bottom, Spacing.sm) + Spacing.lg;
 
+  // Zieh-Offset des Sheets (0 = Ruhelage). Nur nach unten wirksam.
+  const translateY = useSharedValue(0);
+
+  const close = () => {
+    // Tastatur zuerst schließen, damit das Sheet nicht kurz nachspringt.
+    Keyboard.dismiss();
+    onClose();
+  };
+
+  const pan = Gesture.Pan()
+    .onChange((e) => {
+      // Nach unten frei, nach oben mit Widerstand (leichtes Gummiband).
+      const next = translateY.value + e.changeY;
+      translateY.value = next < 0 ? next * 0.25 : next;
+    })
+    .onEnd((e) => {
+      if (translateY.value > DISMISS_DISTANCE || e.velocityY > DISMISS_VELOCITY) {
+        translateY.value = withTiming(windowHeight, { duration: 180 });
+        runOnJS(hapticSelect)();
+        runOnJS(close)();
+      } else {
+        translateY.value = withSpring(0, springConfig('snappy'));
+      }
+    });
+
+  const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: Math.max(translateY.value, -40) }] }));
+  const backdropStyle = useAnimatedStyle(() => {
+    const fade = Math.max(0, 1 - translateY.value / (DISMISS_DISTANCE * 2.4));
+    return { opacity: translateY.value > 0 ? fade : 1 };
+  });
+
+  // Grabber + Kopfzeile tragen die Zieh-Geste (nicht der Scroll-Bereich).
+  const header = (
+    <GestureDetector gesture={pan}>
+      <View>
+        <View style={{ alignItems: 'center', paddingBottom: Spacing.sm, paddingTop: Spacing.xs }}>
+          <View style={{ width: 40, height: 5, borderRadius: 3, backgroundColor: colors.border2 }} />
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.md }}>
+          <Type variant="heading">{title}</Type>
+          <PressableScale accessibilityLabel="Schließen" onPress={close} style={{ padding: Spacing.xs }}>
+            <X size={22} color={colors.text3} strokeWidth={2} />
+          </PressableScale>
+        </View>
+      </View>
+    </GestureDetector>
+  );
+
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      {/* Backdrop dimmt und schließt beim Tap. */}
-      <Pressable accessibilityLabel="Schließen" onPress={onClose} style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.4)' }]} />
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
+      {/* Backdrop dimmt (mit der Zieh-Distanz) und schließt beim Tap. */}
+      <Animated.View style={[StyleSheet.absoluteFill, backdropStyle]} pointerEvents="box-none">
+        <Pressable accessibilityLabel="Schließen" onPress={close} style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.4)' }]} />
+      </Animated.View>
       <View style={{ flex: 1, justifyContent: 'flex-end' }} pointerEvents="box-none">
         {/* Tastaturhöhe als Sockel: hebt das Sheet exakt über die Tastatur. */}
         <View style={{ alignItems: 'center', paddingBottom: keyboard }} pointerEvents="box-none">
-          <Glass
-            variant="card"
-            radius={SHEET_RADIUS}
-            intensity={90}
-            style={[
-              Shadow.lg,
-              {
-                width: '100%',
-                maxWidth: MAX_CONTENT_WIDTH,
-                // Untere Rundung unter den Screenrand bzw. hinter die Tastatur schieben.
-                marginBottom: -SHEET_RADIUS,
-              },
-            ]}
-            contentStyle={{
-              paddingHorizontal: Spacing.lg,
-              paddingTop: Spacing.md,
-              paddingBottom: SHEET_RADIUS + bottomPad,
-            }}
-          >
-            {/* Grabber + Kopfzeile */}
-            <View style={{ alignItems: 'center', paddingBottom: Spacing.sm }}>
-              <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border2 }} />
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.md }}>
-              <Type variant="heading">{title}</Type>
-              <PressableScale accessibilityLabel="Schließen" onPress={onClose} style={{ padding: Spacing.xs }}>
-                <X size={22} color={colors.text3} strokeWidth={2} />
-              </PressableScale>
-            </View>
-            <ScrollView
-              style={{ maxHeight: contentMaxHeight }}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-              automaticallyAdjustKeyboardInsets
+          <Animated.View style={[{ width: '100%', maxWidth: MAX_CONTENT_WIDTH }, sheetStyle]}>
+            <Glass
+              variant="card"
+              radius={SHEET_RADIUS}
+              intensity={90}
+              style={[
+                Shadow.lg,
+                {
+                  width: '100%',
+                  // Untere Rundung unter den Screenrand bzw. hinter die Tastatur schieben.
+                  marginBottom: -SHEET_RADIUS,
+                },
+              ]}
+              contentStyle={{
+                paddingHorizontal: Spacing.lg,
+                paddingTop: Spacing.md,
+                paddingBottom: SHEET_RADIUS + bottomPad,
+              }}
             >
-              {children}
-            </ScrollView>
-            {footer && <View style={{ paddingTop: Spacing.md }}>{footer}</View>}
-          </Glass>
+              {header}
+              <ScrollView
+                style={{ maxHeight: contentMaxHeight }}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+                automaticallyAdjustKeyboardInsets
+              >
+                {children}
+              </ScrollView>
+              {footer && <View style={{ paddingTop: Spacing.md }}>{footer}</View>}
+            </Glass>
+          </Animated.View>
         </View>
       </View>
     </Modal>
