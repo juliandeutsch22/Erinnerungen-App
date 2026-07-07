@@ -21,6 +21,10 @@ export type List = {
   icon: string;
   /** Akzentfarbe (Hex) — aus einer kuratierten Palette, nicht frei. */
   color: string;
+  /** Projekt-Ziel: worauf die Liste hinarbeitet (frei, optional). */
+  goal: string | null;
+  /** Projekt-Deadline ('YYYY-MM-DD', optional) — macht die Liste zum Projekt. */
+  deadline: string | null;
   sort: number;
   createdAt: string; // ISO
 };
@@ -68,6 +72,8 @@ export type NewList = {
   name: string;
   icon: string;
   color: string;
+  goal?: string | null;
+  deadline?: string | null;
 };
 
 /** Dependency-freier ID-Generator (ein Nutzer, ein Gerät — kein UUID nötig). */

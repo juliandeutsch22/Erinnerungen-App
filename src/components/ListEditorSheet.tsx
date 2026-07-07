@@ -1,17 +1,19 @@
 // ListEditorSheet.tsx — Liste anlegen/bearbeiten: Name, Icon (kuratiert),
 // Akzentfarbe (Teal/Indigo-Familie). Löschen zweistufig, Standardliste nie.
-import { Trash2 } from 'lucide-react-native';
+import { CalendarClock, CalendarX2, Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { TextInput, View } from 'react-native';
 
 import { BottomSheet } from '@/components/BottomSheet';
 import { GlassButton } from '@/components/GlassButton';
 import { LIST_COLORS, LIST_ICONS } from '@/components/listMeta';
+import { MiniCalendar } from '@/components/MiniCalendar';
 import { PressableScale } from '@/components/PressableScale';
 import { Type } from '@/components/Type';
 import { DEFAULT_LIST_ID } from '@/data/ListRepository';
 import { useCreateList, useDeleteList, useUpdateList } from '@/data/queries';
 import type { List } from '@/data/types';
+import { deadlineLabel, todayStr } from '@/lib/dates';
 import { hapticSelect } from '@/lib/haptics';
 import { webNoOutline } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
@@ -26,16 +28,21 @@ export function ListEditorSheet({ list, onClose }: { list: List | null; onClose:
   const [name, setName] = useState(list?.name ?? '');
   const [icon, setIcon] = useState(list?.icon ?? 'inbox');
   const [color, setColor] = useState(list?.color ?? LIST_COLORS[0]);
+  const [goal, setGoal] = useState(list?.goal ?? '');
+  const [deadline, setDeadline] = useState<string | null>(list?.deadline ?? null);
+  const [showCalendar, setShowCalendar] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  const today = todayStr();
   const isEdit = list !== null;
   const canDelete = isEdit && list.id !== DEFAULT_LIST_ID;
   const canSave = name.trim().length > 0;
 
   const save = () => {
     if (!canSave) return;
-    if (isEdit) updateList.mutate({ id: list.id, patch: { name: name.trim(), icon, color } });
-    else createList.mutate({ name: name.trim(), icon, color });
+    const goalValue = goal.trim().length > 0 ? goal.trim() : null;
+    if (isEdit) updateList.mutate({ id: list.id, patch: { name: name.trim(), icon, color, goal: goalValue, deadline } });
+    else createList.mutate({ name: name.trim(), icon, color, goal: goalValue, deadline });
     onClose();
   };
 
@@ -111,6 +118,62 @@ export function ListEditorSheet({ list, onClose }: { list: List | null; onClose:
           );
         })}
       </View>
+
+      {/* Projekt: optionales Ziel + Deadline machen die Liste zum Projekt. */}
+      <Type variant="label" tone="text2" style={{ marginBottom: Spacing.sm }}>Ziel (optional)</Type>
+      <TextInput
+        value={goal}
+        onChangeText={setGoal}
+        placeholder="Worauf arbeitet diese Liste hin?"
+        placeholderTextColor={colors.text3}
+        accessibilityLabel="Ziel der Liste"
+        style={[
+          { fontSize: T.md, color: colors.text, paddingVertical: Spacing.sm, borderBottomWidth: 1, borderColor: colors.border2, marginBottom: Spacing.lg },
+          webNoOutline,
+        ]}
+      />
+
+      <Type variant="label" tone="text2" style={{ marginBottom: Spacing.sm }}>Deadline (optional)</Type>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: showCalendar ? Spacing.md : Spacing.xl }}>
+        <PressableScale
+          accessibilityLabel="Deadline wählen"
+          onPress={() => {
+            hapticSelect();
+            setShowCalendar((v) => !v);
+          }}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, paddingVertical: Spacing.sm, paddingHorizontal: Spacing.md, borderRadius: R.pill, backgroundColor: deadline ? `${color}1F` : colors.chip, borderWidth: 1, borderColor: deadline ? color : colors.chipBorder }}
+        >
+          <CalendarClock size={15} color={deadline ? color : colors.text3} strokeWidth={2} />
+          <Type variant="label" tone={deadline ? 'text' : 'text3'}>
+            {deadline ? deadlineLabel(deadline, today) : 'Keine Deadline'}
+          </Type>
+        </PressableScale>
+        {deadline && (
+          <PressableScale
+            accessibilityLabel="Deadline entfernen"
+            onPress={() => {
+              hapticSelect();
+              setDeadline(null);
+              setShowCalendar(false);
+            }}
+            style={{ padding: Spacing.sm }}
+          >
+            <CalendarX2 size={16} color={colors.text3} strokeWidth={2} />
+          </PressableScale>
+        )}
+      </View>
+      {showCalendar && (
+        <View style={{ marginBottom: Spacing.xl }}>
+          <MiniCalendar
+            selected={deadline}
+            minDate={today}
+            onSelect={(d) => {
+              setDeadline(d);
+              setShowCalendar(false);
+            }}
+          />
+        </View>
+      )}
 
       <GlassButton accessibilityLabel={isEdit ? 'Änderungen sichern' : 'Liste anlegen'} onPress={save} disabled={!canSave}>
         <Type variant="label" style={{ color: '#FFFFFF' }}>{isEdit ? 'Sichern' : 'Anlegen'}</Type>

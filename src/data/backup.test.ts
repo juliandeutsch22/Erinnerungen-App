@@ -48,7 +48,7 @@ describe('Backup', () => {
   });
 
   it('Roundtrip: Export → Import stellt Listen + Aufgaben wieder her', async () => {
-    await getListRepository().create({ id: 'l1', name: 'Einkauf', icon: 'shopping-cart', color: '#5B6CFF', sort: 1, createdAt: '2026-07-01T08:00:00.000Z' });
+    await getListRepository().create({ id: 'l1', name: 'Einkauf', icon: 'shopping-cart', color: '#5B6CFF', goal: null, deadline: null, sort: 1, createdAt: '2026-07-01T08:00:00.000Z' });
     await getTaskRepository().create(task({ id: 't1', listId: 'l1', title: 'Milch', dueDate: '2026-07-04', dueTime: '09:00', rrule: 'weekly', notificationId: 'notif-alt' }));
     await getTaskRepository().create(task({ id: 't2', title: 'Steuer', completedAt: '2026-07-02T10:00:00.000Z' }));
 
@@ -74,6 +74,18 @@ describe('Backup', () => {
 
     const lists = await getListRepository().getAll();
     expect(lists.map((l) => l.name).sort()).toEqual(['Einkauf', 'Erinnerungen']);
+  });
+
+  it('Roundtrip: Projekt-Ziel und Deadline bleiben erhalten', async () => {
+    await getListRepository().create({ id: 'p1', name: 'Umzug', icon: 'briefcase', color: '#5B6CFF', goal: 'Bis Ende Juli umziehen', deadline: '2026-07-31', sort: 2, createdAt: '2026-07-01T08:00:00.000Z' });
+    const json = await exportToJsonString(noPhotos, new Date('2026-07-03T12:00:00.000Z'));
+
+    __setListRepositoryForTests(new InMemoryListRepository());
+    await importBackup(json);
+
+    const p = (await getListRepository().getAll()).find((l) => l.id === 'p1')!;
+    expect(p.goal).toBe('Bis Ende Juli umziehen');
+    expect(p.deadline).toBe('2026-07-31');
   });
 
   it('Roundtrip: Smart-Filter und Fotos (mit Datei-IO) werden wiederhergestellt', async () => {

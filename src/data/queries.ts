@@ -141,6 +141,8 @@ export function useCreateList() {
         name: input.name.trim(),
         icon: input.icon,
         color: input.color,
+        goal: input.goal ?? null,
+        deadline: input.deadline ?? null,
         sort: now.getTime(),
         createdAt: now.toISOString(),
       };

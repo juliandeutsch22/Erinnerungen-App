@@ -47,11 +47,18 @@ export function getDb(): Promise<SQLiteDatabase> {
         );
         CREATE INDEX IF NOT EXISTS idx_event_photos_event ON event_photos (event_id);
       `);
-      // Migration: tags/subtasks als JSON-Spalten nachrüsten (bestehende Installs).
+      // Migration: neue Spalten nachrüsten (bestehende Installs).
       // ALTER wirft, wenn die Spalte schon existiert → still schlucken.
       for (const col of ['tags TEXT', 'subtasks TEXT']) {
         try {
           await db.execAsync(`ALTER TABLE tasks ADD COLUMN ${col};`);
+        } catch {
+          /* Spalte existiert bereits */
+        }
+      }
+      for (const col of ['goal TEXT', 'deadline TEXT']) {
+        try {
+          await db.execAsync(`ALTER TABLE lists ADD COLUMN ${col};`);
         } catch {
           /* Spalte existiert bereits */
         }

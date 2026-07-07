@@ -1,6 +1,6 @@
 // taskLogic.test.ts — Überfällig-Ableitung, Abhak-Semantik, Gruppierungen.
 import type { Task } from '@/data/types';
-import { adoptOverdueToToday, groupPlanned, groupToday, groupUpcomingDays, isDueToday, isOverdue, recentlyCompleted, resolveCompletion } from './taskLogic';
+import { adoptOverdueToToday, groupPlanned, listProgress, groupToday, groupUpcomingDays, isDueToday, isOverdue, recentlyCompleted, resolveCompletion } from './taskLogic';
 
 const TODAY = '2026-07-03';
 
@@ -134,5 +134,21 @@ describe('adoptOverdueToToday', () => {
 
   it('leere Liste, wenn nichts überfällig ist', () => {
     expect(adoptOverdueToToday([task({ dueDate: '2026-07-03' })], TODAY)).toEqual([]);
+  });
+});
+
+describe('listProgress', () => {
+  it('zählt erledigte gegen alle Aufgaben', () => {
+    const tasks = [
+      task({ id: 'a', completedAt: '2026-07-02T10:00:00.000Z' }),
+      task({ id: 'b' }),
+      task({ id: 'c', dueDate: '2026-07-04' }),
+      task({ id: 'd', completedAt: '2026-07-01T09:00:00.000Z' }),
+    ];
+    expect(listProgress(tasks)).toEqual({ done: 2, total: 4, ratio: 0.5 });
+  });
+
+  it('leere Liste → ratio 0', () => {
+    expect(listProgress([])).toEqual({ done: 0, total: 0, ratio: 0 });
   });
 });

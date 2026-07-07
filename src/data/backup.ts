@@ -155,6 +155,8 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
       name: l.name,
       icon: str(l.icon) ? l.icon : 'inbox',
       color: str(l.color) ? l.color : '#1FB6A6',
+      goal: str(l.goal) ? l.goal : null,
+      deadline: str(l.deadline) ? l.deadline : null,
       sort: typeof l.sort === 'number' ? l.sort : 0,
       createdAt: str(l.createdAt) ? l.createdAt : new Date().toISOString(),
     });

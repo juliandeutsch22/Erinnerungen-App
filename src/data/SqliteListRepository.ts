@@ -3,10 +3,28 @@ import { getDb } from './db';
 import { DEFAULT_LIST_ID, defaultList, ListRepository } from './ListRepository';
 import type { List } from './types';
 
-type ListRow = { id: string; name: string; icon: string; color: string; sort: number; created_at: string };
+type ListRow = {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  goal: string | null;
+  deadline: string | null;
+  sort: number;
+  created_at: string;
+};
 
 function toList(r: ListRow): List {
-  return { id: r.id, name: r.name, icon: r.icon, color: r.color, sort: r.sort, createdAt: r.created_at };
+  return {
+    id: r.id,
+    name: r.name,
+    icon: r.icon,
+    color: r.color,
+    goal: r.goal ?? null,
+    deadline: r.deadline ?? null,
+    sort: r.sort,
+    createdAt: r.created_at,
+  };
 }
 
 export class SqliteListRepository implements ListRepository {
@@ -19,18 +37,20 @@ export class SqliteListRepository implements ListRepository {
   async create(list: List): Promise<void> {
     const db = await getDb();
     await db.runAsync(
-      'INSERT OR REPLACE INTO lists (id, name, icon, color, sort, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-      [list.id, list.name, list.icon, list.color, list.sort, list.createdAt],
+      'INSERT OR REPLACE INTO lists (id, name, icon, color, goal, deadline, sort, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [list.id, list.name, list.icon, list.color, list.goal, list.deadline, list.sort, list.createdAt],
     );
   }
 
   async update(id: string, patch: Partial<Omit<List, 'id'>>): Promise<void> {
     const db = await getDb();
     const sets: string[] = [];
-    const args: (string | number)[] = [];
+    const args: (string | number | null)[] = [];
     if (patch.name !== undefined) { sets.push('name = ?'); args.push(patch.name); }
     if (patch.icon !== undefined) { sets.push('icon = ?'); args.push(patch.icon); }
     if (patch.color !== undefined) { sets.push('color = ?'); args.push(patch.color); }
+    if (patch.goal !== undefined) { sets.push('goal = ?'); args.push(patch.goal); }
+    if (patch.deadline !== undefined) { sets.push('deadline = ?'); args.push(patch.deadline); }
     if (patch.sort !== undefined) { sets.push('sort = ?'); args.push(patch.sort); }
     if (sets.length === 0) return;
     args.push(id);

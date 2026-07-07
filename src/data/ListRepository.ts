@@ -10,6 +10,8 @@ export function defaultList(): List {
     name: 'Erinnerungen',
     icon: 'inbox',
     color: '#1FB6A6',
+    goal: null,
+    deadline: null,
     sort: 0,
     createdAt: new Date().toISOString(),
   };

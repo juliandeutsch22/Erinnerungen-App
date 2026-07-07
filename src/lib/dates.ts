@@ -75,6 +75,22 @@ export function nextOccurrenceAfter(dueDate: string, rrule: Rrule, today: string
   return next;
 }
 
+/** Ganze Kalendertage von `from` bis `to` (positiv = to liegt später). */
+export function daysBetween(from: string, to: string): number {
+  const ms = parseDateStr(to).getTime() - parseDateStr(from).getTime();
+  return Math.round(ms / 86400000);
+}
+
+/** Projekt-Deadline relativ zu heute: „heute fällig", „noch 3 Tage", „2 Tage überfällig". */
+export function deadlineLabel(deadline: string, today: string): string {
+  const d = daysBetween(today, deadline);
+  if (d === 0) return 'heute fällig';
+  if (d === 1) return 'morgen fällig';
+  if (d > 1) return `noch ${d} Tage`;
+  if (d === -1) return '1 Tag überfällig';
+  return `${-d} Tage überfällig`;
+}
+
 /** Nächster Samstag (heute, falls Samstag) — für den „Wochenende"-Chip. */
 export function nextWeekend(today: string): string {
   const dow = parseDateStr(today).getDay();

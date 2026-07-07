@@ -1,5 +1,5 @@
 // dates.test.ts — Wiederholungs-Berechnung + lokale Kalenderdaten (Fahrplan M1).
-import { addDays, formatDueDate, nextOccurrence, nextOccurrenceAfter, parseDateStr, toDateStr } from './dates';
+import { addDays, daysBetween, deadlineLabel, formatDueDate, nextOccurrence, nextOccurrenceAfter, parseDateStr, toDateStr } from './dates';
 
 describe('toDateStr/parseDateStr', () => {
   it('läuft lokal rund (kein UTC-Versatz)', () => {
@@ -65,5 +65,28 @@ describe('formatDueDate', () => {
     expect(formatDueDate('2026-07-02', '2026-07-03')).toBe('Gestern');
     expect(formatDueDate('2026-07-15', '2026-07-03')).toBe('Mi 15.7.');
     expect(formatDueDate('2027-01-04', '2026-07-03')).toBe('Mo 4.1.2027');
+  });
+});
+
+describe('daysBetween', () => {
+  it('positiv vorwärts, negativ rückwärts, 0 gleich', () => {
+    expect(daysBetween('2026-07-03', '2026-07-06')).toBe(3);
+    expect(daysBetween('2026-07-06', '2026-07-03')).toBe(-3);
+    expect(daysBetween('2026-07-03', '2026-07-03')).toBe(0);
+  });
+
+  it('rechnet über Monatsgrenzen korrekt', () => {
+    expect(daysBetween('2026-07-30', '2026-08-02')).toBe(3);
+  });
+});
+
+describe('deadlineLabel', () => {
+  const today = '2026-07-03';
+  it('heute / morgen / später / überfällig', () => {
+    expect(deadlineLabel('2026-07-03', today)).toBe('heute fällig');
+    expect(deadlineLabel('2026-07-04', today)).toBe('morgen fällig');
+    expect(deadlineLabel('2026-07-06', today)).toBe('noch 3 Tage');
+    expect(deadlineLabel('2026-07-02', today)).toBe('1 Tag überfällig');
+    expect(deadlineLabel('2026-06-30', today)).toBe('3 Tage überfällig');
   });
 });

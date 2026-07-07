@@ -2,7 +2,7 @@
 // Long-Press = bearbeiten; „+ Neue Liste" als gestrichelte Geister-Karte.
 // Darüber die Smart-Ansichten Geplant / Alle (Fahrplan §3.3).
 import { useRouter } from 'expo-router';
-import { CalendarDays, Filter as FilterIcon, Layers, Plus, SlidersHorizontal } from 'lucide-react-native';
+import { CalendarClock, CalendarDays, Filter as FilterIcon, Layers, Plus, SlidersHorizontal } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { View } from 'react-native';
 
@@ -15,10 +15,10 @@ import { Screen } from '@/components/Screen';
 import { Seam } from '@/components/Seam';
 import { Type } from '@/components/Type';
 import { useLists, useTasks } from '@/data/queries';
-import type { List } from '@/data/types';
+import type { List, Task } from '@/data/types';
 import { applyFilter } from '@/lib/taskFilters';
-import { todayStr } from '@/lib/dates';
-import { isOpen } from '@/lib/taskLogic';
+import { deadlineLabel, todayStr } from '@/lib/dates';
+import { isOpen, listProgress } from '@/lib/taskLogic';
 import { hapticSelect } from '@/lib/haptics';
 import { useSettings } from '@/theme/settings.store';
 import { useColors } from '@/theme/ThemeProvider';
@@ -40,6 +40,17 @@ export default function ListenScreen() {
     for (const t of tasks ?? []) {
       if (isOpen(t)) map.set(t.listId, (map.get(t.listId) ?? 0) + 1);
     }
+    return map;
+  }, [tasks]);
+  const progressByList = useMemo(() => {
+    const byList = new Map<string, Task[]>();
+    for (const t of tasks ?? []) {
+      const arr = byList.get(t.listId) ?? [];
+      arr.push(t);
+      byList.set(t.listId, arr);
+    }
+    const map = new Map<string, { done: number; total: number; ratio: number }>();
+    for (const [id, arr] of byList) map.set(id, listProgress(arr));
     return map;
   }, [tasks]);
   const openTotal = useMemo(() => (tasks ?? []).filter(isOpen).length, [tasks]);
@@ -106,6 +117,9 @@ export default function ListenScreen() {
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md }}>
           {(lists ?? []).map((l) => {
             const Icon = listIcon(l.icon);
+            const isProject = !!(l.goal || l.deadline);
+            const prog = progressByList.get(l.id);
+            const deadlineOverdue = !!l.deadline && l.deadline < today && (prog?.ratio ?? 0) < 1;
             return (
               <PressableScale
                 key={l.id}
@@ -134,6 +148,24 @@ export default function ListenScreen() {
                     <Type variant="heading" tabular tone="text2">{openByList.get(l.id) ?? 0}</Type>
                   </View>
                   <Type variant="label" numberOfLines={1}>{l.name}</Type>
+                  {/* Projekt: dünne Fortschrittslinie + Deadline-Hinweis. */}
+                  {isProject && (
+                    <View style={{ gap: 4 }}>
+                      {prog && prog.total > 0 && (
+                        <View style={{ height: 3, borderRadius: 999, backgroundColor: colors.chip, overflow: 'hidden' }}>
+                          <View style={{ height: 3, width: `${Math.max(4, Math.round(prog.ratio * 100))}%`, backgroundColor: l.color, borderRadius: 999 }} />
+                        </View>
+                      )}
+                      {l.deadline && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <CalendarClock size={11} color={deadlineOverdue ? colors.indigo : colors.text3} strokeWidth={2} />
+                          <Type variant="caption" tone={deadlineOverdue ? 'indigo' : 'text3'} numberOfLines={1}>
+                            {(prog?.ratio ?? 0) >= 1 && (prog?.total ?? 0) > 0 ? 'Abgeschlossen' : deadlineLabel(l.deadline, today)}
+                          </Type>
+                        </View>
+                      )}
+                    </View>
+                  )}
                 </Glass>
               </PressableScale>
             );

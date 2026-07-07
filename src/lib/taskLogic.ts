@@ -77,6 +77,16 @@ export function adoptOverdueToToday(tasks: Task[], today: string): { id: string;
   return tasks.filter((t) => isOverdue(t, today)).map((t) => ({ id: t.id, dueDate: today }));
 }
 
+/**
+ * Projekt-Fortschritt einer Liste: erledigte gegen alle Aufgaben (offen +
+ * erledigt). ratio in [0,1]; leere Liste → 0. Reine Funktion.
+ */
+export function listProgress(tasks: Task[]): { done: number; total: number; ratio: number } {
+  const total = tasks.length;
+  const done = tasks.filter((t) => !isOpen(t)).length;
+  return { done, total, ratio: total === 0 ? 0 : done / total };
+}
+
 export type DayGroup = { date: string; tasks: Task[] };
 
 /**
