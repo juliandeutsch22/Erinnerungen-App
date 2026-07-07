@@ -16,7 +16,7 @@
 import { X } from 'lucide-react-native';
 import React, { useRef } from 'react';
 import { Keyboard, Modal, NativeScrollEvent, NativeSyntheticEvent, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
-import { Gesture, GestureDetector, GestureHandlerRootView, ScrollView } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector, ScrollView } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -75,7 +75,10 @@ export function BottomSheet({
   const close = () => {
     // Tastatur zuerst schließen, damit das Sheet nicht kurz nachspringt.
     Keyboard.dismiss();
-    onClose();
+    // Einen Frame warten, damit native Tastatur-Animationen nicht mit dem Unmount kollidieren
+    requestAnimationFrame(() => {
+      onClose();
+    });
   };
 
   // Ganzes Sheet ziehbar; läuft gleichzeitig mit der ScrollView (RNGH-Muster).
@@ -93,7 +96,7 @@ export function BottomSheet({
       if (translateY.value > DISMISS_DISTANCE || (translateY.value > 4 && e.velocityY > DISMISS_VELOCITY)) {
         runOnJS(hapticSelect)();
         
-        // NEU: close() wird erst aufgerufen, wenn die Animation zu 100% fertig ist
+        // FIX: close() erst aufrufen, wenn die iOS-Animation komplett beendet ist!
         translateY.value = withTiming(windowHeight, { duration: 180 }, (finished) => {
           if (finished) {
             runOnJS(close)();
@@ -103,7 +106,7 @@ export function BottomSheet({
         translateY.value = withSpring(0, springConfig('snappy'));
       }
     });
-  
+
   const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: translateY.value }] }));
   const backdropStyle = useAnimatedStyle(() => {
     const fade = Math.max(0, 1 - translateY.value / (DISMISS_DISTANCE * 2.4));
@@ -126,11 +129,12 @@ export function BottomSheet({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
-      <GestureHandlerRootView style={{ flex: 1 }}>
+      {/* FIX: GestureHandlerRootView wurde hier entfernt. Sie MUSS in die App.tsx! */}
       {/* Backdrop dimmt (mit der Zieh-Distanz) und schließt beim Tap. */}
       <Animated.View style={[StyleSheet.absoluteFill, backdropStyle]} pointerEvents="box-none">
         <Pressable accessibilityLabel="Schließen" onPress={close} style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.4)' }]} />
       </Animated.View>
+      
       <View style={{ flex: 1, justifyContent: 'flex-end' }} pointerEvents="box-none">
         {/* Tastaturhöhe als Sockel: hebt das Sheet exakt über die Tastatur. */}
         <View style={{ alignItems: 'center', paddingBottom: keyboard }} pointerEvents="box-none">
@@ -173,7 +177,6 @@ export function BottomSheet({
           </GestureDetector>
         </View>
       </View>
-      </GestureHandlerRootView>
     </Modal>
   );
 }
