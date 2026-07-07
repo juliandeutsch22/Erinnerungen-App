@@ -165,7 +165,7 @@ export function EventEditorSheet({
         onSubmitEditing={save}
         accessibilityLabel="Termin-Titel"
         style={[
-          { fontSize: T.lg, color: colors.text, paddingVertical: Spacing.sm, borderBottomWidth: 1, borderColor: colors.border2 },
+          { fontSize: T.xl, fontWeight: '600', color: colors.text, paddingVertical: Spacing.sm },
           webNoOutline,
         ]}
       />
@@ -188,82 +188,86 @@ export function EventEditorSheet({
         </Type>
       )}
 
-      {/* Kalender-Wahl (nur beim Anlegen). */}
-      {!isEdit && writable.length > 1 && (
-        <>
-          <PressableScale
-            accessibilityLabel={`Kalender: ${currentCalendar?.title ?? '—'}`}
-            onPress={() => toggleSection('calendar')}
-            pressedScale={0.99}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.md }}
-          >
-            <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: currentCalendar?.color ?? colors.indigo }} />
-            <Type variant="body" style={{ flex: 1 }}>Kalender</Type>
-            <Type variant="label" tone="text2" numberOfLines={1} style={{ maxWidth: 170 }}>{currentCalendar?.title ?? '—'}</Type>
-            {section === 'calendar' ? (
-              <ChevronDown size={16} color={colors.text3} strokeWidth={2} />
-            ) : (
-              <ChevronRight size={16} color={colors.text3} strokeWidth={2} />
+      {/* Gruppierte Detail-Zeilen — Kalender / Ganztägig / Beginnt / Endet. */}
+      <Group>
+        {!isEdit && writable.length > 1 && (
+          <>
+            <PressableScale
+              accessibilityLabel={`Kalender: ${currentCalendar?.title ?? '—'}`}
+              onPress={() => toggleSection('calendar')}
+              pressedScale={0.99}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.md, paddingHorizontal: Spacing.md }}
+            >
+              <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: currentCalendar?.color ?? colors.indigo }} />
+              <Type variant="body" style={{ flex: 1 }}>Kalender</Type>
+              <Type variant="label" tone="text2" numberOfLines={1} style={{ maxWidth: 170 }}>{currentCalendar?.title ?? '—'}</Type>
+              {section === 'calendar' ? (
+                <ChevronDown size={16} color={colors.text3} strokeWidth={2} />
+              ) : (
+                <ChevronRight size={16} color={colors.text3} strokeWidth={2} />
+              )}
+            </PressableScale>
+            {section === 'calendar' && (
+              <Expanded>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm }}>
+                  {writable.map((c) => (
+                    <Chip key={c.id} label={c.title} active={calendarId === c.id} onPress={() => setCalendarId(c.id)} />
+                  ))}
+                </View>
+              </Expanded>
             )}
-          </PressableScale>
-          {section === 'calendar' && (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, paddingBottom: Spacing.sm }}>
-              {writable.map((c) => (
-                <Chip key={c.id} label={c.title} active={calendarId === c.id} onPress={() => setCalendarId(c.id)} />
-              ))}
-            </View>
-          )}
-          <Hairline />
-        </>
-      )}
+            <RowDivider />
+          </>
+        )}
 
-      {/* Ganztägig-Schalter */}
-      <PressableScale
-        accessibilityRole="switch"
-        accessibilityState={{ checked: allDay }}
-        accessibilityLabel={allDay ? 'Ganztägig aus' : 'Ganztägig an'}
-        onPress={() => {
-          hapticSelect();
-          setAllDay((v) => !v);
-        }}
-        pressedScale={0.99}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.md }}
-      >
-        <CalendarDays size={18} color={colors.teal} strokeWidth={2} />
-        <Type variant="body" style={{ flex: 1 }}>Ganztägig</Type>
-        <Type variant="label" tone={allDay ? 'teal' : 'text3'}>{allDay ? 'An' : 'Aus'}</Type>
-      </PressableScale>
-      <Hairline />
+        {/* Ganztägig-Schalter */}
+        <PressableScale
+          accessibilityRole="switch"
+          accessibilityState={{ checked: allDay }}
+          accessibilityLabel={allDay ? 'Ganztägig aus' : 'Ganztägig an'}
+          onPress={() => {
+            hapticSelect();
+            setAllDay((v) => !v);
+          }}
+          pressedScale={0.99}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.md, paddingHorizontal: Spacing.md }}
+        >
+          <CalendarDays size={18} color={colors.teal} strokeWidth={2} />
+          <Type variant="body" style={{ flex: 1 }}>Ganztägig</Type>
+          <Type variant="label" tone={allDay ? 'teal' : 'text3'}>{allDay ? 'An' : 'Aus'}</Type>
+        </PressableScale>
+        <RowDivider />
 
-      {/* Beginnt */}
-      <WhenRowView
-        label="Beginnt"
-        value={startLabel}
-        expanded={section === 'start'}
-        onPress={() => toggleSection('start')}
-        day={startDay}
-        onSelectDay={setStartDaySafe}
-        allDay={allDay}
-        time={startTime}
-        onChangeTime={setStartTime}
-        today={today}
-      />
-      <Hairline />
+        {/* Beginnt */}
+        <WhenRowView
+          label="Beginnt"
+          value={startLabel}
+          expanded={section === 'start'}
+          onPress={() => toggleSection('start')}
+          day={startDay}
+          onSelectDay={setStartDaySafe}
+          allDay={allDay}
+          time={startTime}
+          onChangeTime={setStartTime}
+          today={today}
+        />
+        <RowDivider />
 
-      {/* Endet */}
-      <WhenRowView
-        label="Endet"
-        value={endLabel}
-        expanded={section === 'end'}
-        onPress={() => toggleSection('end')}
-        day={endDay}
-        onSelectDay={setEndDaySafe}
-        allDay={allDay}
-        time={endTime}
-        onChangeTime={setEndTime}
-        today={today}
-        minDay={startDay}
-      />
+        {/* Endet */}
+        <WhenRowView
+          label="Endet"
+          value={endLabel}
+          expanded={section === 'end'}
+          onPress={() => toggleSection('end')}
+          day={endDay}
+          onSelectDay={setEndDaySafe}
+          allDay={allDay}
+          time={endTime}
+          onChangeTime={setEndTime}
+          today={today}
+          minDay={startDay}
+        />
+      </Group>
 
       {multiDay && (
         <Type variant="caption" tone="text3" style={{ marginTop: Spacing.sm }}>
@@ -317,7 +321,7 @@ function WhenRowView({
         accessibilityState={{ expanded }}
         onPress={onPress}
         pressedScale={0.99}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.md }}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.md, paddingHorizontal: Spacing.md }}
       >
         <View style={{ width: 18 }} />
         <Type variant="body" style={{ flex: 1 }}>{label}</Type>
@@ -329,28 +333,51 @@ function WhenRowView({
         )}
       </PressableScale>
       {expanded && (
-        <View style={{ gap: Spacing.md, paddingBottom: Spacing.md }}>
-          {!allDay && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Type variant="caption" tone="text3">Uhrzeit</Type>
-              <TimeField value={time} onChange={onChangeTime} accessibilityLabel={`${label} Uhrzeit wählen`} />
+        <Expanded>
+          <View style={{ gap: Spacing.md }}>
+            {!allDay && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Type variant="caption" tone="text3">Uhrzeit</Type>
+                <TimeField value={time} onChange={onChangeTime} accessibilityLabel={`${label} Uhrzeit wählen`} />
+              </View>
+            )}
+            <View style={{ borderRadius: R.lg, borderWidth: 1, borderColor: colors.chipBorder, backgroundColor: colors.bg2, padding: Spacing.sm }}>
+              <MiniCalendar
+                selected={day}
+                onSelect={onSelectDay}
+                minDate={minDay}
+              />
             </View>
-          )}
-          <View style={{ borderRadius: R.lg, borderWidth: 1, borderColor: colors.chipBorder, backgroundColor: colors.chip, padding: Spacing.sm }}>
-            <MiniCalendar
-              selected={day}
-              onSelect={onSelectDay}
-              minDate={minDay}
-            />
+            <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+              <Chip label="Heute" active={day === today} onPress={() => onSelectDay(today)} />
+              <Chip label="Morgen" active={day === addDays(today, 1)} onPress={() => onSelectDay(addDays(today, 1))} />
+            </View>
           </View>
-          <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
-            <Chip label="Heute" active={day === today} onPress={() => onSelectDay(today)} />
-            <Chip label="Morgen" active={day === addDays(today, 1)} onPress={() => onSelectDay(addDays(today, 1))} />
-          </View>
-        </View>
+        </Expanded>
       )}
     </>
   );
+}
+
+/** Gerundete Sammel-Fläche für die Detail-Zeilen (iOS-Grouped-Look). */
+function Group({ children }: { children: React.ReactNode }) {
+  const colors = useColors();
+  return (
+    <View style={{ borderRadius: R.lg, backgroundColor: colors.chip, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.chipBorder, overflow: 'hidden' }}>
+      {children}
+    </View>
+  );
+}
+
+/** Trenner innerhalb der Gruppe — an der Textkante eingerückt (wie iOS). */
+function RowDivider() {
+  const colors = useColors();
+  return <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: Spacing.md * 2 + 18 }} />;
+}
+
+/** Aufgeklappter Inhalt einer Zeile — eingerückt, sitzt optisch an der Zeile. */
+function Expanded({ children }: { children: React.ReactNode }) {
+  return <View style={{ paddingHorizontal: Spacing.md, paddingBottom: Spacing.md, paddingTop: Spacing.xs }}>{children}</View>;
 }
 
 function Hairline() {

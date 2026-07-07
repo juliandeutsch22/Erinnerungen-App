@@ -197,7 +197,7 @@ export function TaskEditorSheet({
         onSubmitEditing={save}
         accessibilityLabel="Titel"
         style={[
-          { fontSize: T.lg, color: colors.text, paddingVertical: Spacing.sm, borderBottomWidth: 1, borderColor: colors.border2 },
+          { fontSize: T.xl, fontWeight: '600', color: colors.text, paddingVertical: Spacing.sm },
           webNoOutline,
         ]}
       />
@@ -256,172 +256,177 @@ export function TaskEditorSheet({
           )}
         </View>
       </View>
-      <Hairline />
-
-      {/* Liste — nur wenn es mehr als eine gibt. */}
-      {(lists?.length ?? 0) > 1 && (
-        <>
-          <DetailRow
-            icon={ListIcon ?? CalendarDays}
-            iconColor={currentList?.color ?? colors.text3}
-            label="Liste"
-            value={currentList?.name ?? '—'}
-            valueTone="text2"
-            expanded={section === 'list'}
-            onPress={() => toggleSection('list')}
-          />
-          {section === 'list' && (
-            <ChipWrap>
-              {(lists ?? []).map((l) => (
-                <Chip key={l.id} label={l.name} active={listId === l.id} onPress={() => setListId(l.id)} />
-              ))}
-            </ChipWrap>
-          )}
-          <Hairline />
-        </>
-      )}
-
-      {/* Fällig: Datum + Uhrzeit gemeinsam (gehören zusammen). */}
-      <DetailRow
-        icon={CalendarDays}
-        iconColor={dueDate ? colors.teal : colors.text3}
-        label="Fällig"
-        value={dueLabel}
-        valueTone={dueDate ? 'teal' : 'text3'}
-        expanded={section === 'due'}
-        onPress={() => toggleSection('due')}
-      />
-      {section === 'due' && (
-        <View style={{ gap: Spacing.md, paddingBottom: Spacing.md }}>
-          <ChipWrap>
-            {dateChips.map((c) => {
-              // „Heute" und „Heute Abend" schließen sich gegenseitig aus.
-              const active =
-                dueDate === c.date &&
-                (c.key === 'abend' ? dueTime === '18:00' : c.key === 'heute' ? dueTime !== '18:00' : true);
-              return (
-                <Chip
-                  key={c.key}
-                  label={c.label}
-                  icon={c.icon}
-                  active={active}
-                  onPress={() => {
-                    setDueDate(c.date);
-                    if (c.time !== undefined) setDueTime(c.time);
-                    setShowCalendar(false);
-                  }}
-                />
-              );
-            })}
-            <Chip label="Kalender" icon={CalendarDays} active={showCalendar} onPress={() => setShowCalendar((v) => !v)} />
-            {dueDate && (
-              <Chip
-                label="Kein Datum ✕"
-                accessibilityLabel="Datum entfernen"
-                onPress={() => {
-                  setDueDate(null);
-                  setDueTime(null);
-                  setRrule(null);
-                  setShowCalendar(false);
-                }}
-              />
-            )}
-          </ChipWrap>
-          {showCalendar && (
-            <View style={{ borderRadius: R.lg, borderWidth: 1, borderColor: colors.chipBorder, backgroundColor: colors.chip, padding: Spacing.sm }}>
-              <MiniCalendar
-                selected={dueDate}
-                onSelect={(d) => {
-                  setDueDate(d);
-                  setShowCalendar(false);
-                }}
-              />
-            </View>
-          )}
-          <View style={{ gap: Spacing.sm }}>
-            <Type variant="caption" tone="text3">Uhrzeit</Type>
-            <ChipWrap>
-              {TIME_PRESETS.map((t) => (
-                <Chip
-                  key={t}
-                  label={t}
-                  active={dueTime === t && !customTime}
-                  onPress={() => {
-                    setCustomTime(false);
-                    setDueTime(dueTime === t ? null : t);
-                  }}
-                />
-              ))}
-              <Chip
-                label="Eigene"
-                active={customTime}
-                onPress={() => {
-                  setCustomTime((v) => !v);
-                  if (!dueTime) setDueTime(defaultDueTime);
-                }}
-              />
-            </ChipWrap>
-            {customTime && (
-              <TimeField
-                value={dueTime ?? defaultDueTime}
-                onChange={setDueTime}
-                accessibilityLabel="Eigene Uhrzeit wählen"
-              />
-            )}
-          </View>
-        </View>
-      )}
-      <Hairline />
-
-      {/* Wiederholung */}
-      <DetailRow
-        icon={Repeat}
-        iconColor={rrule ? colors.teal : colors.text3}
-        label="Wiederholung"
-        value={rrule ? RRULE_LABEL[rrule] : 'Nie'}
-        valueTone={rrule ? 'teal' : 'text3'}
-        expanded={section === 'repeat'}
-        onPress={() => toggleSection('repeat')}
-      />
-      {section === 'repeat' && (
-        <ChipWrap>
-          {RRULES.map((r) => (
-            <Chip
-              key={r.value}
-              label={r.label}
-              active={rrule === r.value}
-              onPress={() => setRrule(rrule === r.value ? null : r.value)}
+      {/* Gruppierte Detail-Zeilen — iOS-Grouped-Look statt frei schwebender Zeilen. */}
+      <Group>
+        {(lists?.length ?? 0) > 1 && (
+          <>
+            <DetailRow
+              icon={ListIcon ?? CalendarDays}
+              iconColor={currentList?.color ?? colors.text3}
+              label="Liste"
+              value={currentList?.name ?? '—'}
+              valueTone="text2"
+              expanded={section === 'list'}
+              onPress={() => toggleSection('list')}
             />
-          ))}
-        </ChipWrap>
-      )}
-      <Hairline />
+            {section === 'list' && (
+              <Expanded>
+                <ChipWrap>
+                  {(lists ?? []).map((l) => (
+                    <Chip key={l.id} label={l.name} active={listId === l.id} onPress={() => setListId(l.id)} />
+                  ))}
+                </ChipWrap>
+              </Expanded>
+            )}
+            <RowDivider />
+          </>
+        )}
 
-      {/* Flagge: direkter Schalter, kein Aufklappen nötig. */}
-      <PressableScale
-        accessibilityRole="switch"
-        accessibilityState={{ checked: flagged }}
-        accessibilityLabel={flagged ? 'Flagge entfernen' : 'Flagge setzen'}
-        onPress={() => {
-          hapticSelect();
-          setFlagged((v) => !v);
-        }}
-        pressedScale={0.99}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.md }}
-      >
-        <Flag
-          size={18}
-          color={flagged ? colors.indigo : colors.text3}
-          fill={flagged ? colors.indigo : 'transparent'}
-          strokeWidth={2}
+        {/* Fällig: Datum + Uhrzeit gemeinsam (gehören zusammen). */}
+        <DetailRow
+          icon={CalendarDays}
+          iconColor={dueDate ? colors.teal : colors.text3}
+          label="Fällig"
+          value={dueLabel}
+          valueTone={dueDate ? 'teal' : 'text3'}
+          expanded={section === 'due'}
+          onPress={() => toggleSection('due')}
         />
-        <Type variant="body" style={{ flex: 1 }}>Flagge</Type>
-        <Type variant="label" tone={flagged ? 'indigo' : 'text3'}>{flagged ? 'Gesetzt' : 'Aus'}</Type>
-      </PressableScale>
-      <Hairline />
+        {section === 'due' && (
+          <Expanded>
+            <View style={{ gap: Spacing.md }}>
+              <ChipWrap>
+                {dateChips.map((c) => {
+                  // „Heute" und „Heute Abend" schließen sich gegenseitig aus.
+                  const active =
+                    dueDate === c.date &&
+                    (c.key === 'abend' ? dueTime === '18:00' : c.key === 'heute' ? dueTime !== '18:00' : true);
+                  return (
+                    <Chip
+                      key={c.key}
+                      label={c.label}
+                      icon={c.icon}
+                      active={active}
+                      onPress={() => {
+                        setDueDate(c.date);
+                        if (c.time !== undefined) setDueTime(c.time);
+                        setShowCalendar(false);
+                      }}
+                    />
+                  );
+                })}
+                <Chip label="Kalender" icon={CalendarDays} active={showCalendar} onPress={() => setShowCalendar((v) => !v)} />
+                {dueDate && (
+                  <Chip
+                    label="Kein Datum ✕"
+                    accessibilityLabel="Datum entfernen"
+                    onPress={() => {
+                      setDueDate(null);
+                      setDueTime(null);
+                      setRrule(null);
+                      setShowCalendar(false);
+                    }}
+                  />
+                )}
+              </ChipWrap>
+              {showCalendar && (
+                <View style={{ borderRadius: R.lg, borderWidth: 1, borderColor: colors.chipBorder, backgroundColor: colors.bg2, padding: Spacing.sm }}>
+                  <MiniCalendar
+                    selected={dueDate}
+                    onSelect={(d) => {
+                      setDueDate(d);
+                      setShowCalendar(false);
+                    }}
+                  />
+                </View>
+              )}
+              <View style={{ gap: Spacing.sm }}>
+                <Type variant="caption" tone="text3">Uhrzeit</Type>
+                <ChipWrap>
+                  {TIME_PRESETS.map((t) => (
+                    <Chip
+                      key={t}
+                      label={t}
+                      active={dueTime === t && !customTime}
+                      onPress={() => {
+                        setCustomTime(false);
+                        setDueTime(dueTime === t ? null : t);
+                      }}
+                    />
+                  ))}
+                  <Chip
+                    label="Eigene"
+                    active={customTime}
+                    onPress={() => {
+                      setCustomTime((v) => !v);
+                      if (!dueTime) setDueTime(defaultDueTime);
+                    }}
+                  />
+                </ChipWrap>
+                {customTime && (
+                  <TimeField
+                    value={dueTime ?? defaultDueTime}
+                    onChange={setDueTime}
+                    accessibilityLabel="Eigene Uhrzeit wählen"
+                  />
+                )}
+              </View>
+            </View>
+          </Expanded>
+        )}
+        <RowDivider />
+
+        {/* Wiederholung */}
+        <DetailRow
+          icon={Repeat}
+          iconColor={rrule ? colors.teal : colors.text3}
+          label="Wiederholung"
+          value={rrule ? RRULE_LABEL[rrule] : 'Nie'}
+          valueTone={rrule ? 'teal' : 'text3'}
+          expanded={section === 'repeat'}
+          onPress={() => toggleSection('repeat')}
+        />
+        {section === 'repeat' && (
+          <Expanded>
+            <ChipWrap>
+              {RRULES.map((r) => (
+                <Chip
+                  key={r.value}
+                  label={r.label}
+                  active={rrule === r.value}
+                  onPress={() => setRrule(rrule === r.value ? null : r.value)}
+                />
+              ))}
+            </ChipWrap>
+          </Expanded>
+        )}
+        <RowDivider />
+
+        {/* Flagge: direkter Schalter, kein Aufklappen nötig. */}
+        <PressableScale
+          accessibilityRole="switch"
+          accessibilityState={{ checked: flagged }}
+          accessibilityLabel={flagged ? 'Flagge entfernen' : 'Flagge setzen'}
+          onPress={() => {
+            hapticSelect();
+            setFlagged((v) => !v);
+          }}
+          pressedScale={0.99}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.md, paddingHorizontal: Spacing.md }}
+        >
+          <Flag
+            size={18}
+            color={flagged ? colors.indigo : colors.text3}
+            fill={flagged ? colors.indigo : 'transparent'}
+            strokeWidth={2}
+          />
+          <Type variant="body" style={{ flex: 1 }}>Flagge</Type>
+          <Type variant="label" tone={flagged ? 'indigo' : 'text3'}>{flagged ? 'Gesetzt' : 'Aus'}</Type>
+        </PressableScale>
+      </Group>
 
       {/* Tags — kontextübergreifend, per Eingabe + Vorschläge. */}
-      <View style={{ gap: Spacing.sm, paddingTop: Spacing.md }}>
+      <View style={{ gap: Spacing.sm, paddingTop: Spacing.lg }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md }}>
           <TagIcon size={18} color={colors.text3} strokeWidth={2} />
           <TextInput
@@ -478,7 +483,7 @@ function DetailRow({
       accessibilityLabel={`${label}: ${value}`}
       onPress={onPress}
       pressedScale={0.99}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.md }}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.md, paddingHorizontal: Spacing.md }}
     >
       <Icon size={18} color={iconColor} strokeWidth={2} />
       <Type variant="body" style={{ flex: 1 }}>{label}</Type>
@@ -493,10 +498,26 @@ function DetailRow({
 }
 
 function ChipWrap({ children }: { children: React.ReactNode }) {
-  return <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, paddingBottom: Spacing.sm }}>{children}</View>;
+  return <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm }}>{children}</View>;
 }
 
-function Hairline() {
+/** Gerundete Sammel-Fläche für die Detail-Zeilen (iOS-Grouped-Look). */
+function Group({ children }: { children: React.ReactNode }) {
   const colors = useColors();
-  return <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border }} />;
+  return (
+    <View style={{ borderRadius: R.lg, backgroundColor: colors.chip, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.chipBorder, overflow: 'hidden' }}>
+      {children}
+    </View>
+  );
+}
+
+/** Trenner innerhalb der Gruppe — an der Textkante eingerückt (wie iOS). */
+function RowDivider() {
+  const colors = useColors();
+  return <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: Spacing.md * 2 + 18 }} />;
+}
+
+/** Aufgeklappter Inhalt einer Zeile — eingerückt, sitzt optisch an der Zeile. */
+function Expanded({ children }: { children: React.ReactNode }) {
+  return <View style={{ paddingHorizontal: Spacing.md, paddingBottom: Spacing.md, paddingTop: Spacing.xs }}>{children}</View>;
 }
