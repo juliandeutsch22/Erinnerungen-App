@@ -11,6 +11,7 @@ import { GlassPanel } from '@/components/GlassPanel';
 import { ListEditorSheet } from '@/components/ListEditorSheet';
 import { listIcon } from '@/components/listMeta';
 import { PressableScale } from '@/components/PressableScale';
+import { ProgressLine } from '@/components/ProgressLine';
 import { ReorderSheet } from '@/components/ReorderSheet';
 import { RescheduleSheet } from '@/components/RescheduleSheet';
 import { Reveal } from '@/components/Reveal';
@@ -144,11 +145,7 @@ export default function ListeDetailScreen() {
                 </View>
               )}
             </View>
-            {progress.total > 0 && (
-              <View style={{ height: 4, borderRadius: 999, backgroundColor: colors.chip, overflow: 'hidden' }}>
-                <View style={{ height: 4, width: `${Math.max(4, Math.round(progress.ratio * 100))}%`, backgroundColor: list.color, borderRadius: 999 }} />
-              </View>
-            )}
+            {progress.total > 0 && <ProgressLine ratio={progress.ratio} color={list.color} height={4} />}
           </View>
         )}
       </Reveal>

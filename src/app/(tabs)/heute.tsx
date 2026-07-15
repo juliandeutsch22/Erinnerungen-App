@@ -11,6 +11,8 @@ import { EventEditorSheet } from '@/components/EventEditorSheet';
 import { EventRow } from '@/components/EventRow';
 import { GlassPanel } from '@/components/GlassPanel';
 import { PressableScale } from '@/components/PressableScale';
+import { ProgressLine } from '@/components/ProgressLine';
+import { PulseDot } from '@/components/PulseDot';
 import { QuickAdd } from '@/components/QuickAdd';
 import { RescheduleSheet } from '@/components/RescheduleSheet';
 import { Reveal } from '@/components/Reveal';
@@ -213,7 +215,7 @@ export default function HeuteScreen() {
   // Timeline-Einträgen an der Stelle der aktuellen Uhrzeit.
   const nowMarker = (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginVertical: 6 }}>
-      <View style={{ width: 7, height: 7, borderRadius: 999, backgroundColor: colors.teal }} />
+      <PulseDot color={colors.teal} />
       <Type variant="caption" tone="teal" tabular>Jetzt · {nowLabel}</Type>
       <View style={{ flex: 1, height: 1, borderRadius: 999, backgroundColor: colors.teal, opacity: 0.35 }} />
     </View>
@@ -372,15 +374,8 @@ export default function HeuteScreen() {
         <GlassPanel>
           {/* Dünne Fortschrittslinie: der Tag bekommt einen Körper. */}
           {dayTotal > 0 && (
-            <View style={{ height: 3, borderRadius: 999, backgroundColor: colors.chip, marginBottom: Spacing.md, overflow: 'hidden' }}>
-              <View
-                style={{
-                  height: 3,
-                  width: `${Math.round((doneToday.length / dayTotal) * 100)}%`,
-                  backgroundColor: colors.teal,
-                  borderRadius: 999,
-                }}
-              />
+            <View style={{ marginBottom: Spacing.md }}>
+              <ProgressLine ratio={doneToday.length / dayTotal} />
             </View>
           )}
 

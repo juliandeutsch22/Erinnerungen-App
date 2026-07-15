@@ -10,6 +10,7 @@ import { Glass } from '@/components/Glass';
 import { ListEditorSheet } from '@/components/ListEditorSheet';
 import { listIcon } from '@/components/listMeta';
 import { PressableScale } from '@/components/PressableScale';
+import { ProgressLine } from '@/components/ProgressLine';
 import { Reveal } from '@/components/Reveal';
 import { Screen } from '@/components/Screen';
 import { Seam } from '@/components/Seam';
@@ -59,7 +60,14 @@ export default function ListenScreen() {
   return (
     <Screen>
       <Reveal>
-        <Type variant="title">Listen</Type>
+        <View style={{ gap: Spacing.xs }}>
+          <Type variant="title">Listen</Type>
+          {/* Ruhige Zähl-Zeile — dieselbe Stimme wie die Tages-Bilanz auf Heute. */}
+          <Type variant="caption" tone="text3" tabular>
+            {openTotal === 1 ? '1 offene Aufgabe' : `${openTotal} offene Aufgaben`}
+            {` · ${(lists ?? []).length} ${(lists ?? []).length === 1 ? 'Liste' : 'Listen'}`}
+          </Type>
+        </View>
       </Reveal>
 
       {/* Smart-Ansichten */}
@@ -151,11 +159,7 @@ export default function ListenScreen() {
                   {/* Projekt: dünne Fortschrittslinie + Deadline-Hinweis. */}
                   {isProject && (
                     <View style={{ gap: 4 }}>
-                      {prog && prog.total > 0 && (
-                        <View style={{ height: 3, borderRadius: 999, backgroundColor: colors.chip, overflow: 'hidden' }}>
-                          <View style={{ height: 3, width: `${Math.max(4, Math.round(prog.ratio * 100))}%`, backgroundColor: l.color, borderRadius: 999 }} />
-                        </View>
-                      )}
+                      {prog && prog.total > 0 && <ProgressLine ratio={prog.ratio} color={l.color} />}
                       {l.deadline && (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                           <CalendarClock size={11} color={deadlineOverdue ? colors.indigo : colors.text3} strokeWidth={2} />

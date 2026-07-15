@@ -103,15 +103,22 @@ function TabButton({
   // dezenter Lift (translateY) beim Fokus + Opacity-Feedback beim Drücken.
   const lift = useSharedValue(focused ? 0 : 1.5);
   const pressed = useSharedValue(0);
+  // Weiche Teal-Pill hinter dem aktiven Tab — blendet + wächst sanft ein.
+  const focusP = useSharedValue(focused ? 1 : 0);
 
   React.useEffect(() => {
     const target = focused ? 0 : 1.5;
     lift.value = reduced ? target : withSpring(target, springConfig('snappy'));
-  }, [focused, reduced, lift]);
+    focusP.value = reduced ? (focused ? 1 : 0) : withSpring(focused ? 1 : 0, springConfig('snappy'));
+  }, [focused, reduced, lift, focusP]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: lift.value }],
     opacity: 1 - pressed.value * 0.35,
+  }));
+  const pillStyle = useAnimatedStyle(() => ({
+    opacity: focusP.value,
+    transform: [{ scaleX: 0.7 + focusP.value * 0.3 }],
   }));
   const color = focused ? activeColor : inactiveColor;
 
@@ -129,6 +136,10 @@ function TabButton({
       }}
       style={styles.tab}
     >
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.pill, { backgroundColor: `${activeColor}14` }, pillStyle]}
+      />
       <Animated.View style={[styles.tabInner, animatedStyle]}>
         <Icon size={23} color={color} strokeWidth={focused ? 2.2 : 1.75} />
         <Type variant="caption" style={{ color }}>
@@ -161,5 +172,13 @@ const styles = StyleSheet.create({
   tabInner: {
     alignItems: 'center',
     gap: 2,
+  },
+  pill: {
+    position: 'absolute',
+    top: 8,
+    bottom: 8,
+    left: 10,
+    right: 10,
+    borderRadius: 18,
   },
 });

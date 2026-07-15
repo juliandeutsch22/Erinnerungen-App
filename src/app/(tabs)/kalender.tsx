@@ -125,7 +125,16 @@ export default function KalenderScreen() {
     <Screen>
       <Reveal>
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-          <Type variant="title">Kalender</Type>
+          <View style={{ gap: Spacing.xs, flex: 1 }}>
+            <Type variant="title">Kalender</Type>
+            {/* Ruhige Zähl-Zeile — dieselbe Stimme wie die Tages-Bilanz auf Heute. */}
+            <Type variant="caption" tone="text3" tabular>
+              {(() => {
+                const n = (eventsByDay.get(today)?.length ?? 0) + (openTaskDays.get(today)?.length ?? 0);
+                return n === 0 ? 'Heute nichts geplant' : n === 1 ? 'Heute 1 Eintrag' : `Heute ${n} Einträge`;
+              })()}
+            </Type>
+          </View>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <PressableScale
               accessibilityLabel="Rückblick öffnen"
@@ -158,7 +167,8 @@ export default function KalenderScreen() {
           {/* Kopf: gewählter Tag mit Teal-Akzent — visuell an die Grid-Auswahl gebunden. */}
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
-              <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: colors.teal }} />
+              {/* Punkt trägt Teal nur für heute — sonst neutral wie der Text daneben. */}
+              <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: selected === today ? colors.teal : colors.border3 }} />
               <Type variant="eyebrow" tone={selected === today ? 'teal' : 'text3'}>{formatDayHeading(selected, today)}</Type>
             </View>
             {dayCount > 0 && <Type variant="caption" tone="text3" tabular>{dayCount}</Type>}

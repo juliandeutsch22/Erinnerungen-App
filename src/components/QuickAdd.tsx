@@ -8,6 +8,7 @@ import { TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Glass } from '@/components/Glass';
+import { PopIn } from '@/components/PopIn';
 import { PressableScale } from '@/components/PressableScale';
 import { Type } from '@/components/Type';
 import { useCreateTask } from '@/data/queries';
@@ -82,27 +83,28 @@ export function QuickAdd({ listId = DEFAULT_LIST_ID }: { listId?: string }) {
           {chips.length > 0 && (
             <View style={{ flexDirection: 'row', gap: Spacing.xs, justifyContent: 'flex-start', paddingLeft: Spacing.sm }}>
               {chips.map((c) => (
-                <PressableScale
-                  key={c.key}
-                  accessibilityLabel={`${c.label} entfernen`}
-                  onPress={() => setRemoved((r) => ({ ...r, [c.key]: true }))}
-                >
-                  <Glass
-                    variant="pill"
-                    style={Shadow.sm}
-                    contentStyle={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: Spacing.xs,
-                      paddingVertical: 6,
-                      paddingHorizontal: Spacing.sm + 2,
-                    }}
+                <PopIn key={c.key}>
+                  <PressableScale
+                    accessibilityLabel={`${c.label} entfernen`}
+                    onPress={() => setRemoved((r) => ({ ...r, [c.key]: true }))}
                   >
-                    <c.icon size={12} color={colors.teal} strokeWidth={2.2} />
-                    <Type variant="caption" tone="teal">{c.label}</Type>
-                    <X size={11} color={colors.text3} strokeWidth={2.2} />
-                  </Glass>
-                </PressableScale>
+                    <Glass
+                      variant="pill"
+                      style={Shadow.sm}
+                      contentStyle={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: Spacing.xs,
+                        paddingVertical: 6,
+                        paddingHorizontal: Spacing.sm + 2,
+                      }}
+                    >
+                      <c.icon size={12} color={colors.teal} strokeWidth={2.2} />
+                      <Type variant="caption" tone="teal">{c.label}</Type>
+                      <X size={11} color={colors.text3} strokeWidth={2.2} />
+                    </Glass>
+                  </PressableScale>
+                </PopIn>
               ))}
             </View>
           )}
@@ -135,20 +137,22 @@ export function QuickAdd({ listId = DEFAULT_LIST_ID }: { listId?: string }) {
               style={[{ flex: 1, fontSize: T.md, color: colors.text, paddingVertical: 2 }, webNoOutline]}
             />
             {text.trim().length > 0 && (
-              <PressableScale
-                accessibilityLabel="Aufgabe anlegen"
-                onPress={submit}
-                style={{
-                  width: 30,
-                  height: 30,
-                  borderRadius: R.pill,
-                  backgroundColor: colors.teal,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Plus size={17} color="#FFFFFF" strokeWidth={2.6} />
-              </PressableScale>
+              <PopIn>
+                <PressableScale
+                  accessibilityLabel="Aufgabe anlegen"
+                  onPress={submit}
+                  style={{
+                    width: 30,
+                    height: 30,
+                    borderRadius: R.pill,
+                    backgroundColor: colors.teal,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Plus size={17} color="#FFFFFF" strokeWidth={2.6} />
+                </PressableScale>
+              </PopIn>
             )}
           </Glass>
         </View>

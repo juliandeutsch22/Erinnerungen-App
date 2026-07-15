@@ -64,7 +64,13 @@ export default function SucheScreen() {
     // Tastatur-Insets: lange Trefferlisten bleiben bei offener Tastatur scrollbar.
     <Screen automaticallyAdjustKeyboardInsets>
       <Reveal>
-        <Type variant="title">Suche</Type>
+        <View style={{ gap: Spacing.xs }}>
+          <Type variant="title">Suche</Type>
+          {/* Ruhige Zähl-Zeile — dieselbe Stimme wie die Tages-Bilanz auf Heute. */}
+          <Type variant="caption" tone="text3" tabular>
+            {`${(tasks ?? []).length} ${(tasks ?? []).length === 1 ? 'Aufgabe' : 'Aufgaben'} · ${(lists ?? []).length} ${(lists ?? []).length === 1 ? 'Liste' : 'Listen'} durchsuchbar`}
+          </Type>
+        </View>
       </Reveal>
 
       <Reveal delay={60}>
@@ -90,7 +96,11 @@ export default function SucheScreen() {
         <Reveal delay={90}>
           <GlassPanel>
             {taskHits.length === 0 && listHits.length === 0 ? (
-              <EmptyState title="Keine Treffer" body={`Nichts zu „${query.trim()}" gefunden.`} />
+              <EmptyState
+                icon={<Search size={20} color={colors.teal} strokeWidth={2} />}
+                title="Keine Treffer"
+                body={`Nichts zu „${query.trim()}" gefunden.`}
+              />
             ) : (
               <>
                 {listHits.length > 0 && (
