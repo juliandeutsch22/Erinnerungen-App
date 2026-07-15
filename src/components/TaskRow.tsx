@@ -11,6 +11,7 @@ import { TaskCheck } from '@/components/TaskCheck';
 import { Type } from '@/components/Type';
 import type { List, Task } from '@/data/types';
 import { formatDueDate } from '@/lib/dates';
+import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { subtaskProgress } from '@/lib/taskFilters';
 import { isOverdue } from '@/lib/taskLogic';
 import { useColors } from '@/theme/ThemeProvider';
@@ -181,8 +182,13 @@ export function TaskRow({
       }
       onSwipeableWillOpen={(direction) => {
         swipeRef.current?.close();
-        if (direction === 'left') onToggle(true);
-        else onReschedule?.();
+        if (direction === 'left') {
+          hapticSuccess();
+          onToggle(true);
+        } else {
+          hapticSelect();
+          onReschedule?.();
+        }
       }}
     >
       {row}
