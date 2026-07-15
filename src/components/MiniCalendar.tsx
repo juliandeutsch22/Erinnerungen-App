@@ -1,19 +1,18 @@
-// MiniCalendar.tsx — kompakter Monats-Kalender für die Datums-Wahl im Editor
-// (bewusst ohne Fremdbibliothek). Wochen beginnen bei Montag.
+// MiniCalendar.tsx — kompakter Monats-Kalender für die Datums-Wahl im Editor.
+// Kopf (Monat + Navigation) über dem gemeinsamen MonthGrid (compact) — gleiche
+// Zell-Optik wie der Kalender-Tab, nur kleiner und ohne Marker.
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
+import { MonthGrid } from '@/components/calendar/MonthGrid';
+import { MONTHS } from '@/components/calendar/monthMatrix';
 import { PressableScale } from '@/components/PressableScale';
 import { Type } from '@/components/Type';
-import { parseDateStr, toDateStr, todayStr } from '@/lib/dates';
+import { parseDateStr, todayStr } from '@/lib/dates';
 import { hapticSelect } from '@/lib/haptics';
 import { useColors } from '@/theme/ThemeProvider';
-import { R, Spacing } from '@/theme/theme.tokens';
-
-const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
-const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-const CELL = 36;
+import { Spacing } from '@/theme/theme.tokens';
 
 export function MiniCalendar({
   selected,
@@ -27,9 +26,9 @@ export function MiniCalendar({
 }) {
   const colors = useColors();
   const today = todayStr();
-  const anchor = selected ? parseDateStr(selected) : parseDateStr(today);
-  const [year, setYear] = useState(anchor.getFullYear());
-  const [month, setMonth] = useState(anchor.getMonth());
+  const anchorDate = selected ? parseDateStr(selected) : parseDateStr(today);
+  const [year, setYear] = useState(anchorDate.getFullYear());
+  const [month, setMonth] = useState(anchorDate.getMonth());
 
   const shift = (delta: number) => {
     hapticSelect();
@@ -37,15 +36,6 @@ export function MiniCalendar({
     setYear(d.getFullYear());
     setMonth(d.getMonth());
   };
-
-  const first = new Date(year, month, 1);
-  const offset = (first.getDay() + 6) % 7; // Mo = 0
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const cells: (number | null)[] = [
-    ...Array.from({ length: offset }, () => null),
-    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
-  ];
-  while (cells.length % 7 !== 0) cells.push(null);
 
   return (
     <View style={{ gap: Spacing.sm }}>
@@ -58,49 +48,7 @@ export function MiniCalendar({
           <ChevronRight size={18} color={colors.text2} strokeWidth={2} />
         </PressableScale>
       </View>
-      <View style={{ flexDirection: 'row' }}>
-        {WEEKDAYS.map((w) => (
-          <View key={w} style={{ flex: 1, alignItems: 'center' }}>
-            <Type variant="caption" tone="text3">{w}</Type>
-          </View>
-        ))}
-      </View>
-      {Array.from({ length: cells.length / 7 }, (_, row) => (
-        <View key={row} style={{ flexDirection: 'row' }}>
-          {cells.slice(row * 7, row * 7 + 7).map((day, i) => {
-            if (day === null) return <View key={i} style={{ flex: 1, height: CELL }} />;
-            const dateStr = toDateStr(new Date(year, month, day));
-            const isSelected = dateStr === selected;
-            const isToday = dateStr === today;
-            const disabled = minDate !== undefined && dateStr < minDate;
-            return (
-              <View key={i} style={{ flex: 1, alignItems: 'center' }}>
-                <PressableScale
-                  accessibilityLabel={`${day}. ${MONTHS[month]} wählen`}
-                  accessibilityState={{ disabled }}
-                  disabled={disabled}
-                  onPress={() => onSelect(dateStr)}
-                  style={{
-                    width: CELL,
-                    height: CELL,
-                    borderRadius: R.pill,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    opacity: disabled ? 0.3 : 1,
-                    backgroundColor: isSelected ? colors.teal : 'transparent',
-                    borderWidth: isToday && !isSelected ? 1 : 0,
-                    borderColor: colors.teal,
-                  }}
-                >
-                  <Type variant="label" tabular style={{ color: isSelected ? '#FFFFFF' : isToday ? colors.teal : colors.text }}>
-                    {day}
-                  </Type>
-                </PressableScale>
-              </View>
-            );
-          })}
-        </View>
-      ))}
+      <MonthGrid anchor={{ year, month }} selected={selected} onSelect={onSelect} today={today} minDate={minDate} compact />
     </View>
   );
 }
