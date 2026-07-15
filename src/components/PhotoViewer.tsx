@@ -2,7 +2,7 @@
 // durch die Momente eines Termins. Tippen schließt; Löschen zweistufig.
 import { Trash2, X } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { Image, Modal, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
+import { Modal, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -37,6 +37,8 @@ export function PhotoViewer({
   const swipeDown = Gesture.Pan()
     .activeOffsetY(24)
     .failOffsetX([-24, 24])
+    // Nur Ein-Finger — damit das Zwei-Finger-Zoomen nicht das Schließen auslöst.
+    .maxPointers(1)
     .onChange((e) => {
       dragY.value = Math.max(0, dragY.value + e.changeY);
     })
@@ -68,9 +70,7 @@ export function PhotoViewer({
           onMomentumScrollEnd={(e) => setCurrent(Math.round(e.nativeEvent.contentOffset.x / width))}
         >
           {photos.map((p) => (
-            <Pressable key={p.id} onPress={onClose} style={{ width, height, alignItems: 'center', justifyContent: 'center' }}>
-              <Image source={{ uri: p.uri }} style={{ width, height: height * 0.8 }} resizeMode="contain" />
-            </Pressable>
+            <ZoomableImage key={p.id} uri={p.uri} width={width} height={height} onPress={onClose} />
           ))}
         </ScrollView>
           </Animated.View>
@@ -130,5 +130,26 @@ export function PhotoViewer({
       </Animated.View>
       </GestureHandlerRootView>
     </Modal>
+  );
+}
+
+/** Ein Foto mit „Pinch-to-Peek": mit zwei Fingern zoomen, beim Loslassen sanft
+ *  zurückfedern. Bewusst ohne Pan/Scroll-Kopplung — nur die Pinch-Geste. */
+function ZoomableImage({ uri, width, height, onPress }: { uri: string; width: number; height: number; onPress: () => void }) {
+  const scale = useSharedValue(1);
+  const pinch = Gesture.Pinch()
+    .onUpdate((e) => {
+      scale.value = Math.min(Math.max(e.scale, 1), 4);
+    })
+    .onEnd(() => {
+      scale.value = withSpring(1, { damping: 20, stiffness: 220 });
+    });
+  const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  return (
+    <GestureDetector gesture={pinch}>
+      <Pressable onPress={onPress} style={{ width, height, alignItems: 'center', justifyContent: 'center' }}>
+        <Animated.Image source={{ uri }} style={[{ width, height: height * 0.8 }, style]} resizeMode="contain" />
+      </Pressable>
+    </GestureDetector>
   );
 }

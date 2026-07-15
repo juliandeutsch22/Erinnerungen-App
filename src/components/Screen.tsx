@@ -1,7 +1,8 @@
 // Screen.tsx — Standard-Screen-Wrapper: BG aus Tokens, horizontales lg-Padding,
 // Safe-Area oben, Tab-Bar-Clearance unten, zentrierte max. Inhaltsbreite.
 // Scroll-Offset wird an den Backdrop gereicht → Aurora-Parallax (Tiefe hinter Glas).
-import React from 'react';
+import { useScrollToTop } from 'expo-router';
+import React, { useRef } from 'react';
 import { RefreshControl, ScrollViewProps, StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -32,6 +33,11 @@ export function Screen({ children, withTabBar = true, scroll = true, refreshing,
     scrollY.value = e.contentOffset.y;
   });
 
+  // Tippen auf den bereits aktiven Tab scrollt nach oben (iOS-Standard).
+  // Aus expo-router (SDK 56: vendored, KEIN @react-navigation-Import).
+  const scrollRef = useRef<Animated.ScrollView>(null);
+  useScrollToTop(scrollRef);
+
   const inner = (
     <View style={styles.center}>
       <View style={{ width: '100%', maxWidth: MAX_CONTENT_WIDTH, gap: Spacing.lg }}>{children}</View>
@@ -51,6 +57,7 @@ export function Screen({ children, withTabBar = true, scroll = true, refreshing,
     <View style={{ flex: 1 }}>
       <Backdrop scrollY={scrollY} />
       <Animated.ScrollView
+        ref={scrollRef}
         style={[{ backgroundColor: 'transparent' }, style]}
         contentContainerStyle={[
           { paddingTop: insets.top + Spacing.lg, paddingBottom: bottomPad, paddingHorizontal: Spacing.lg },
