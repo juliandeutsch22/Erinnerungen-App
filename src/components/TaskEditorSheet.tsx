@@ -3,7 +3,7 @@
 // Detail-Zeilen (Liste / Fällig / Wiederholung / Flagge) mit aktuellem Wert,
 // die erst beim Antippen ihre Chips aufklappen — keine Chip-Wand. Der
 // Primär-Button sitzt fest im Sheet-Footer. Löschen zweistufig.
-import { CalendarDays, ChevronDown, ChevronRight, Flag, ListChecks, type LucideIcon, Moon, Plus, Repeat, Sun, Tag as TagIcon, Trash2, X } from 'lucide-react-native';
+import { CalendarDays, CalendarX2, ChevronDown, ChevronRight, Clock, Flag, ListChecks, type LucideIcon, Plus, Repeat, Tag as TagIcon, Trash2, X } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
@@ -19,7 +19,7 @@ import { Type } from '@/components/Type';
 import { useCreateTask, useDeleteTask, useLists, useTasks, useUpdateTask } from '@/data/queries';
 import type { Rrule, Subtask, Task } from '@/data/types';
 import { newId, normalizeTag } from '@/data/types';
-import { addDays, formatDueDate, nextWeekend, todayStr } from '@/lib/dates';
+import { formatDueDate, todayStr } from '@/lib/dates';
 import { tagCounts } from '@/lib/taskFilters';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { webNoOutline } from '@/theme/layout';
@@ -27,7 +27,6 @@ import { useColors } from '@/theme/ThemeProvider';
 import { useSettings } from '@/theme/settings.store';
 import { R, Spacing, T } from '@/theme/theme.tokens';
 
-const TIME_PRESETS = ['09:00', '12:00', '18:00'];
 const RRULES: { value: Rrule; label: string }[] = [
   { value: 'daily', label: 'Täglich' },
   { value: 'weekdays', label: 'Werktags' },
@@ -76,8 +75,6 @@ export function TaskEditorSheet({
   const [tagDraft, setTagDraft] = useState('');
   const [subtasks, setSubtasks] = useState<Subtask[]>(task?.subtasks ?? []);
   const [subDraft, setSubDraft] = useState('');
-  const [showCalendar, setShowCalendar] = useState(false);
-  const [customTime, setCustomTime] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   // Neue Aufgabe: Fällig direkt offen (häufigste Aktion); Bearbeiten: alles kompakt.
   const [section, setSection] = useState<Section | null>(task === null ? 'due' : null);
@@ -88,22 +85,20 @@ export function TaskEditorSheet({
   const toggleSection = (s: Section) => {
     hapticSelect();
     setSection((cur) => (cur === s ? null : s));
-    setShowCalendar(false);
+  };
+
+  // Uhrzeit an/aus: an → Standard-Uhrzeit (Datum notfalls heute), aus → keine.
+  const toggleTime = () => {
+    hapticSelect();
+    if (dueTime !== null) {
+      setDueTime(null);
+    } else {
+      if (!dueDate) setDueDate(today);
+      setDueTime(defaultDueTime);
+    }
   };
 
   const currentList = useMemo(() => (lists ?? []).find((l) => l.id === listId), [lists, listId]);
-
-  // Datums-Chips: Heute / Heute Abend / Morgen / Wochenende / Kalender.
-  const weekend = nextWeekend(today);
-  const dateChips = useMemo(
-    () => [
-      { key: 'heute', label: 'Heute', icon: Sun as LucideIcon | undefined, date: today, time: undefined as string | null | undefined },
-      { key: 'abend', label: 'Heute Abend', icon: Moon as LucideIcon | undefined, date: today, time: '18:00' as string | null },
-      { key: 'morgen', label: 'Morgen', icon: undefined, date: addDays(today, 1), time: undefined },
-      { key: 'wochenende', label: 'Wochenende', icon: undefined, date: weekend, time: undefined },
-    ],
-    [today, weekend],
-  );
 
   const dueLabel = dueDate ? formatDueDate(dueDate, today) + (dueTime ? `, ${dueTime}` : '') : 'Kein Datum';
 
@@ -295,82 +290,46 @@ export function TaskEditorSheet({
         {section === 'due' && (
           <Expanded>
             <View style={{ gap: Spacing.md }}>
-              <ChipWrap>
-                {dateChips.map((c) => {
-                  // „Heute" und „Heute Abend" schließen sich gegenseitig aus.
-                  const active =
-                    dueDate === c.date &&
-                    (c.key === 'abend' ? dueTime === '18:00' : c.key === 'heute' ? dueTime !== '18:00' : true);
-                  return (
-                    <Chip
-                      key={c.key}
-                      label={c.label}
-                      icon={c.icon}
-                      active={active}
-                      onPress={() => {
-                        setDueDate(c.date);
-                        if (c.time !== undefined) setDueTime(c.time);
-                        setShowCalendar(false);
-                      }}
-                    />
-                  );
-                })}
-                <Chip label="Kalender" icon={CalendarDays} active={showCalendar} onPress={() => setShowCalendar((v) => !v)} />
-                {dueDate && (
-                  <Chip
-                    label="Kein Datum ✕"
-                    accessibilityLabel="Datum entfernen"
-                    onPress={() => {
-                      setDueDate(null);
-                      setDueTime(null);
-                      setRrule(null);
-                      setShowCalendar(false);
-                    }}
-                  />
-                )}
-              </ChipWrap>
-              {showCalendar && (
-                <View style={{ borderRadius: R.lg, borderWidth: 1, borderColor: colors.chipBorder, backgroundColor: colors.bg2, padding: Spacing.sm }}>
-                  <MiniCalendar
-                    selected={dueDate}
-                    onSelect={(d) => {
-                      setDueDate(d);
-                      setShowCalendar(false);
-                    }}
-                  />
-                </View>
-              )}
+              {/* Datum direkt im Kalender antippen — keine Schnell-Chips. */}
+              <View style={{ borderRadius: R.lg, borderWidth: 1, borderColor: colors.chipBorder, backgroundColor: colors.bg2, padding: Spacing.sm }}>
+                <MiniCalendar selected={dueDate} onSelect={setDueDate} />
+              </View>
+
+              {/* Uhrzeit: Schalter + natives Rad (statt Presets). */}
               <View style={{ gap: Spacing.sm }}>
-                <Type variant="caption" tone="text3">Uhrzeit</Type>
-                <ChipWrap>
-                  {TIME_PRESETS.map((t) => (
-                    <Chip
-                      key={t}
-                      label={t}
-                      active={dueTime === t && !customTime}
-                      onPress={() => {
-                        setCustomTime(false);
-                        setDueTime(dueTime === t ? null : t);
-                      }}
-                    />
-                  ))}
-                  <Chip
-                    label="Eigene"
-                    active={customTime}
-                    onPress={() => {
-                      setCustomTime((v) => !v);
-                      if (!dueTime) setDueTime(defaultDueTime);
-                    }}
-                  />
-                </ChipWrap>
-                {customTime && (
-                  <TimeField
-                    value={dueTime ?? defaultDueTime}
-                    onChange={setDueTime}
-                    accessibilityLabel="Eigene Uhrzeit wählen"
-                  />
+                <PressableScale
+                  accessibilityRole="switch"
+                  accessibilityState={{ checked: dueTime !== null }}
+                  accessibilityLabel={dueTime !== null ? 'Uhrzeit entfernen' : 'Uhrzeit hinzufügen'}
+                  onPress={toggleTime}
+                  pressedScale={0.99}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.xs }}
+                >
+                  <Clock size={18} color={dueTime !== null ? colors.teal : colors.text3} strokeWidth={2} />
+                  <Type variant="body" style={{ flex: 1 }}>Uhrzeit</Type>
+                  <Type variant="label" tone={dueTime !== null ? 'teal' : 'text3'}>{dueTime !== null ? 'An' : 'Aus'}</Type>
+                </PressableScale>
+                {dueTime !== null && (
+                  <TimeField value={dueTime} onChange={setDueTime} accessibilityLabel="Uhrzeit wählen" />
                 )}
               </View>
+
+              {/* Datum wieder entfernen (dezenter Text-Link statt Chip). */}
+              {dueDate && (
+                <PressableScale
+                  accessibilityLabel="Datum entfernen"
+                  onPress={() => {
+                    hapticSelect();
+                    setDueDate(null);
+                    setDueTime(null);
+                    setRrule(null);
+                  }}
+                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.xs, paddingVertical: Spacing.xs }}
+                >
+                  <CalendarX2 size={15} color={colors.text3} strokeWidth={2} />
+                  <Type variant="label" tone="text3">Datum entfernen</Type>
+                </PressableScale>
+              )}
             </View>
           </Expanded>
         )}

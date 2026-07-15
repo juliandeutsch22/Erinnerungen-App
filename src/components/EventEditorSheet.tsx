@@ -348,10 +348,6 @@ function WhenRowView({
                 minDate={minDay}
               />
             </View>
-            <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
-              <Chip label="Heute" active={day === today} onPress={() => onSelectDay(today)} />
-              <Chip label="Morgen" active={day === addDays(today, 1)} onPress={() => onSelectDay(addDays(today, 1))} />
-            </View>
           </View>
         </Expanded>
       )}
