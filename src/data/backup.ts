@@ -154,7 +154,7 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
       id: l.id,
       name: l.name,
       icon: str(l.icon) ? l.icon : 'inbox',
-      color: str(l.color) ? l.color : '#1FB6A6',
+      color: str(l.color) ? l.color : '#C96A47',
       goal: str(l.goal) ? l.goal : null,
       deadline: str(l.deadline) ? l.deadline : null,
       sort: typeof l.sort === 'number' ? l.sort : 0,

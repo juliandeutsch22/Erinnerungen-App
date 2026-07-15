@@ -60,7 +60,7 @@ export async function getEventCalendars(): Promise<DeviceCalendar[]> {
   return cals.map((c) => ({
     id: c.id,
     title: c.title,
-    color: c.color ?? '#5B6CFF',
+    color: c.color ?? '#74936B',
     allowsModifications: c.allowsModifications,
     sourceName: c.source?.name ?? '',
   }));

@@ -13,43 +13,47 @@ export const Spacing = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 48 } as cons
 // Border-Radii. Karten/Glas-Surfaces R.xl (28), Pills R.pill, Floating-Bars 28.
 export const R = { xs: 8, sm: 12, md: 16, lg: 22, xl: 28, xxl: 36, pill: 999 } as const;
 
-// ↓↓↓ DIE EINZIGEN ZWEI MARKEN-HEX (Health-Variante) ↓↓↓
-const ACCENT_A = '#1FB6A6'; // primär / CTA / "vital" (ruhiges Teal)
-const ACCENT_B = '#5B6CFF'; // sekundär / info (seriöses Indigo)
+// ↓↓↓ DIE EINZIGEN ZWEI MARKEN-HEX (Mediterran-Variante) ↓↓↓
+// Erdig-warm wie Ton und Olivenbaum: Terrakotta trägt die Handlung,
+// Salbei erdet Zweitinformationen (Überfällig, Termine, Info).
+const ACCENT_A = '#C96A47'; // primär / CTA (warmes Terrakotta)
+const ACCENT_B = '#74936B'; // sekundär / info (ruhiger Salbei)
 
-// Light = DEFAULT im Health-Kontext (Trust, bei Tageslicht lesbar).
+// Light = DEFAULT (Trust, bei Tageslicht lesbar). Neutraltöne bewusst warm
+// (Sand/Creme statt Blaugrau) — die halbe Wärme steckt im Grund, nicht im Akzent.
 // Iron Rule: genau zwei Akzentfarben, alle semantischen Slots mappen darauf.
-// WICHTIG (Health): KEIN drittes Alarm-Rot — danger/warning mappen bewusst auf die Akzente.
+// WICHTIG: KEIN drittes Alarm-Rot — danger/warning mappen bewusst auf die Akzente.
 export const lightColors = {
   teal: ACCENT_A,
   indigo: ACCENT_B,
-  bg: '#F7F8F8',
+  bg: '#F8F4EE',
   bg2: '#FFFFFF',
-  bg3: '#F0F1F2',
-  bg4: '#E5E6E8',
+  bg3: '#F1EBE2',
+  bg4: '#E7DFD3',
   // Chip = erhabene Glas-Well auf einer Panel-Fläche (statt flachem Grau).
   chip: 'rgba(255,255,255,0.62)',
-  chipBorder: 'rgba(0,0,0,0.09)',
-  border: 'rgba(0,0,0,0.09)',
-  border2: 'rgba(0,0,0,0.15)',
-  border3: 'rgba(0,0,0,0.26)',
-  text: '#0B0B0C',
-  text2: '#545458',
-  text3: '#8E8E93',
+  chipBorder: 'rgba(60,40,20,0.10)',
+  border: 'rgba(60,40,20,0.10)',
+  border2: 'rgba(60,40,20,0.16)',
+  border3: 'rgba(60,40,20,0.28)',
+  text: '#171210',
+  text2: '#5A5148',
+  text3: '#98908A',
   success: ACCENT_A,
   info: ACCENT_B,
   danger: ACCENT_A,
   warning: ACCENT_B,
 };
 
-// Dark = Gast (umgekehrte Gewichtung zum VIBE-Default).
+// Dark = Gast: warme Erd-Dunkeltöne statt Grün-Schwarz; Akzente eine Stufe
+// heller, damit sie auf Dunkel genauso ruhig leuchten wie Light auf Creme.
 export const darkColors: typeof lightColors = {
-  teal: ACCENT_A,
-  indigo: '#7C8AFF',
+  teal: '#DA8158',
+  indigo: '#95B187',
   bg: '#000000',
-  bg2: '#0E1413',
-  bg3: '#161B1A',
-  bg4: '#1E2423',
+  bg2: '#15100C',
+  bg3: '#1C1712',
+  bg4: '#251E17',
   chip: 'rgba(255,255,255,0.07)',
   chipBorder: 'rgba(255,255,255,0.10)',
   border: 'rgba(255,255,255,0.12)',
@@ -58,10 +62,10 @@ export const darkColors: typeof lightColors = {
   text: '#FFFFFF',
   text2: 'rgba(255,255,255,0.70)',
   text3: 'rgba(255,255,255,0.38)',
-  success: ACCENT_A,
-  info: '#7C8AFF',
-  danger: ACCENT_A,
-  warning: '#7C8AFF',
+  success: '#DA8158',
+  info: '#95B187',
+  danger: '#DA8158',
+  warning: '#95B187',
 };
 
 export type Colors = typeof lightColors;

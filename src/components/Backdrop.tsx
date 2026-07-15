@@ -1,5 +1,5 @@
 // Backdrop.tsx — Aurora-Hintergrund mit Tiefe: Basis-Verlauf + zwei Radial-Glows
-// (Teal oben-links, Indigo unten-rechts). Gibt dem Liquid Glass etwas zum Brechen.
+// (Terrakotta oben-links, Salbei unten-rechts). Gibt dem Liquid Glass etwas zum Brechen.
 // Optional mit Scroll-Parallax: das Feld bewegt sich langsamer als der Inhalt →
 // die Glasflächen schweben sichtbar ÜBER einem lebendigen Grund.
 import { LinearGradient } from 'expo-linear-gradient';
@@ -24,9 +24,10 @@ export function Backdrop({ scrollY }: { scrollY?: SharedValue<number> }) {
   const tealOp = isDark ? 0.28 : 0.42;
   const indigoOp = isDark ? 0.24 : 0.36;
 
-  // Basis-Verlauf: kühl oben → warm/violett unten. Light bewusst eine Stufe
-  // tiefer/satter, damit die Frost-Platten hell DAGEGEN leuchten (Figur-Grund).
-  const base: [string, string, string] = isDark ? ['#05100E', '#000000', '#05080F'] : ['#CCE4DE', '#D9DEE9', '#D5C8E6'];
+  // Basis-Verlauf: Terrakotta-Sand oben → Salbei unten (mediterranes Licht).
+  // Light bewusst eine Stufe tiefer/satter, damit die Frost-Platten hell
+  // DAGEGEN leuchten (Figur-Grund).
+  const base: [string, string, string] = isDark ? ['#120B07', '#000000', '#0A0E08'] : ['#EAD5C2', '#EFE6DB', '#DDE0CE'];
 
   const parallax = useAnimatedStyle(() => {
     if (!scrollY || reduced) return { transform: [{ translateY: 0 }] };

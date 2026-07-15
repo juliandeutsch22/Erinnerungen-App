@@ -1,5 +1,5 @@
 // listMeta.ts — kuratierte Icon- und Farbauswahl für Listen. Farben bleiben in
-// der Marken-Familie (Teal/Indigo + Abstufungen) — kein freies Farbrad.
+// der Marken-Familie (mediterrane Erdtöne) — kein freies Farbrad.
 import {
   Book,
   Briefcase,
@@ -35,5 +35,6 @@ export function listIcon(name: string): LucideIcon {
   return LIST_ICONS[name] ?? Inbox;
 }
 
-/** Teal/Indigo-Familie (Iron Rule: keine fremden Akzente, kein Rot). */
-export const LIST_COLORS = ['#1FB6A6', '#149286', '#0E7C71', '#5B6CFF', '#7C8AFF', '#3D4ACC'] as const;
+/** Mediterrane Erdtöne (Iron Rule: keine fremden Akzente, kein Alarm-Rot):
+ *  Terrakotta · Ton · Ocker · Salbei · Olive · Meerblau. */
+export const LIST_COLORS = ['#C96A47', '#A9532F', '#C99A3F', '#74936B', '#5A7A50', '#4E7E9B'] as const;
