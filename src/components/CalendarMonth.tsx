@@ -1,11 +1,11 @@
 // CalendarMonth.tsx — Monatsansicht für den Kalender-Tab: Kopf (Monat + „Heute" +
 // Navigation) über dem gemeinsamen MonthGrid. Zell-Optik und Überlappungs-Fix
-// leben in DayCell/MonthGrid (calendar/); hier nur die Navigation.
+// leben in DayCell/MonthGrid (calendar/); hier Navigation + Monatswechsel-Animation.
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { runOnJS } from 'react-native-reanimated';
+import Animated, { Easing, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { MonthGrid } from '@/components/calendar/MonthGrid';
 import { MONTHS, type MonthAnchor, monthGridRange } from '@/components/calendar/monthMatrix';
@@ -44,8 +44,27 @@ export function CalendarMonth({
   const colors = useColors();
   const today = todayStr();
 
+  // Richtung des letzten Wechsels (für die Slide-Richtung der Animation).
+  const dir = useRef(0);
+  const tx = useSharedValue(0);
+  const op = useSharedValue(1);
+
+  // Bei jedem Monatswechsel: das neue Gitter gleitet sanft aus der Wisch-Richtung
+  // herein und blendet auf. Kein haptisches Feedback beim Wischen — nur Animation.
+  useEffect(() => {
+    tx.value = dir.current * 22;
+    op.value = 0.4;
+    tx.value = withTiming(0, { duration: 260, easing: Easing.out(Easing.cubic) });
+    op.value = withTiming(1, { duration: 240, easing: Easing.out(Easing.cubic) });
+    dir.current = 0;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anchor.year, anchor.month]);
+
+  const gridStyle = useAnimatedStyle(() => ({ transform: [{ translateX: tx.value }], opacity: op.value }));
+
+  // Monatswechsel selbst (Swipe): bewusst OHNE Haptik.
   const shift = (delta: number) => {
-    hapticSelect();
+    dir.current = delta > 0 ? 1 : -1;
     const d = new Date(anchor.year, anchor.month + delta, 1);
     onAnchorChange({ year: d.getFullYear(), month: d.getMonth() });
   };
@@ -76,19 +95,20 @@ export function CalendarMonth({
           <PressableScale accessibilityLabel="Zu heute springen" onPress={jumpToday} style={{ paddingVertical: Spacing.xs, paddingHorizontal: Spacing.sm }}>
             <Type variant="label" tone="teal">Heute</Type>
           </PressableScale>
-          <PressableScale accessibilityLabel="Voriger Monat" onPress={() => shift(-1)} style={{ padding: Spacing.sm }}>
+          {/* Chevrons behalten Haptik (Tastendruck) — nur das Wischen nicht. */}
+          <PressableScale accessibilityLabel="Voriger Monat" onPress={() => { hapticSelect(); shift(-1); }} style={{ padding: Spacing.sm }}>
             <ChevronLeft size={20} color={colors.text2} strokeWidth={2} />
           </PressableScale>
-          <PressableScale accessibilityLabel="Nächster Monat" onPress={() => shift(1)} style={{ padding: Spacing.sm }}>
+          <PressableScale accessibilityLabel="Nächster Monat" onPress={() => { hapticSelect(); shift(1); }} style={{ padding: Spacing.sm }}>
             <ChevronRight size={20} color={colors.text2} strokeWidth={2} />
           </PressableScale>
         </View>
       </View>
 
       <GestureDetector gesture={swipe}>
-        <View>
+        <Animated.View style={gridStyle}>
           <MonthGrid anchor={anchor} selected={selected} onSelect={onSelect} today={today} markers={markers} onDayLongPress={onDayLongPress} />
-        </View>
+        </Animated.View>
       </GestureDetector>
     </View>
   );
