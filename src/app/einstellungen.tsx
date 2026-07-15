@@ -1,6 +1,7 @@
 // einstellungen.tsx — Zahnrad-Ziel (Fahrplan §4): Theme, Bewegung,
 // Standard-Uhrzeit, Sammel-Notification, JSON-Backup (Export/Import §3.8).
 import { useQueryClient } from '@tanstack/react-query';
+import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, Download, FolderOpen, Upload } from 'lucide-react-native';
 import React, { useState } from 'react';
@@ -43,6 +44,10 @@ const MOTIONS: { value: MotionPref; label: string }[] = [
 ];
 const DEFAULT_TIMES = ['08:00', '09:00', '12:00', '18:00'];
 const SUMMARY_TIMES = ['07:00', '08:00', '09:00', '10:00'];
+
+// Version + Build aus der App-Config — damit man am Gerät sieht, welcher Build läuft.
+const build = Constants.expoConfig?.ios?.buildNumber;
+const appVersion = `${Constants.expoConfig?.version ?? '?'}${build ? ` (${build})` : ''}`;
 
 export default function EinstellungenScreen() {
   const colors = useColors();
@@ -271,6 +276,12 @@ export default function EinstellungenScreen() {
             </Type>
           )}
         </GlassPanel>
+      </Reveal>
+
+      <Reveal delay={200}>
+        <Type variant="caption" tone="text3" style={{ textAlign: 'center', marginTop: Spacing.sm }}>
+          Erinnerungen · Version {appVersion}
+        </Type>
       </Reveal>
     </Screen>
   );

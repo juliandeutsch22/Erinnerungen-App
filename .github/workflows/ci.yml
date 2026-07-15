@@ -1,10 +1,17 @@
-# CI — schützt jeden Push: Typen, Tests, Web-Build.
+# CI — Typen, Tests, Web-Build. Läuft auf main + Pull Requests (nicht auf jedem
+# Branch-Push — spart Actions-Minuten; Feature-Branches werden ohnehin per
+# Fast-Forward auf main gemergt und dort geprüft).
 name: CI
 
 on:
   push:
-    branches: ['**']
+    branches: [main]
   pull_request:
+
+# Überholte Läufe desselben Refs abbrechen (spart Minuten bei schnellen Pushes).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   verify:

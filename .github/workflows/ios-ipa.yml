@@ -7,6 +7,11 @@ name: iOS IPA
 on:
   workflow_dispatch:
 
+# Ältere (teure macOS-)Läufe abbrechen, wenn ein neuer gestartet wird.
+concurrency:
+  group: ipa-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: macos-15
