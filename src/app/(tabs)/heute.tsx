@@ -26,6 +26,7 @@ import { usePhotoCounts } from '@/data/photoQueries';
 import { useAdoptOverdue, useCompleteTask, useLists, useReopenTask, useTasks } from '@/data/queries';
 import type { Task } from '@/data/types';
 import { bucketEventsByDay } from '@/lib/calendarLogic';
+import { buildDayTimeline, nowMarkerIndex } from '@/lib/dayTimeline';
 import { addDays, formatDayHeading, toDateStr, todayStr } from '@/lib/dates';
 import { type DeviceEvent, hasCalendarPermission } from '@/lib/deviceCalendar';
 import { groupToday, groupUpcomingDays } from '@/lib/taskLogic';
@@ -103,6 +104,18 @@ export default function HeuteScreen() {
   const greeting = hour < 5 ? 'Gute Nacht' : hour < 11 ? 'Guten Morgen' : hour < 18 ? 'Guten Tag' : 'Guten Abend';
   const dateLine = now.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
 
+  // Tagesplan: Termine (mit Uhrzeit) + Aufgaben (mit Uhrzeit) verschmelzen zu
+  // EINEM chronologischen Ablauf mit „Jetzt"-Marker. Ganztägige Termine haben
+  // keinen Slot und stehen als eigene Zeile über der Timeline.
+  const nowMin = hour * 60 + now.getMinutes();
+  const nowLabel = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  const allDayEvents = useMemo(() => todayEvents.filter((e) => e.allDay), [todayEvents]);
+  const timeline = useMemo(
+    () => buildDayTimeline(todayEvents, groups.timed, today),
+    [todayEvents, groups.timed, today],
+  );
+  const nowIdx = nowMarkerIndex(timeline, nowMin);
+
   // Ruhige Tages-Bilanz unter der Begrüßung (inkl. Termine).
   const eventSuffix =
     todayEvents.length > 0 ? ` · ${todayEvents.length} ${todayEvents.length === 1 ? 'Termin' : 'Termine'}` : '';
@@ -138,6 +151,130 @@ export default function HeuteScreen() {
         onLongPress={() => setQuickTask(t)}
       />
     ));
+
+  // „Jetzt"-Marker: Teal-Punkt + Uhrzeit + dünne Linie, sitzt zwischen den
+  // Timeline-Einträgen an der Stelle der aktuellen Uhrzeit.
+  const nowMarker = (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginVertical: 6 }}>
+      <View style={{ width: 7, height: 7, borderRadius: 999, backgroundColor: colors.teal }} />
+      <Type variant="caption" tone="teal" tabular>Jetzt · {nowLabel}</Type>
+      <View style={{ flex: 1, height: 1, borderRadius: 999, backgroundColor: colors.teal, opacity: 0.35 }} />
+    </View>
+  );
+
+  // Sektionen des Tages als Liste — dazwischen Seams. Reihenfolge: überfällig →
+  // Tagesplan (Termine + Aufgaben chronologisch) → ohne Uhrzeit → erledigt.
+  const hasOverdue = groups.overdue.length > 0;
+  const hasPlan = timeline.length > 0 || allDayEvents.length > 0;
+  const hasUntimed = groups.untimed.length > 0;
+  const hasDone = doneToday.length > 0;
+  const nothingAtAll = !hasOverdue && !hasPlan && !hasUntimed && !hasDone;
+
+  const sections: React.ReactNode[] = [];
+
+  if (hasOverdue) {
+    sections.push(
+      <View key="overdue">
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Type variant="eyebrow" tone="indigo">Überfällig · {groups.overdue.length}</Type>
+          {/* Auto-Übernahme: alle überfälligen mit einem Tipp auf heute holen. */}
+          <PressableScale
+            accessibilityLabel="Alle überfälligen auf heute holen"
+            onPress={adoptAll}
+            pressedScale={0.97}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 4, paddingHorizontal: 8, marginRight: -8 }}
+          >
+            <CalendarCheck size={14} color={colors.indigo} strokeWidth={2} />
+            <Type variant="caption" tone="indigo">Auf heute</Type>
+          </PressableScale>
+        </View>
+        <View style={{ marginTop: Spacing.xs }}>{renderRows(groups.overdue)}</View>
+      </View>,
+    );
+  }
+
+  if (hasPlan) {
+    sections.push(
+      <View key="plan">
+        <Type variant="eyebrow" tone="text3">Tagesplan</Type>
+        <View style={{ marginTop: Spacing.xs }}>
+          {/* Ganztägige Termine zuerst — ohne Zeit-Slot, über der Timeline. */}
+          {allDayEvents.map((ev) => (
+            <EventRow
+              key={ev.key}
+              event={ev}
+              calendar={calendarById.get(ev.calendarId)}
+              day={today}
+              showCalendarName={false}
+              photoCount={photoCounts.get(ev.id) ?? 0}
+              onPress={() => setEditorEvent(ev)}
+            />
+          ))}
+          {timeline.map((entry, i) => (
+            <React.Fragment key={entry.key}>
+              {i === nowIdx && nowMarker}
+              {entry.kind === 'event' ? (
+                <EventRow
+                  event={entry.event}
+                  calendar={calendarById.get(entry.event.calendarId)}
+                  day={today}
+                  showCalendarName={false}
+                  photoCount={photoCounts.get(entry.event.id) ?? 0}
+                  onPress={() => setEditorEvent(entry.event)}
+                />
+              ) : (
+                <TaskRow
+                  task={entry.task}
+                  today={today}
+                  showDue="time-only"
+                  list={entry.task.listId !== 'default' ? listById.get(entry.task.listId) : undefined}
+                  onToggle={toggle(entry.task)}
+                  onPress={() => setEditorTask(entry.task)}
+                  onReschedule={() => setRescheduleTask(entry.task)}
+                  onLongPress={() => setQuickTask(entry.task)}
+                />
+              )}
+            </React.Fragment>
+          ))}
+          {/* Marker ans Ende, wenn schon alles vorbei ist. */}
+          {nowIdx === timeline.length && timeline.length > 0 && nowMarker}
+        </View>
+      </View>,
+    );
+  }
+
+  if (hasUntimed) {
+    sections.push(
+      <View key="untimed">
+        <Type variant="eyebrow" tone="text3">Ohne Uhrzeit</Type>
+        <View style={{ marginTop: Spacing.xs }}>{renderRows(groups.untimed)}</View>
+      </View>,
+    );
+  }
+
+  if (hasDone) {
+    sections.push(
+      <View key="done">
+        {/* Erledigt heute — einklappbar, Abhaken bleibt sichtbar + rückholbar. */}
+        <PressableScale
+          accessibilityLabel={showCompleted ? 'Erledigte ausblenden' : 'Erledigte anzeigen'}
+          onPress={() => {
+            hapticSelect();
+            setShowCompleted((v) => !v);
+          }}
+          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+        >
+          <Type variant="eyebrow" tone="text3">Erledigt · {doneToday.length}</Type>
+          {showCompleted ? (
+            <ChevronDown size={16} color={colors.text3} strokeWidth={2} />
+          ) : (
+            <ChevronRight size={16} color={colors.text3} strokeWidth={2} />
+          )}
+        </PressableScale>
+        {showCompleted && <View style={{ marginTop: Spacing.xs }}>{renderRows(doneToday)}</View>}
+      </View>,
+    );
+  }
 
   return (
     <View style={{ flex: 1 }}>
@@ -185,100 +322,21 @@ export default function HeuteScreen() {
             </View>
           )}
 
-          {/* Termine des Tages — aus allen iOS-Kalendern (inkl. Google). */}
-          {todayEvents.length > 0 && (
-            <>
-              <Type variant="eyebrow" tone="text3">Termine</Type>
-              <View style={{ marginTop: Spacing.xs }}>
-                {todayEvents.map((ev) => (
-                  <EventRow
-                    key={ev.key}
-                    event={ev}
-                    calendar={calendarById.get(ev.calendarId)}
-                    day={today}
-                    showCalendarName={false}
-                    photoCount={photoCounts.get(ev.id) ?? 0}
-                    onPress={() => setEditorEvent(ev)}
-                  />
-                ))}
-              </View>
-              {dayTotal > 0 && <Seam marginVertical={Spacing.md} />}
-            </>
-          )}
-
-          {isLoading && dayTotal === 0 ? (
+          {isLoading && nothingAtAll ? (
             <LoadingState />
-          ) : dayTotal === 0 ? (
-            todayEvents.length === 0 ? (
-              <EmptyState
-                icon={<Sun size={20} color={colors.teal} strokeWidth={2} />}
-                title="Nichts für heute"
-                body="Kopf frei. Neues landet unten in der Eingabezeile — oder du genießt die Ruhe."
-              />
-            ) : null
+          ) : nothingAtAll ? (
+            <EmptyState
+              icon={<Sun size={20} color={colors.teal} strokeWidth={2} />}
+              title="Nichts für heute"
+              body="Kopf frei. Neues landet unten in der Eingabezeile — oder du genießt die Ruhe."
+            />
           ) : (
-            <>
-              {allDone && (
-                <Type variant="body" tone="text2">
-                  Alles erledigt — der Tag gehört dir.
-                </Type>
-              )}
-              {groups.overdue.length > 0 && (
-                <>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Type variant="eyebrow" tone="indigo">Überfällig · {groups.overdue.length}</Type>
-                    {/* Auto-Übernahme: alle überfälligen mit einem Tipp auf heute holen. */}
-                    <PressableScale
-                      accessibilityLabel="Alle überfälligen auf heute holen"
-                      onPress={adoptAll}
-                      pressedScale={0.97}
-                      style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 4, paddingHorizontal: 8, marginRight: -8 }}
-                    >
-                      <CalendarCheck size={14} color={colors.indigo} strokeWidth={2} />
-                      <Type variant="caption" tone="indigo">Auf heute</Type>
-                    </PressableScale>
-                  </View>
-                  <View style={{ marginTop: Spacing.xs }}>{renderRows(groups.overdue)}</View>
-                  {(groups.timed.length > 0 || groups.untimed.length > 0) && <Seam marginVertical={Spacing.md} />}
-                </>
-              )}
-              {groups.timed.length > 0 && (
-                <>
-                  <Type variant="eyebrow" tone="text3">Heute</Type>
-                  <View style={{ marginTop: Spacing.xs }}>{renderRows(groups.timed)}</View>
-                  {groups.untimed.length > 0 && <Seam marginVertical={Spacing.md} />}
-                </>
-              )}
-              {groups.untimed.length > 0 && (
-                <>
-                  <Type variant="eyebrow" tone="text3">Ohne Uhrzeit</Type>
-                  <View style={{ marginTop: Spacing.xs }}>{renderRows(groups.untimed)}</View>
-                </>
-              )}
-
-              {/* Erledigt heute — einklappbar, Abhaken bleibt sichtbar + rückholbar. */}
-              {doneToday.length > 0 && (
-                <>
-                  {!allDone && <Seam marginVertical={Spacing.md} />}
-                  <PressableScale
-                    accessibilityLabel={showCompleted ? 'Erledigte ausblenden' : 'Erledigte anzeigen'}
-                    onPress={() => {
-                      hapticSelect();
-                      setShowCompleted((v) => !v);
-                    }}
-                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: allDone ? Spacing.md : 0 }}
-                  >
-                    <Type variant="eyebrow" tone="text3">Erledigt · {doneToday.length}</Type>
-                    {showCompleted ? (
-                      <ChevronDown size={16} color={colors.text3} strokeWidth={2} />
-                    ) : (
-                      <ChevronRight size={16} color={colors.text3} strokeWidth={2} />
-                    )}
-                  </PressableScale>
-                  {showCompleted && <View style={{ marginTop: Spacing.xs }}>{renderRows(doneToday)}</View>}
-                </>
-              )}
-            </>
+            sections.map((s, i) => (
+              <React.Fragment key={i}>
+                {i > 0 && <Seam marginVertical={Spacing.md} />}
+                {s}
+              </React.Fragment>
+            ))
           )}
         </GlassPanel>
       </Reveal>
