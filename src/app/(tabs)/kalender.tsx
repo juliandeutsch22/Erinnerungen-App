@@ -18,6 +18,7 @@ import { Screen } from '@/components/Screen';
 import { Seam } from '@/components/Seam';
 import { EmptyState, LoadingState } from '@/components/StateView';
 import { TaskEditorSheet } from '@/components/TaskEditorSheet';
+import { TaskQuickSheet } from '@/components/TaskQuickSheet';
 import { TaskRow } from '@/components/TaskRow';
 import { Type } from '@/components/Type';
 import { usePhotoCounts } from '@/data/photoQueries';
@@ -47,6 +48,7 @@ export default function KalenderScreen() {
   const [editorEvent, setEditorEvent] = useState<DeviceEvent | null | undefined>(undefined);
   const [editorTask, setEditorTask] = useState<Task | null>(null);
   const [rescheduleTask, setRescheduleTask] = useState<Task | null>(null);
+  const [quickTask, setQuickTask] = useState<Task | null>(null);
 
   useEffect(() => {
     if (!deviceCalendarAvailable) return;
@@ -211,6 +213,7 @@ export default function KalenderScreen() {
                     onToggle={toggle(task)}
                     onPress={() => setEditorTask(task)}
                     onReschedule={() => setRescheduleTask(task)}
+                    onLongPress={() => setQuickTask(task)}
                   />
                 ))}
               </View>
@@ -239,6 +242,7 @@ export default function KalenderScreen() {
       )}
       {editorTask && <TaskEditorSheet task={editorTask} onClose={() => setEditorTask(null)} />}
       {rescheduleTask && <RescheduleSheet task={rescheduleTask} onClose={() => setRescheduleTask(null)} />}
+      {quickTask && <TaskQuickSheet task={quickTask} onClose={() => setQuickTask(null)} />}
     </Screen>
   );
 }

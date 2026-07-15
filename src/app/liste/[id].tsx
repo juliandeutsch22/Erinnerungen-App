@@ -18,6 +18,7 @@ import { Screen } from '@/components/Screen';
 import { Seam } from '@/components/Seam';
 import { EmptyState } from '@/components/StateView';
 import { TaskEditorSheet } from '@/components/TaskEditorSheet';
+import { TaskQuickSheet } from '@/components/TaskQuickSheet';
 import { TaskRow } from '@/components/TaskRow';
 import { Type } from '@/components/Type';
 import { useCompleteTask, useLists, useReopenTask, useTasks } from '@/data/queries';
@@ -39,6 +40,7 @@ export default function ListeDetailScreen() {
 
   const [editorTask, setEditorTask] = useState<Task | null | undefined>(undefined);
   const [rescheduleTask, setRescheduleTask] = useState<Task | null>(null);
+  const [quickTask, setQuickTask] = useState<Task | null>(null);
   const [editList, setEditList] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
   const [reordering, setReordering] = useState(false);
@@ -91,6 +93,7 @@ export default function ListeDetailScreen() {
       onToggle={toggle(t)}
       onPress={() => setEditorTask(t)}
       onReschedule={() => setRescheduleTask(t)}
+      onLongPress={() => setQuickTask(t)}
     />
   );
 
@@ -207,6 +210,7 @@ export default function ListeDetailScreen() {
         />
       )}
       {rescheduleTask && <RescheduleSheet task={rescheduleTask} onClose={() => setRescheduleTask(null)} />}
+      {quickTask && <TaskQuickSheet task={quickTask} onClose={() => setQuickTask(null)} />}
       {editList && list && <ListEditorSheet list={list} onClose={() => setEditList(false)} />}
       {reordering && <ReorderSheet tasks={open} onClose={() => setReordering(false)} />}
     </Screen>

@@ -18,6 +18,7 @@ import { Screen } from '@/components/Screen';
 import { Seam } from '@/components/Seam';
 import { EmptyState, LoadingState } from '@/components/StateView';
 import { TaskEditorSheet } from '@/components/TaskEditorSheet';
+import { TaskQuickSheet } from '@/components/TaskQuickSheet';
 import { TaskRow } from '@/components/TaskRow';
 import { Type } from '@/components/Type';
 import { useDeviceCalendars, useDeviceEvents } from '@/data/calendarQueries';
@@ -45,6 +46,7 @@ export default function HeuteScreen() {
   // undefined = Editor zu, null = neue Aufgabe, Task = bearbeiten.
   const [editorTask, setEditorTask] = useState<Task | null | undefined>(undefined);
   const [rescheduleTask, setRescheduleTask] = useState<Task | null>(null);
+  const [quickTask, setQuickTask] = useState<Task | null>(null);
   const [editorEvent, setEditorEvent] = useState<DeviceEvent | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
@@ -133,6 +135,7 @@ export default function HeuteScreen() {
         onToggle={toggle(t)}
         onPress={() => setEditorTask(t)}
         onReschedule={() => setRescheduleTask(t)}
+        onLongPress={() => setQuickTask(t)}
       />
     ));
 
@@ -337,6 +340,7 @@ export default function HeuteScreen() {
                           onToggle={toggle(t)}
                           onPress={() => setEditorTask(t)}
                           onReschedule={() => setRescheduleTask(t)}
+                          onLongPress={() => setQuickTask(t)}
                         />
                       ))}
                     </View>
@@ -352,6 +356,7 @@ export default function HeuteScreen() {
         <TaskEditorSheet task={editorTask} defaultDueDate={today} onClose={() => setEditorTask(undefined)} />
       )}
       {rescheduleTask && <RescheduleSheet task={rescheduleTask} onClose={() => setRescheduleTask(null)} />}
+      {quickTask && <TaskQuickSheet task={quickTask} onClose={() => setQuickTask(null)} />}
       {editorEvent && (
         <EventEditorSheet event={editorEvent} defaultDate={today} calendars={calendars ?? []} onClose={() => setEditorEvent(null)} />
       )}

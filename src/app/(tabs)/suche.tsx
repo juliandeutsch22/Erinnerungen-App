@@ -15,6 +15,7 @@ import { Screen } from '@/components/Screen';
 import { Seam } from '@/components/Seam';
 import { EmptyState } from '@/components/StateView';
 import { TaskEditorSheet } from '@/components/TaskEditorSheet';
+import { TaskQuickSheet } from '@/components/TaskQuickSheet';
 import { TaskRow } from '@/components/TaskRow';
 import { Type } from '@/components/Type';
 import { useCompleteTask, useLists, useReopenTask, useTasks } from '@/data/queries';
@@ -35,6 +36,7 @@ export default function SucheScreen() {
   const [query, setQuery] = useState('');
   const [editorTask, setEditorTask] = useState<Task | null>(null);
   const [rescheduleTask, setRescheduleTask] = useState<Task | null>(null);
+  const [quickTask, setQuickTask] = useState<Task | null>(null);
 
   const today = todayStr();
   const listById = useMemo(() => new Map((lists ?? []).map((l) => [l.id, l])), [lists]);
@@ -126,6 +128,7 @@ export default function SucheScreen() {
                           onToggle={toggle(t)}
                           onPress={() => setEditorTask(t)}
                           onReschedule={() => setRescheduleTask(t)}
+                          onLongPress={() => setQuickTask(t)}
                         />
                       ))}
                     </View>
@@ -139,6 +142,7 @@ export default function SucheScreen() {
 
       {editorTask && <TaskEditorSheet task={editorTask} onClose={() => setEditorTask(null)} />}
       {rescheduleTask && <RescheduleSheet task={rescheduleTask} onClose={() => setRescheduleTask(null)} />}
+      {quickTask && <TaskQuickSheet task={quickTask} onClose={() => setQuickTask(null)} />}
     </Screen>
   );
 }

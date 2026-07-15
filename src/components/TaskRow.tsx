@@ -33,6 +33,7 @@ export function TaskRow({
   onToggle,
   onPress,
   onReschedule,
+  onLongPress,
 }: {
   task: Task;
   today: string;
@@ -43,6 +44,8 @@ export function TaskRow({
   onToggle: (next: boolean) => void;
   onPress: () => void;
   onReschedule?: () => void;
+  /** Langes Drücken (Schnellmenü). */
+  onLongPress?: () => void;
 }) {
   const colors = useColors();
   const done = task.completedAt !== null;
@@ -77,7 +80,7 @@ export function TaskRow({
         onToggle={onToggle}
         accessibilityLabel={done ? `${task.title} — wieder öffnen` : `${task.title} — erledigen`}
       />
-      <PressableScale accessibilityLabel={`${task.title} bearbeiten`} onPress={onPress} pressedScale={0.99} style={{ flex: 1 }}>
+      <PressableScale accessibilityLabel={`${task.title} bearbeiten`} onPress={onPress} onLongPress={onLongPress} pressedScale={0.99} style={{ flex: 1 }}>
         <View style={{ gap: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
             <Type
