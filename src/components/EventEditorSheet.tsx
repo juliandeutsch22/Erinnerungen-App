@@ -2,7 +2,7 @@
 // Formsprache des Aufgaben-Editors: Titel + Notiz oben, kompakte Detail-Zeilen
 // (Kalender / Beginnt / Endet), Primär-Button fest im Footer. Termine können
 // sich über mehrere Tage erstrecken; Uhrzeiten über natives iOS-Rad.
-import { CalendarDays, ChevronDown, ChevronRight, Trash2 } from 'lucide-react-native';
+import { CalendarDays, ChevronDown, ChevronRight, Plus, Trash2, X } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
@@ -13,9 +13,12 @@ import { MiniCalendar } from '@/components/MiniCalendar';
 import { PhotoStrip } from '@/components/PhotoStrip';
 import { PressableScale } from '@/components/PressableScale';
 import { Expanded, Group, RowDivider } from '@/components/SheetParts';
+import { TaskCheck } from '@/components/TaskCheck';
 import { TimeField } from '@/components/TimeField';
 import { Type } from '@/components/Type';
 import { useCreateEvent, useDeleteEvent, useUpdateEvent } from '@/data/calendarQueries';
+import { DEFAULT_LIST_ID } from '@/data/ListRepository';
+import { useCompleteTask, useCreateTask, useReopenTask, useTasks, useUpdateTask } from '@/data/queries';
 import { addDays, formatDueDate, parseDateStr, toDateStr, todayStr } from '@/lib/dates';
 import type { DeviceCalendar, DeviceEvent } from '@/lib/deviceCalendar';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
@@ -276,6 +279,17 @@ export function EventEditorSheet({
         </Type>
       )}
 
+      {/* Aufgaben zum Termin — macht den Termin zum kleinen Projekt
+          (Vorbereiten, Mitbringen …). Erst für gespeicherte Termine. */}
+      {isEdit && event && (
+        <View style={{ marginTop: Spacing.md }}>
+          <Hairline />
+          <View style={{ marginTop: Spacing.md }}>
+            <EventTasks eventId={event.id} eventDay={startDay} />
+          </View>
+        </View>
+      )}
+
       {/* Fotos: erst für gespeicherte Termine (brauchen eine Event-ID). */}
       {isEdit && event && (
         <View style={{ marginTop: Spacing.md }}>
@@ -286,6 +300,92 @@ export function EventEditorSheet({
         </View>
       )}
     </BottomSheet>
+  );
+}
+
+/** Aufgaben, die an diesen Termin gehängt sind: abhaken, lösen, direkt anlegen.
+ *  Bewusst inline (kein zweites Sheet über dem Sheet) — nur Eingabe + Buttons. */
+function EventTasks({ eventId, eventDay }: { eventId: string; eventDay: string }) {
+  const colors = useColors();
+  const { data: tasks } = useTasks();
+  const createTask = useCreateTask();
+  const completeTask = useCompleteTask();
+  const reopenTask = useReopenTask();
+  const updateTask = useUpdateTask();
+  const [draft, setDraft] = useState('');
+
+  const linked = useMemo(
+    () =>
+      (tasks ?? [])
+        .filter((t) => t.eventId === eventId)
+        .sort((a, b) => (a.completedAt ? 1 : 0) - (b.completedAt ? 1 : 0) || a.sort - b.sort),
+    [tasks, eventId],
+  );
+
+  const add = () => {
+    const title = draft.trim();
+    if (!title) return;
+    hapticSuccess();
+    // Auf den Termintag datiert, ohne Uhrzeit — erscheint dort im Tagesplan.
+    createTask.mutate({ listId: DEFAULT_LIST_ID, title, eventId, dueDate: eventDay });
+    setDraft('');
+  };
+
+  return (
+    <View style={{ gap: Spacing.xs }}>
+      <Type variant="eyebrow" tone="text3">Aufgaben</Type>
+      {linked.map((t) => {
+        const done = t.completedAt !== null;
+        return (
+          <View key={t.id} style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: 2 }}>
+            <TaskCheck
+              checked={done}
+              accessibilityLabel={done ? `${t.title} wieder öffnen` : `${t.title} erledigen`}
+              onToggle={(next) => (next ? completeTask.mutate(t) : reopenTask.mutate(t.id))}
+            />
+            <Type
+              variant="body"
+              tone={done ? 'text3' : 'text'}
+              numberOfLines={2}
+              style={{ flex: 1, textDecorationLine: done ? 'line-through' : 'none' }}
+            >
+              {t.title}
+            </Type>
+            <PressableScale
+              accessibilityLabel={`„${t.title}" vom Termin lösen`}
+              onPress={() => {
+                hapticSelect();
+                updateTask.mutate({ id: t.id, patch: { eventId: null } });
+              }}
+              style={{ padding: Spacing.xs }}
+            >
+              <X size={15} color={colors.text3} strokeWidth={2} />
+            </PressableScale>
+          </View>
+        );
+      })}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+        <View style={{ width: 22, alignItems: 'center' }}>
+          <Plus size={18} color={colors.teal} strokeWidth={2.2} />
+        </View>
+        <TextInput
+          value={draft}
+          onChangeText={setDraft}
+          placeholder="Aufgabe zum Termin"
+          placeholderTextColor={colors.text3}
+          returnKeyType="done"
+          blurOnSubmit={false}
+          onSubmitEditing={add}
+          accessibilityLabel="Aufgabe zum Termin hinzufügen"
+          style={[{ flex: 1, fontSize: T.md, color: colors.text, paddingVertical: Spacing.xs }, webNoOutline]}
+        />
+        {draft.trim().length > 0 && (
+          <PressableScale accessibilityLabel="Aufgabe übernehmen" onPress={add} style={{ padding: Spacing.xs }}>
+            <Type variant="label" tone="teal">Hinzufügen</Type>
+          </PressableScale>
+        )}
+      </View>
+    </View>
   );
 }
 

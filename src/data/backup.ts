@@ -175,6 +175,7 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
       dueTime: str(t.dueTime) ? t.dueTime : null,
       rrule: str(t.rrule) && RRULES.has(t.rrule) ? (t.rrule as Rrule) : null,
       flagged: t.flagged === true,
+      eventId: str(t.eventId) ? t.eventId : null,
       completedAt: str(t.completedAt) ? t.completedAt : null,
       // Geplante Notifications gehören zum alten Gerät/Install — neu planen.
       notificationId: null,

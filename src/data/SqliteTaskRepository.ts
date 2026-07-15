@@ -8,6 +8,7 @@ type TaskRow = {
   due_date: string | null; due_time: string | null; rrule: string | null;
   flagged: number; completed_at: string | null; notification_id: string | null;
   created_at: string; sort: number; tags: string | null; subtasks: string | null;
+  event_id: string | null;
 };
 
 function parseArray<T>(json: string | null): T[] {
@@ -30,6 +31,7 @@ function toTask(r: TaskRow): Task {
     dueTime: r.due_time,
     rrule: (r.rrule as Rrule | null) ?? null,
     flagged: r.flagged === 1,
+    eventId: r.event_id,
     completedAt: r.completed_at,
     notificationId: r.notification_id,
     tags: parseArray<string>(r.tags),
@@ -50,12 +52,13 @@ export class SqliteTaskRepository implements TaskRepository {
     const db = await getDb();
     await db.runAsync(
       `INSERT OR REPLACE INTO tasks
-         (id, list_id, title, note, due_date, due_time, rrule, flagged, completed_at, notification_id, created_at, sort, tags, subtasks)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, list_id, title, note, due_date, due_time, rrule, flagged, completed_at, notification_id, created_at, sort, tags, subtasks, event_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         task.id, task.listId, task.title, task.note, task.dueDate, task.dueTime,
         task.rrule, task.flagged ? 1 : 0, task.completedAt, task.notificationId,
         task.createdAt, task.sort, JSON.stringify(task.tags ?? []), JSON.stringify(task.subtasks ?? []),
+        task.eventId,
       ],
     );
   }
@@ -68,6 +71,7 @@ export class SqliteTaskRepository implements TaskRepository {
       listId: 'list_id', title: 'title', note: 'note', dueDate: 'due_date', dueTime: 'due_time',
       rrule: 'rrule', flagged: 'flagged', completedAt: 'completed_at',
       notificationId: 'notification_id', sort: 'sort', tags: 'tags', subtasks: 'subtasks',
+      eventId: 'event_id',
     };
     for (const [key, col] of Object.entries(map)) {
       if (key in patch) {

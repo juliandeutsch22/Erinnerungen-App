@@ -1,7 +1,7 @@
 // TaskRow.tsx — eine Aufgaben-Zeile: Haken (Teal-Puls) + Titel + Meta-Zeile.
 // Swipe rechts = erledigt, Swipe links = „Neu planen" (Fahrplan §3.6).
 // Überfällig trägt Indigo (ruhig), nie Alarm-Rot.
-import { Check, Flag, ListChecks, Repeat } from 'lucide-react-native';
+import { Check, Flag, Link2, ListChecks, Repeat } from 'lucide-react-native';
 import React, { useRef } from 'react';
 import { View } from 'react-native';
 import ReanimatedSwipeable, { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
@@ -30,6 +30,7 @@ export function TaskRow({
   today,
   list,
   showDue = true,
+  showEventLink = true,
   onToggle,
   onPress,
   onReschedule,
@@ -41,6 +42,8 @@ export function TaskRow({
   list?: List;
   /** 'time-only': nur Uhrzeit zeigen (Tagesgruppen — das Datum steht im Header). */
   showDue?: boolean | 'time-only';
+  /** Termin-Verknüpfungs-Glyph zeigen; unter dem verknüpften Termin selbst überflüssig. */
+  showEventLink?: boolean;
   onToggle: (next: boolean) => void;
   onPress: () => void;
   onReschedule?: () => void;
@@ -93,6 +96,7 @@ export function TaskRow({
             </Type>
             {task.flagged && <Flag size={13} color={colors.indigo} fill={colors.indigo} strokeWidth={2} />}
             {task.rrule && <Repeat size={13} color={colors.text3} strokeWidth={2} />}
+            {showEventLink && task.eventId && <Link2 size={13} color={colors.text3} strokeWidth={2} />}
           </View>
           {(metaParts.length > 0 || task.note || progress.total > 0) && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>

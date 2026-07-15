@@ -28,6 +28,7 @@ const task = (id: string, dueTime: string | null, dueDate: string | null = DAY):
   dueTime,
   rrule: null,
   flagged: false,
+  eventId: null,
   completedAt: null,
   notificationId: null,
   tags: [],

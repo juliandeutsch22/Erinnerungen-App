@@ -22,6 +22,7 @@ function task(overrides: Partial<Task>): Task {
     dueTime: null,
     rrule: null,
     flagged: false,
+    eventId: null,
     completedAt: null,
     notificationId: null,
     tags: [],
@@ -51,6 +52,7 @@ describe('Backup', () => {
     await getListRepository().create({ id: 'l1', name: 'Einkauf', icon: 'shopping-cart', color: '#5B6CFF', goal: null, deadline: null, sort: 1, createdAt: '2026-07-01T08:00:00.000Z' });
     await getTaskRepository().create(task({ id: 't1', listId: 'l1', title: 'Milch', dueDate: '2026-07-04', dueTime: '09:00', rrule: 'weekly', notificationId: 'notif-alt' }));
     await getTaskRepository().create(task({ id: 't2', title: 'Steuer', completedAt: '2026-07-02T10:00:00.000Z' }));
+    await getTaskRepository().create(task({ id: 't3', title: 'Agenda vorbereiten', eventId: 'evt-42' }));
 
     const json = await exportToJsonString(noPhotos, new Date('2026-07-03T12:00:00.000Z'));
 
@@ -60,7 +62,7 @@ describe('Backup', () => {
     __setPhotoRepositoryForTests(new InMemoryPhotoRepository());
 
     const result = await importBackup(json);
-    expect(result).toEqual({ lists: 2, tasks: 2, filters: 0, photos: 0 }); // Standardliste + Einkauf
+    expect(result).toEqual({ lists: 2, tasks: 3, filters: 0, photos: 0 }); // Standardliste + Einkauf
 
     const tasks = await getTaskRepository().getAll();
     const milch = tasks.find((t) => t.id === 't1')!;
@@ -71,6 +73,8 @@ describe('Backup', () => {
     // Notification-IDs gehören zum alten Install → zurückgesetzt.
     expect(milch.notificationId).toBeNull();
     expect(tasks.find((t) => t.id === 't2')!.completedAt).toBe('2026-07-02T10:00:00.000Z');
+    // Termin-Verknüpfung überlebt den Roundtrip.
+    expect(tasks.find((t) => t.id === 't3')!.eventId).toBe('evt-42');
 
     const lists = await getListRepository().getAll();
     expect(lists.map((l) => l.name).sort()).toEqual(['Einkauf', 'Erinnerungen']);

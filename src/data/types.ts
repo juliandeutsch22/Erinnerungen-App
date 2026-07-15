@@ -38,6 +38,8 @@ export type Task = {
   dueTime: string | null; // 'HH:MM' | null (nur mit dueDate)
   rrule: Rrule | null;
   flagged: boolean;
+  /** An einen Gerätekalender-Termin gehängt (EventKit-Event-ID), null = frei. */
+  eventId: string | null;
   /** null = offen. Bei Wiederholung: Instanz abgehakt → dueDate rückt weiter, bleibt null. */
   completedAt: string | null; // ISO
   /** geplante lokale Notification (zum Ersetzen/Abbrechen), null = keine geplant. */
@@ -59,6 +61,7 @@ export type NewTask = {
   dueTime?: string | null;
   rrule?: Rrule | null;
   flagged?: boolean;
+  eventId?: string | null;
   tags?: string[];
   subtasks?: Subtask[];
 };

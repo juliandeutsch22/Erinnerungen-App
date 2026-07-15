@@ -60,20 +60,7 @@ export default function HeuteScreen() {
   }, []);
 
   const today = todayStr();
-  const groups = useMemo(() => groupToday(tasks ?? [], today), [tasks, today]);
   const listById = useMemo(() => new Map((lists ?? []).map((l) => [l.id, l])), [lists]);
-  const open = groups.overdue.length + groups.timed.length + groups.untimed.length;
-
-  // Heute Erledigtes (lokales Datum!) — neueste zuerst, für Bilanz + Sektion.
-  const doneToday = useMemo(
-    () =>
-      (tasks ?? [])
-        .filter((t) => t.completedAt !== null && toDateStr(new Date(t.completedAt)) === today)
-        .sort((a, b) => (a.completedAt! < b.completedAt! ? 1 : -1)),
-    [tasks, today],
-  );
-  const dayTotal = open + doneToday.length;
-  const allDone = dayTotal > 0 && open === 0;
 
   // Termine (heute + nächste 6 Tage) aus dem Gerätekalender.
   const horizon = addDays(today, 6);
@@ -83,6 +70,44 @@ export default function HeuteScreen() {
   const calendarById = useMemo(() => new Map((calendars ?? []).map((c) => [c.id, c])), [calendars]);
   const eventsByDay = useMemo(() => bucketEventsByDay(events ?? [], today, horizon), [events, today, horizon]);
   const todayEvents = eventsByDay.get(today) ?? [];
+
+  // An heutige Termine gehängte Aufgaben: sie erscheinen eingerückt UNTER ihrem
+  // Termin (der Termin wird zum kleinen Projekt) — und darum aus allen anderen
+  // Sektionen herausgehalten, damit nichts doppelt auftaucht.
+  const todayEventIds = useMemo(() => new Set(todayEvents.map((e) => e.id)), [todayEvents]);
+  const attachedByEvent = useMemo(() => {
+    const m = new Map<string, Task[]>();
+    for (const t of tasks ?? []) {
+      if (t.eventId && todayEventIds.has(t.eventId)) {
+        const arr = m.get(t.eventId) ?? [];
+        arr.push(t);
+        m.set(t.eventId, arr);
+      }
+    }
+    for (const arr of m.values()) {
+      arr.sort((a, b) => (a.completedAt ? 1 : 0) - (b.completedAt ? 1 : 0) || a.sort - b.sort);
+    }
+    return m;
+  }, [tasks, todayEventIds]);
+  const attachedIds = useMemo(
+    () => new Set([...attachedByEvent.values()].flat().map((t) => t.id)),
+    [attachedByEvent],
+  );
+  const freeTasks = useMemo(() => (tasks ?? []).filter((t) => !attachedIds.has(t.id)), [tasks, attachedIds]);
+
+  const groups = useMemo(() => groupToday(freeTasks, today), [freeTasks, today]);
+  const open = groups.overdue.length + groups.timed.length + groups.untimed.length;
+
+  // Heute Erledigtes (lokales Datum!) — neueste zuerst, für Bilanz + Sektion.
+  const doneToday = useMemo(
+    () =>
+      freeTasks
+        .filter((t) => t.completedAt !== null && toDateStr(new Date(t.completedAt)) === today)
+        .sort((a, b) => (a.completedAt! < b.completedAt! ? 1 : -1)),
+    [freeTasks, today],
+  );
+  const dayTotal = open + doneToday.length;
+  const allDone = dayTotal > 0 && open === 0;
 
   // Wochenvorschau: die nächsten 6 Tage — Erinnerungen + Termine vereint,
   // nur Tage, an denen etwas ansteht.
@@ -152,6 +177,38 @@ export default function HeuteScreen() {
       />
     ));
 
+  // An einen Termin gehängte Aufgaben, eingerückt unter dem Termin — mit
+  // dünner Leiste als visuelle Klammer.
+  const renderAttached = (eventId: string) => {
+    const items = attachedByEvent.get(eventId);
+    if (!items || items.length === 0) return null;
+    return (
+      <View
+        style={{
+          marginLeft: Spacing.lg,
+          marginBottom: Spacing.xs,
+          paddingLeft: Spacing.md,
+          borderLeftWidth: 2,
+          borderLeftColor: colors.chipBorder,
+        }}
+      >
+        {items.map((t) => (
+          <TaskRow
+            key={t.id}
+            task={t}
+            today={today}
+            showDue="time-only"
+            showEventLink={false}
+            onToggle={toggle(t)}
+            onPress={() => setEditorTask(t)}
+            onReschedule={() => setRescheduleTask(t)}
+            onLongPress={() => setQuickTask(t)}
+          />
+        ))}
+      </View>
+    );
+  };
+
   // „Jetzt"-Marker: Teal-Punkt + Uhrzeit + dünne Linie, sitzt zwischen den
   // Timeline-Einträgen an der Stelle der aktuellen Uhrzeit.
   const nowMarker = (
@@ -200,28 +257,33 @@ export default function HeuteScreen() {
         <View style={{ marginTop: Spacing.xs }}>
           {/* Ganztägige Termine zuerst — ohne Zeit-Slot, über der Timeline. */}
           {allDayEvents.map((ev) => (
-            <EventRow
-              key={ev.key}
-              event={ev}
-              calendar={calendarById.get(ev.calendarId)}
-              day={today}
-              showCalendarName={false}
-              photoCount={photoCounts.get(ev.id) ?? 0}
-              onPress={() => setEditorEvent(ev)}
-            />
+            <React.Fragment key={ev.key}>
+              <EventRow
+                event={ev}
+                calendar={calendarById.get(ev.calendarId)}
+                day={today}
+                showCalendarName={false}
+                photoCount={photoCounts.get(ev.id) ?? 0}
+                onPress={() => setEditorEvent(ev)}
+              />
+              {renderAttached(ev.id)}
+            </React.Fragment>
           ))}
           {timeline.map((entry, i) => (
             <React.Fragment key={entry.key}>
               {i === nowIdx && nowMarker}
               {entry.kind === 'event' ? (
-                <EventRow
-                  event={entry.event}
-                  calendar={calendarById.get(entry.event.calendarId)}
-                  day={today}
-                  showCalendarName={false}
-                  photoCount={photoCounts.get(entry.event.id) ?? 0}
-                  onPress={() => setEditorEvent(entry.event)}
-                />
+                <>
+                  <EventRow
+                    event={entry.event}
+                    calendar={calendarById.get(entry.event.calendarId)}
+                    day={today}
+                    showCalendarName={false}
+                    photoCount={photoCounts.get(entry.event.id) ?? 0}
+                    onPress={() => setEditorEvent(entry.event)}
+                  />
+                  {renderAttached(entry.event.id)}
+                </>
               ) : (
                 <TaskRow
                   task={entry.task}

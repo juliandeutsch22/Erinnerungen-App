@@ -50,6 +50,7 @@ export function useCreateTask() {
         dueTime: input.dueTime ?? null,
         rrule: input.rrule ?? null,
         flagged: input.flagged ?? false,
+        eventId: input.eventId ?? null,
         completedAt: null,
         notificationId: null,
         tags: input.tags ?? [],

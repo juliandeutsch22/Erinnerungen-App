@@ -14,6 +14,7 @@ function task(overrides: Partial<Task>): Task {
     dueTime: null,
     rrule: null,
     flagged: false,
+    eventId: null,
     completedAt: null,
     notificationId: null,
     tags: [],
