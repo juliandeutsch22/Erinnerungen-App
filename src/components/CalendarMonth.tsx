@@ -4,6 +4,8 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import React from 'react';
 import { View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { runOnJS } from 'react-native-reanimated';
 
 import { MonthGrid } from '@/components/calendar/MonthGrid';
 import { MONTHS, type MonthAnchor, monthGridRange } from '@/components/calendar/monthMatrix';
@@ -13,6 +15,10 @@ import { parseDateStr, todayStr } from '@/lib/dates';
 import { hapticSelect } from '@/lib/haptics';
 import { useColors } from '@/theme/ThemeProvider';
 import { Spacing } from '@/theme/theme.tokens';
+
+// Wisch-Schwellen für den Monatswechsel.
+const SWIPE_DISTANCE = 48;
+const SWIPE_VELOCITY = 350;
 
 // Weiterhin aus diesem Modul beziehbar (kalender.tsx importiert von hier).
 export { monthGridRange };
@@ -24,6 +30,7 @@ export function CalendarMonth({
   selected,
   onSelect,
   markers,
+  onDayLongPress,
 }: {
   anchor: MonthAnchor;
   onAnchorChange: (a: MonthAnchor) => void;
@@ -31,6 +38,8 @@ export function CalendarMonth({
   onSelect: (date: string) => void;
   /** Punkt-Farben pro Tag (max. 3 werden gezeigt). */
   markers: Map<string, string[]>;
+  /** Langes Drücken auf einen Tag (z. B. „Neuer Termin"). */
+  onDayLongPress?: (date: string) => void;
 }) {
   const colors = useColors();
   const today = todayStr();
@@ -40,6 +49,17 @@ export function CalendarMonth({
     const d = new Date(anchor.year, anchor.month + delta, 1);
     onAnchorChange({ year: d.getFullYear(), month: d.getMonth() });
   };
+
+  // Horizontal über das Gitter wischen = Monat vor/zurück. Richtungs-Aktivierung
+  // (activeOffsetX + failOffsetY) lässt vertikales Scrollen der Seite unberührt;
+  // bewusst KEINE Kopplung mit einer ScrollView (die stürzt auf dem Gerät ab).
+  const swipe = Gesture.Pan()
+    .activeOffsetX([-20, 20])
+    .failOffsetY([-16, 16])
+    .onEnd((e) => {
+      if (e.translationX <= -SWIPE_DISTANCE || e.velocityX <= -SWIPE_VELOCITY) runOnJS(shift)(1);
+      else if (e.translationX >= SWIPE_DISTANCE || e.velocityX >= SWIPE_VELOCITY) runOnJS(shift)(-1);
+    });
 
   const jumpToday = () => {
     hapticSelect();
@@ -65,7 +85,11 @@ export function CalendarMonth({
         </View>
       </View>
 
-      <MonthGrid anchor={anchor} selected={selected} onSelect={onSelect} today={today} markers={markers} />
+      <GestureDetector gesture={swipe}>
+        <View>
+          <MonthGrid anchor={anchor} selected={selected} onSelect={onSelect} today={today} markers={markers} onDayLongPress={onDayLongPress} />
+        </View>
+      </GestureDetector>
     </View>
   );
 }

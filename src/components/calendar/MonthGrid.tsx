@@ -18,6 +18,7 @@ export function MonthGrid({
   markers,
   minDate,
   compact = false,
+  onDayLongPress,
 }: {
   anchor: MonthAnchor;
   selected: string | null;
@@ -29,6 +30,8 @@ export function MonthGrid({
   minDate?: string;
   /** kleinere Zellen für den Editor. */
   compact?: boolean;
+  /** Langes Drücken auf einen Tag. */
+  onDayLongPress?: (date: string) => void;
 }) {
   const weeks = monthWeeks(anchor);
   const size = compact ? 36 : 44;
@@ -58,6 +61,7 @@ export function MonthGrid({
                 dots={markers ? (markers.get(dateStr) ?? []) : undefined}
                 size={size}
                 onSelect={onSelect}
+                onLongPress={onDayLongPress}
               />
             );
           })}

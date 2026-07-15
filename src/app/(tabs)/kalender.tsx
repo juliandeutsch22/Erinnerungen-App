@@ -27,6 +27,7 @@ import type { Task } from '@/data/types';
 import { bucketEventsByDay } from '@/lib/calendarLogic';
 import { formatDayHeading, parseDateStr, todayStr } from '@/lib/dates';
 import { deviceCalendarAvailable, type DeviceEvent, ensureCalendarPermission } from '@/lib/deviceCalendar';
+import { hapticSelect } from '@/lib/haptics';
 import { byTimeThenCreation, isOpen } from '@/lib/taskLogic';
 import { useColors } from '@/theme/ThemeProvider';
 import { Spacing } from '@/theme/theme.tokens';
@@ -108,6 +109,16 @@ export default function KalenderScreen() {
 
   const writableExists = (calendars ?? []).some((c) => c.allowsModifications);
 
+  // Langes Drücken auf einen Tag: Tag wählen und (wenn möglich) direkt einen
+  // neuen Termin für diesen Tag anlegen.
+  const handleDayLongPress = (day: string) => {
+    hapticSelect();
+    setSelected(day);
+    if (granted && writableExists) setEditorEvent(null);
+  };
+
+  const dayCount = dayEvents.length + dayTasks.length;
+
   return (
     <Screen>
       <Reveal>
@@ -136,14 +147,23 @@ export default function KalenderScreen() {
 
       <Reveal delay={80}>
         <GlassPanel>
-          <CalendarMonth anchor={anchor} onAnchorChange={setAnchor} selected={selected} onSelect={setSelected} markers={markers} />
+          <CalendarMonth anchor={anchor} onAnchorChange={setAnchor} selected={selected} onSelect={setSelected} markers={markers} onDayLongPress={handleDayLongPress} />
         </GlassPanel>
       </Reveal>
 
       <Reveal delay={140}>
         <GlassPanel>
-          <Type variant="eyebrow" tone="text3">{formatDayHeading(selected, today)}</Type>
+          {/* Kopf: gewählter Tag mit Teal-Akzent — visuell an die Grid-Auswahl gebunden. */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+              <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: colors.teal }} />
+              <Type variant="eyebrow" tone={selected === today ? 'teal' : 'text3'}>{formatDayHeading(selected, today)}</Type>
+            </View>
+            {dayCount > 0 && <Type variant="caption" tone="text3" tabular>{dayCount}</Type>}
+          </View>
 
+          {/* Inhalt fadet bei jedem Tageswechsel neu ein (Grid ↔ Agenda verbunden). */}
+          <Reveal key={selected} delay={0}>
           {/* Termine des Tages */}
           {permission === 'denied' && deviceCalendarAvailable && (
             <EmptyState
@@ -196,6 +216,7 @@ export default function KalenderScreen() {
               </View>
             </>
           )}
+          </Reveal>
         </GlassPanel>
       </Reveal>
 

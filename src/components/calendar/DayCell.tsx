@@ -20,6 +20,7 @@ export function DayCell({
   dots,
   size,
   onSelect,
+  onLongPress,
 }: {
   day: number;
   dateStr: string;
@@ -33,6 +34,8 @@ export function DayCell({
   /** Maximaler Kreisdurchmesser in pt (responsiv nach unten). */
   size: number;
   onSelect: (date: string) => void;
+  /** Langes Drücken auf den Tag (z. B. „Neuer Termin an diesem Tag"). */
+  onLongPress?: (date: string) => void;
 }) {
   const colors = useColors();
   return (
@@ -42,6 +45,7 @@ export function DayCell({
         accessibilityState={{ selected, disabled }}
         disabled={disabled}
         onPress={() => onSelect(dateStr)}
+        onLongPress={onLongPress ? () => onLongPress(dateStr) : undefined}
         pressedScale={0.9}
         style={{
           width: '88%',
