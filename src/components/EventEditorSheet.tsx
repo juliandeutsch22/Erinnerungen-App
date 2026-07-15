@@ -12,6 +12,7 @@ import { GlassButton } from '@/components/GlassButton';
 import { MiniCalendar } from '@/components/MiniCalendar';
 import { PhotoStrip } from '@/components/PhotoStrip';
 import { PressableScale } from '@/components/PressableScale';
+import { Expanded, Group, RowDivider } from '@/components/SheetParts';
 import { TimeField } from '@/components/TimeField';
 import { Type } from '@/components/Type';
 import { useCreateEvent, useDeleteEvent, useUpdateEvent } from '@/data/calendarQueries';
@@ -353,27 +354,6 @@ function WhenRowView({
       )}
     </>
   );
-}
-
-/** Gerundete Sammel-Fläche für die Detail-Zeilen (iOS-Grouped-Look). */
-function Group({ children }: { children: React.ReactNode }) {
-  const colors = useColors();
-  return (
-    <View style={{ borderRadius: R.lg, backgroundColor: colors.chip, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.chipBorder, overflow: 'hidden' }}>
-      {children}
-    </View>
-  );
-}
-
-/** Trenner innerhalb der Gruppe — an der Textkante eingerückt (wie iOS). */
-function RowDivider() {
-  const colors = useColors();
-  return <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: Spacing.md * 2 + 18 }} />;
-}
-
-/** Aufgeklappter Inhalt einer Zeile — eingerückt, sitzt optisch an der Zeile. */
-function Expanded({ children }: { children: React.ReactNode }) {
-  return <View style={{ paddingHorizontal: Spacing.md, paddingBottom: Spacing.md, paddingTop: Spacing.xs }}>{children}</View>;
 }
 
 function Hairline() {

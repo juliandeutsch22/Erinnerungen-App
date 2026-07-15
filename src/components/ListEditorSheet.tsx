@@ -58,7 +58,7 @@ export function ListEditorSheet({ list, onClose }: { list: List | null; onClose:
         onSubmitEditing={save}
         accessibilityLabel="Name der Liste"
         style={[
-          { fontSize: T.lg, color: colors.text, paddingVertical: Spacing.sm, borderBottomWidth: 1, borderColor: colors.border2, marginBottom: Spacing.lg },
+          { fontSize: T.xl, fontWeight: '600', color: colors.text, paddingVertical: Spacing.sm, marginBottom: Spacing.md },
           webNoOutline,
         ]}
       />
