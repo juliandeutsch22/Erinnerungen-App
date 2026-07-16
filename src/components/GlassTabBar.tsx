@@ -11,7 +11,7 @@ import { Glass } from '@/components/Glass';
 import { Type } from '@/components/Type';
 import { hapticSelect } from '@/lib/haptics';
 import { Dur, springConfig } from '@/theme/motion.tokens';
-import { useColors, useReducedMotion, useScheme } from '@/theme/ThemeProvider';
+import { useColors, useReducedMotion } from '@/theme/ThemeProvider';
 import { TAB_BAR_HEIGHT } from '@/theme/layout';
 import { Shadow, Spacing } from '@/theme/theme.tokens';
 
@@ -41,7 +41,6 @@ type TabBarProps = {
 
 export function GlassTabBar({ state, navigation }: TabBarProps) {
   const colors = useColors();
-  const scheme = useScheme();
   const insets = useSafeAreaInsets();
 
   return (
@@ -74,7 +73,6 @@ export function GlassTabBar({ state, navigation }: TabBarProps) {
               label={label}
               activeColor={colors.teal}
               inactiveColor={colors.text3}
-              recessColor={scheme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(60,55,40,0.08)'}
               onPress={onPress}
             />
           );
@@ -90,7 +88,6 @@ function TabButton({
   label,
   activeColor,
   inactiveColor,
-  recessColor,
   onPress,
 }: {
   focused: boolean;
@@ -98,7 +95,6 @@ function TabButton({
   label: string;
   activeColor: string;
   inactiveColor: string;
-  recessColor: string;
   onPress: () => void;
 }) {
   const reduced = useReducedMotion();
@@ -107,22 +103,15 @@ function TabButton({
   // dezenter Lift (translateY) beim Fokus + Opacity-Feedback beim Drücken.
   const lift = useSharedValue(focused ? 0 : 1.5);
   const pressed = useSharedValue(0);
-  // Weiche Teal-Pill hinter dem aktiven Tab — blendet + wächst sanft ein.
-  const focusP = useSharedValue(focused ? 1 : 0);
 
   React.useEffect(() => {
     const target = focused ? 0 : 1.5;
     lift.value = reduced ? target : withSpring(target, springConfig('snappy'));
-    focusP.value = reduced ? (focused ? 1 : 0) : withSpring(focused ? 1 : 0, springConfig('snappy'));
-  }, [focused, reduced, lift, focusP]);
+  }, [focused, reduced, lift]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: lift.value }],
     opacity: 1 - pressed.value * 0.35,
-  }));
-  const pillStyle = useAnimatedStyle(() => ({
-    opacity: focusP.value,
-    transform: [{ scaleX: 0.7 + focusP.value * 0.3 }],
   }));
   const color = focused ? activeColor : inactiveColor;
 
@@ -140,12 +129,6 @@ function TabButton({
       }}
       style={styles.tab}
     >
-      {/* Eingemeißelte Mulde statt Farbschimmer: neutraler Stein-Ton, der in
-          Light wie eine Vertiefung und in Dark wie ein matter Schein wirkt. */}
-      <Animated.View
-        pointerEvents="none"
-        style={[styles.pill, { backgroundColor: recessColor }, pillStyle]}
-      />
       <Animated.View style={[styles.tabInner, animatedStyle]}>
         <Icon size={23} color={color} strokeWidth={focused ? 2.2 : 1.75} />
         <Type variant="caption" style={{ color }}>
@@ -178,13 +161,5 @@ const styles = StyleSheet.create({
   tabInner: {
     alignItems: 'center',
     gap: 2,
-  },
-  pill: {
-    position: 'absolute',
-    top: 8,
-    bottom: 8,
-    left: 10,
-    right: 10,
-    borderRadius: 13,
   },
 });
