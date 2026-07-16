@@ -99,9 +99,10 @@ export function Backdrop({ scrollY }: { scrollY?: SharedValue<number> }) {
     ? ['#0B0D10', '#000000', '#0C0E0C']
     : ['#ECE7DB', '#F6F3EA', '#E7E3D5'];
 
-  // Säulen-Ton: dunkler Stein auf hell, heller Stein auf dunkel — nie Farbe.
-  const tone = isDark ? '#C8CDD4' : '#6B6450';
-  const opacity = isDark ? 0.10 : 0.12;
+  // Tempelfront: Light in Santorini-Kuppel-Blau (blaugewaschene Architektur
+  // auf gekalkter Wand), Dark in Weiß — Marmor im Mondlicht.
+  const tone = isDark ? '#EDEFF2' : '#2B5FA6';
+  const opacity = isDark ? 0.10 : 0.11;
   // Säulenbreite: monumental (halbe Screenbreite), am Rand angeschnitten.
   const colWidth = width * 0.52;
 
