@@ -78,6 +78,8 @@ describe('Backup', () => {
 
     const lists = await getListRepository().getAll();
     expect(lists.map((l) => l.name).sort()).toEqual(['Einkauf', 'Erinnerungen']);
+    // Alte Marken-Farbe (Indigo) zieht beim Import auf die Erdton-Palette um.
+    expect(lists.find((l) => l.id === 'l1')!.color).toBe('#74936B');
   });
 
   it('Roundtrip: Projekt-Ziel und Deadline bleiben erhalten', async () => {

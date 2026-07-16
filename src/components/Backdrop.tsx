@@ -19,10 +19,10 @@ export function Backdrop({ scrollY }: { scrollY?: SharedValue<number> }) {
   const colors = useColors();
   const isDark = useScheme() === 'dark';
   const reduced = useReducedMotion();
-  // Light kräftiger, damit echte Farbe durch das frostige Glas bricht (iOS-Look);
-  // Dark seit den transluzenteren Panels ebenfalls etwas farbiger.
-  const tealOp = isDark ? 0.28 : 0.42;
-  const indigoOp = isDark ? 0.24 : 0.36;
+  // Mediterran gedimmt: sonnengebleichtes Licht statt satter Aurora — die
+  // Farbe liegt im Grundverlauf, die Glows setzen nur noch sanfte Pole.
+  const tealOp = isDark ? 0.22 : 0.30;
+  const indigoOp = isDark ? 0.18 : 0.26;
 
   // Basis-Verlauf: Terrakotta-Sand oben → Salbei unten (mediterranes Licht).
   // Light bewusst eine Stufe tiefer/satter, damit die Frost-Platten hell

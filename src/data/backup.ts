@@ -11,6 +11,7 @@
 import { Platform, Share } from 'react-native';
 
 import type { FilterRange, SavedFilter } from '@/lib/taskFilters';
+import { remapListColor } from './colorRebrand';
 import { getListRepository, getPhotoRepository, getTaskRepository } from './index';
 import { DEFAULT_LIST_ID } from './ListRepository';
 import type { EventPhoto } from './PhotoRepository';
@@ -154,7 +155,8 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
       id: l.id,
       name: l.name,
       icon: str(l.icon) ? l.icon : 'inbox',
-      color: str(l.color) ? l.color : '#C96A47',
+      // Alte Marken-Farben aus Backups vor v1.2 ziehen mit auf die Erdtöne um.
+      color: str(l.color) ? remapListColor(l.color) : '#C96A47',
       goal: str(l.goal) ? l.goal : null,
       deadline: str(l.deadline) ? l.deadline : null,
       sort: typeof l.sort === 'number' ? l.sort : 0,

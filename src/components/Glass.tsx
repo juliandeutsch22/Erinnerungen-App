@@ -8,7 +8,8 @@
 //  4. Diagonal-Sheen    — schmale Lichtbahn quer über die Scheibe (metallic, nur card).
 //  4b. Sheen-Sweep      — einmalige Lichtwanderung beim Erscheinen (reduced-motion-gegated).
 //  5. Specular-Ring     — Lichtkanten oben/unten/links/rechts: geschliffene Platte.
-//     Unterkante mit chromatischem Schimmer (Teal→Weiß→Indigo): Glas bricht Farbe.
+//     Unterkante mit warmem Schimmer (Terrakotta→Weiß→Salbei), bewusst leise —
+//     matte Keramik statt Hochglanz (mediterran).
 //  6. Bottom-Depth      — weicher innerer Schatten unten (Wölbung).
 //  7. Innen-Rand        — 1px eingerückter heller Rand: Illusion von Glasdicke.
 import { BlurView } from 'expo-blur';
@@ -28,26 +29,27 @@ type Recipe = { bg: string; border: string; highlight: string; sheenTop: string 
 const RECIPES: Record<GlassVariant, { dark: Recipe; light: Recipe }> = {
   // Apple-„Liquid Glass": Hintergrund scheint leicht durch (translucent), aber
   // etwas deckender als iOS; kräftiges Specular-Kantenlicht.
+  // Mediterran: Sheens/Highlights eine Stufe leiser als das iOS-Original —
+  // matte, sonnengebleichte Keramik statt Hochglanz-Vitrine.
   card: {
-    dark: { bg: 'rgba(16,16,20,0.24)', border: 'rgba(255,255,255,0.20)', highlight: 'rgba(255,255,255,0.5)', sheenTop: 'rgba(255,255,255,0.11)' },
-    // Light: hohe Transluzenz (Aurora bricht durch) + kräftiger Sheen → iOS-Slab.
-    light: { bg: 'rgba(255,255,255,0.22)', border: 'rgba(0,0,0,0.09)', highlight: 'rgba(255,255,255,0.75)', sheenTop: 'rgba(255,255,255,0.8)' },
+    dark: { bg: 'rgba(20,16,12,0.24)', border: 'rgba(255,255,255,0.18)', highlight: 'rgba(255,255,255,0.4)', sheenTop: 'rgba(255,255,255,0.09)' },
+    light: { bg: 'rgba(255,255,255,0.26)', border: 'rgba(60,40,20,0.09)', highlight: 'rgba(255,255,255,0.55)', sheenTop: 'rgba(255,255,255,0.5)' },
   },
   pill: {
-    dark: { bg: 'rgba(255,255,255,0.10)', border: 'rgba(255,255,255,0.24)', highlight: 'rgba(255,255,255,0.45)', sheenTop: 'rgba(255,255,255,0.12)' },
-    light: { bg: 'rgba(255,255,255,0.38)', border: 'rgba(0,0,0,0.08)', highlight: 'rgba(255,255,255,0.65)', sheenTop: 'rgba(255,255,255,0.6)' },
+    dark: { bg: 'rgba(255,255,255,0.10)', border: 'rgba(255,255,255,0.22)', highlight: 'rgba(255,255,255,0.35)', sheenTop: 'rgba(255,255,255,0.10)' },
+    light: { bg: 'rgba(255,255,255,0.40)', border: 'rgba(60,40,20,0.08)', highlight: 'rgba(255,255,255,0.5)', sheenTop: 'rgba(255,255,255,0.4)' },
   },
   bar: {
-    dark: { bg: 'rgba(12,12,16,0.38)', border: 'rgba(255,255,255,0.16)', highlight: 'rgba(255,255,255,0.4)', sheenTop: 'rgba(255,255,255,0.05)' },
-    light: { bg: 'rgba(255,255,255,0.34)', border: 'rgba(0,0,0,0.06)', highlight: 'rgba(255,255,255,0.7)', sheenTop: 'rgba(255,255,255,0.4)' },
+    dark: { bg: 'rgba(16,12,10,0.38)', border: 'rgba(255,255,255,0.15)', highlight: 'rgba(255,255,255,0.3)', sheenTop: 'rgba(255,255,255,0.04)' },
+    light: { bg: 'rgba(255,255,255,0.36)', border: 'rgba(60,40,20,0.06)', highlight: 'rgba(255,255,255,0.5)', sheenTop: 'rgba(255,255,255,0.28)' },
   },
 };
 
 const DEFAULT_RADIUS: Record<GlassVariant, number> = { card: R.xl, pill: R.pill, bar: 28 };
 
 // Markenfarben als Kanten-Chromatik (§ Farb-Regel: nur die zwei Haupt-Akzente).
-const TEAL_FRINGE = (a: number) => `rgba(31,182,166,${a})`;
-const INDIGO_FRINGE = (a: number) => `rgba(91,108,255,${a})`;
+const TERRA_FRINGE = (a: number) => `rgba(201,106,71,${a})`;
+const SAGE_FRINGE = (a: number) => `rgba(116,147,107,${a})`;
 
 function bumpAlpha(rgba: string, delta: number): string {
   const m = rgba.match(/rgba?\(([^)]+)\)/);
@@ -91,22 +93,23 @@ export function Glass({ variant = 'card', radius, intensity, tint, sheenTop, she
   const bottomDepthColor = footerShade ?? (isDark ? 'rgba(0,0,0,0.08)' : 'rgba(0,0,0,0.08)');
   // Kantenlicht ringsum (polierte Glas-Slab-Kante) — nur card, im Light kräftiger.
   const showEdges = variant === 'card' && !footerShade;
-  // Seitenkanten mit leichter Chromatik: Teal links, Indigo rechts (Glas bricht Farbe).
+  // Seitenkanten mit leiser Chromatik: Terrakotta links, Salbei rechts.
   const leftEdge = isDark
-    ? ['rgba(255,255,255,0)', TEAL_FRINGE(0.16), 'rgba(255,255,255,0)']
-    : ['rgba(255,255,255,0)', TEAL_FRINGE(0.5), 'rgba(255,255,255,0)'];
+    ? ['rgba(255,255,255,0)', TERRA_FRINGE(0.12), 'rgba(255,255,255,0)']
+    : ['rgba(255,255,255,0)', TERRA_FRINGE(0.28), 'rgba(255,255,255,0)'];
   const rightEdge = isDark
-    ? ['rgba(255,255,255,0)', INDIGO_FRINGE(0.16), 'rgba(255,255,255,0)']
-    : ['rgba(255,255,255,0)', INDIGO_FRINGE(0.5), 'rgba(255,255,255,0)'];
-  // Diagonale Sheen-Bahn (Licht wandert schräg über die Scheibe) — nur card.
+    ? ['rgba(255,255,255,0)', SAGE_FRINGE(0.12), 'rgba(255,255,255,0)']
+    : ['rgba(255,255,255,0)', SAGE_FRINGE(0.28), 'rgba(255,255,255,0)'];
+  // Diagonale Sheen-Bahn (Licht wandert schräg über die Scheibe) — nur card,
+  // matt gedimmt (Keramik, kein Spiegel).
   const showDiagonalSheen = variant === 'card';
-  const diagonalSheen = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.5)';
+  const diagonalSheen = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.26)';
   // Innen-Rand (Glasdicke) — heller 1px-Rand, leicht eingerückt.
-  const innerRimColor = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.65)';
-  // Chromatik an der Unterkante: Teal links, Weiß mittig, Indigo rechts.
+  const innerRimColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.45)';
+  // Chromatik an der Unterkante: Terrakotta links, Weiß mittig, Salbei rechts.
   const chroma = isDark
-    ? [TEAL_FRINGE(0), TEAL_FRINGE(0.24), 'rgba(255,255,255,0.16)', INDIGO_FRINGE(0.24), INDIGO_FRINGE(0)]
-    : [TEAL_FRINGE(0), TEAL_FRINGE(0.55), 'rgba(255,255,255,0.9)', INDIGO_FRINGE(0.55), INDIGO_FRINGE(0)];
+    ? [TERRA_FRINGE(0), TERRA_FRINGE(0.16), 'rgba(255,255,255,0.10)', SAGE_FRINGE(0.16), SAGE_FRINGE(0)]
+    : [TERRA_FRINGE(0), TERRA_FRINGE(0.32), 'rgba(255,255,255,0.55)', SAGE_FRINGE(0.32), SAGE_FRINGE(0)];
 
   return (
     <View style={[styles.wrapper, { borderRadius, borderColor: recipe.border, borderWidth: StyleSheet.hairlineWidth }, style]}>
@@ -216,7 +219,7 @@ function SheenSweep({ isDark, borderRadius }: { isDark: boolean; borderRadius: n
   });
 
   if (reduced) return null;
-  const bandColor = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.38)';
+  const bandColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.22)';
 
   return (
     <View

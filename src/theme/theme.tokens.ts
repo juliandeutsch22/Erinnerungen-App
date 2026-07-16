@@ -71,12 +71,11 @@ export const darkColors: typeof lightColors = {
 export type Colors = typeof lightColors;
 export type ColorToken = keyof Colors;
 
-// Schatten-Skala. Opacity hier bewusst niedriger als im VIBE-Original
-// (Light-first verträgt keine schweren Schwarzschatten). Glow = einzige Glow-Quelle,
-// nur für genau EIN Hero-Element (Vitalitäts-Trend-Ring beim ersten Reveal).
+// Schatten-Skala — mediterran flach: Flächen liegen wie Keramik auf dem Tisch,
+// sie schweben nicht in einer Vitrine. Weiche, kurze Schatten statt tiefer Drops.
 export const Shadow = {
-  sm: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 10, elevation: 3 },
-  md: { shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 24, elevation: 8 },
-  lg: { shadowColor: '#000', shadowOffset: { width: 0, height: 16 }, shadowOpacity: 0.28, shadowRadius: 40, elevation: 14 },
-  glow: (c: string) => ({ shadowColor: c, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.4, shadowRadius: 20, elevation: 8 }),
+  sm: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 2 },
+  md: { shadowColor: '#000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.10, shadowRadius: 16, elevation: 5 },
+  lg: { shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.15, shadowRadius: 26, elevation: 9 },
+  glow: (c: string) => ({ shadowColor: c, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.32, shadowRadius: 18, elevation: 6 }),
 } as const;

@@ -4,6 +4,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { openDatabaseAsync } from 'expo-sqlite';
 
+import { COLOR_REBRAND } from './colorRebrand';
 import { DEFAULT_LIST_ID, defaultList } from './ListRepository';
 
 const DB_NAME = 'stille.db';
@@ -62,6 +63,12 @@ export function getDb(): Promise<SQLiteDatabase> {
         } catch {
           /* Spalte existiert bereits */
         }
+      }
+      // Mediterran-Rebrand (v1.2): gespeicherte Listenfarben der alten
+      // Teal/Indigo-Palette einmalig auf die Erdton-Palette umziehen.
+      // Idempotent — nach dem ersten Lauf matcht keine alte Farbe mehr.
+      for (const [oldColor, newColor] of COLOR_REBRAND) {
+        await db.runAsync('UPDATE lists SET color = ? WHERE color = ?', [newColor, oldColor]);
       }
       // Seed: Standardliste „Erinnerungen" existiert immer.
       const row = await db.getFirstAsync<{ c: number }>('SELECT COUNT(*) AS c FROM lists WHERE id = ?', [DEFAULT_LIST_ID]);
