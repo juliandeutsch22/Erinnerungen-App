@@ -120,7 +120,7 @@ export function PhotoViewer({
               paddingVertical: Spacing.sm,
               paddingHorizontal: Spacing.lg,
               borderRadius: 999,
-              backgroundColor: confirm ? 'rgba(201,106,71,0.35)' : 'rgba(255,255,255,0.14)',
+              backgroundColor: confirm ? 'rgba(45,92,138,0.4)' : 'rgba(255,255,255,0.14)',
             }}
           >
             <Trash2 size={16} color="#FFFFFF" strokeWidth={2} />

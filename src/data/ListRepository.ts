@@ -9,7 +9,7 @@ export function defaultList(): List {
     id: DEFAULT_LIST_ID,
     name: 'Erinnerungen',
     icon: 'inbox',
-    color: '#C96A47',
+    color: '#2D5C8A',
     goal: null,
     deadline: null,
     sort: 0,

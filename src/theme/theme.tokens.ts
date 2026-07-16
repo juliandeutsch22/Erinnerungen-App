@@ -10,50 +10,49 @@ export const T = { xs: 10, sm: 13, md: 15, lg: 18, xl: 22, xxl: 28, hero: 40 } a
 // Spacing-Skala (großzügig = premium). Screen-Padding horizontal = Spacing.lg.
 export const Spacing = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 48 } as const;
 
-// Border-Radii. Karten/Glas-Surfaces R.xl (28), Pills R.pill, Floating-Bars 28.
-export const R = { xs: 8, sm: 12, md: 16, lg: 22, xl: 28, xxl: 36, pill: 999 } as const;
+// Border-Radii — Steintafeln sind kantiger als Glas-Slabs (leicht reduziert).
+export const R = { xs: 7, sm: 10, md: 13, lg: 16, xl: 18, xxl: 24, pill: 999 } as const;
 
-// ↓↓↓ DIE EINZIGEN ZWEI MARKEN-HEX (Mediterran-Variante) ↓↓↓
-// Erdig-warm wie Ton und Olivenbaum: Terrakotta trägt die Handlung,
-// Salbei erdet Zweitinformationen (Überfällig, Termine, Info).
-const ACCENT_A = '#C96A47'; // primär / CTA (warmes Terrakotta)
-const ACCENT_B = '#74936B'; // sekundär / info (ruhiger Salbei)
+// ↓↓↓ DIE EINZIGEN ZWEI MARKEN-HEX (Antikes Griechenland) ↓↓↓
+// Marmor & Ägäis: gealtertes Lapis-Blau trägt die Handlung, der Oliven-Zweig
+// erdet Zweitinformationen (Überfällig, Termine, Info).
+const ACCENT_A = '#2D5C8A'; // primär / CTA (gealtertes Ägäis-Blau / Lapis)
+const ACCENT_B = '#7E8C5C'; // sekundär / info (Oliven-Zweig)
 
-// Light = DEFAULT (Trust, bei Tageslicht lesbar). Neutraltöne bewusst warm
-// (Sand/Creme statt Blaugrau) — die halbe Wärme steckt im Grund, nicht im Akzent.
+// Light = DEFAULT: Marmor/Elfenbein-Neutraltöne (nie reines Weiß — Stein).
 // Iron Rule: genau zwei Akzentfarben, alle semantischen Slots mappen darauf.
 // WICHTIG: KEIN drittes Alarm-Rot — danger/warning mappen bewusst auf die Akzente.
 export const lightColors = {
   teal: ACCENT_A,
   indigo: ACCENT_B,
-  bg: '#F8F4EE',
-  bg2: '#FFFFFF',
-  bg3: '#F1EBE2',
-  bg4: '#E7DFD3',
-  // Chip = erhabene Glas-Well auf einer Panel-Fläche (statt flachem Grau).
-  chip: 'rgba(255,255,255,0.62)',
-  chipBorder: 'rgba(60,40,20,0.10)',
-  border: 'rgba(60,40,20,0.10)',
-  border2: 'rgba(60,40,20,0.16)',
-  border3: 'rgba(60,40,20,0.28)',
-  text: '#171210',
-  text2: '#5A5148',
-  text3: '#98908A',
+  bg: '#F4F1E8',
+  bg2: '#FBF9F1',
+  bg3: '#EFEBDF',
+  bg4: '#E5E0D1',
+  // Chip = ruhige Stein-Well auf der Marmor-Tafel (solide, kein Alpha-Weiß).
+  chip: '#EFEBDE',
+  chipBorder: 'rgba(50,50,40,0.12)',
+  border: 'rgba(50,50,40,0.12)',
+  border2: 'rgba(50,50,40,0.18)',
+  border3: 'rgba(50,50,40,0.30)',
+  text: '#1E1D18',
+  text2: '#565349',
+  text3: '#93907F',
   success: ACCENT_A,
   info: ACCENT_B,
   danger: ACCENT_A,
   warning: ACCENT_B,
 };
 
-// Dark = Gast: warme Erd-Dunkeltöne statt Grün-Schwarz; Akzente eine Stufe
-// heller, damit sie auf Dunkel genauso ruhig leuchten wie Light auf Creme.
+// Dark = Nacht über der Ägäis: dunkler Schiefer-Marmor, Akzente eine Stufe
+// heller, damit sie auf Dunkel genauso ruhig leuchten wie Light auf Elfenbein.
 export const darkColors: typeof lightColors = {
-  teal: '#DA8158',
-  indigo: '#95B187',
+  teal: '#6D9CCB',
+  indigo: '#9DAF7E',
   bg: '#000000',
-  bg2: '#15100C',
-  bg3: '#1C1712',
-  bg4: '#251E17',
+  bg2: '#101315',
+  bg3: '#171B1E',
+  bg4: '#1F2429',
   chip: 'rgba(255,255,255,0.07)',
   chipBorder: 'rgba(255,255,255,0.10)',
   border: 'rgba(255,255,255,0.12)',
@@ -62,20 +61,20 @@ export const darkColors: typeof lightColors = {
   text: '#FFFFFF',
   text2: 'rgba(255,255,255,0.70)',
   text3: 'rgba(255,255,255,0.38)',
-  success: '#DA8158',
-  info: '#95B187',
-  danger: '#DA8158',
-  warning: '#95B187',
+  success: '#6D9CCB',
+  info: '#9DAF7E',
+  danger: '#6D9CCB',
+  warning: '#9DAF7E',
 };
 
 export type Colors = typeof lightColors;
 export type ColorToken = keyof Colors;
 
-// Schatten-Skala — mediterran flach: Flächen liegen wie Keramik auf dem Tisch,
-// sie schweben nicht in einer Vitrine. Weiche, kurze Schatten statt tiefer Drops.
+// Schatten-Skala — Steintafeln liegen flach auf dem Grund, sie schweben nicht.
+// Hauchdünne Schatten; die Kante (Meißel-Grat) trägt die Plastizität.
 export const Shadow = {
-  sm: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 2 },
-  md: { shadowColor: '#000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.10, shadowRadius: 16, elevation: 5 },
-  lg: { shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.15, shadowRadius: 26, elevation: 9 },
-  glow: (c: string) => ({ shadowColor: c, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.32, shadowRadius: 18, elevation: 6 }),
+  sm: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 5, elevation: 1 },
+  md: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2 },
+  lg: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.09, shadowRadius: 12, elevation: 3 },
+  glow: (c: string) => ({ shadowColor: c, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.2, shadowRadius: 12, elevation: 3 }),
 } as const;

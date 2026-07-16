@@ -11,7 +11,7 @@ import { Glass } from '@/components/Glass';
 import { Type } from '@/components/Type';
 import { hapticSelect } from '@/lib/haptics';
 import { Dur, springConfig } from '@/theme/motion.tokens';
-import { useColors, useReducedMotion } from '@/theme/ThemeProvider';
+import { useColors, useReducedMotion, useScheme } from '@/theme/ThemeProvider';
 import { TAB_BAR_HEIGHT } from '@/theme/layout';
 import { Shadow, Spacing } from '@/theme/theme.tokens';
 
@@ -41,13 +41,14 @@ type TabBarProps = {
 
 export function GlassTabBar({ state, navigation }: TabBarProps) {
   const colors = useColors();
+  const scheme = useScheme();
   const insets = useSafeAreaInsets();
 
   return (
     <View pointerEvents="box-none" style={[styles.host, { paddingBottom: Math.max(insets.bottom, Spacing.md) }]}>
       <Glass
         variant="bar"
-        radius={28}
+        radius={20}
         intensity={80}
         style={[styles.bar, Shadow.lg]}
         contentStyle={{ flexDirection: 'row', height: TAB_BAR_HEIGHT, alignItems: 'center' }}
@@ -73,6 +74,7 @@ export function GlassTabBar({ state, navigation }: TabBarProps) {
               label={label}
               activeColor={colors.teal}
               inactiveColor={colors.text3}
+              recessColor={scheme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(60,55,40,0.08)'}
               onPress={onPress}
             />
           );
@@ -88,6 +90,7 @@ function TabButton({
   label,
   activeColor,
   inactiveColor,
+  recessColor,
   onPress,
 }: {
   focused: boolean;
@@ -95,6 +98,7 @@ function TabButton({
   label: string;
   activeColor: string;
   inactiveColor: string;
+  recessColor: string;
   onPress: () => void;
 }) {
   const reduced = useReducedMotion();
@@ -136,9 +140,11 @@ function TabButton({
       }}
       style={styles.tab}
     >
+      {/* Eingemeißelte Mulde statt Farbschimmer: neutraler Stein-Ton, der in
+          Light wie eine Vertiefung und in Dark wie ein matter Schein wirkt. */}
       <Animated.View
         pointerEvents="none"
-        style={[styles.pill, { backgroundColor: `${activeColor}14` }, pillStyle]}
+        style={[styles.pill, { backgroundColor: recessColor }, pillStyle]}
       />
       <Animated.View style={[styles.tabInner, animatedStyle]}>
         <Icon size={23} color={color} strokeWidth={focused ? 2.2 : 1.75} />
@@ -179,6 +185,6 @@ const styles = StyleSheet.create({
     bottom: 8,
     left: 10,
     right: 10,
-    borderRadius: 18,
+    borderRadius: 13,
   },
 });

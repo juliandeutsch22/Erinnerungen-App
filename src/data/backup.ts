@@ -156,7 +156,7 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
       name: l.name,
       icon: str(l.icon) ? l.icon : 'inbox',
       // Alte Marken-Farben aus Backups vor v1.2 ziehen mit auf die Erdtöne um.
-      color: str(l.color) ? remapListColor(l.color) : '#C96A47',
+      color: str(l.color) ? remapListColor(l.color) : '#2D5C8A',
       goal: str(l.goal) ? l.goal : null,
       deadline: str(l.deadline) ? l.deadline : null,
       sort: typeof l.sort === 'number' ? l.sort : 0,

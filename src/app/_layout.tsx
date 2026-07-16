@@ -1,6 +1,7 @@
 import '@/global.css';
 
-import { Sora_700Bold, Sora_800ExtraBold, useFonts } from '@expo-google-fonts/sora';
+import { CormorantGaramond_700Bold } from '@expo-google-fonts/cormorant-garamond/700Bold';
+import { useFonts } from '@expo-google-fonts/sora';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -63,7 +64,7 @@ export function ErrorBoundary({ error, retry }: { error: Error; retry: () => Pro
           accessibilityRole="button"
           accessibilityLabel="Erneut versuchen"
           onPress={() => { void retry(); }}
-          style={{ marginTop: 8, paddingVertical: 12, paddingHorizontal: 28, borderRadius: 999, backgroundColor: '#C96A47' }}
+          style={{ marginTop: 8, paddingVertical: 12, paddingHorizontal: 28, borderRadius: 999, backgroundColor: '#2D5C8A' }}
         >
           <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>Erneut versuchen</Text>
         </Pressable>
@@ -73,7 +74,7 @@ export function ErrorBoundary({ error, retry }: { error: Error; retry: () => Pro
 }
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({ Sora_700Bold, Sora_800ExtraBold });
+  const [fontsLoaded] = useFonts({ CormorantGaramond_700Bold });
   const queryClient = useMemo(() => new QueryClient(), []);
 
   // Fonts blockieren das erste Render nicht hart: bis sie da sind, fällt Type auf

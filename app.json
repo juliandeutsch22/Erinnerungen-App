@@ -2,7 +2,7 @@
   "expo": {
     "name": "Erinnerungen",
     "slug": "stille",
-    "version": "1.2.0",
+    "version": "1.3.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "stille",
@@ -10,13 +10,13 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "app.julian.stille",
-      "buildNumber": "3"
+      "buildNumber": "4"
     },
     "android": {
       "package": "app.julian.stille",
       "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#A9532F",
+        "backgroundColor": "#1F4467",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
@@ -34,7 +34,7 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 120,
           "resizeMode": "contain",
-          "backgroundColor": "#F8F4EE",
+          "backgroundColor": "#F4F1E8",
           "dark": {
             "backgroundColor": "#000000"
           }

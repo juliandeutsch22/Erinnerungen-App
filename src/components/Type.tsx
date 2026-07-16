@@ -19,23 +19,21 @@ export type TypeProps = RNTextProps & {
   style?: StyleProp<TextStyle>;
 };
 
-// Headings: Sora (geometrisch, seriös-modern, premium) mit leicht negativem Tracking.
-const HEAD_EXTRABOLD = 'Sora_800ExtraBold';
-const HEAD_BOLD = 'Sora_700Bold';
+// Headings: Cormorant Garamond — klassische Antiqua mit hohem Strichkontrast,
+// wie griechischer Buchsatz. POSITIVES Tracking (Inschriften sind gesperrt,
+// nie eng). Body bleibt System-Font (Lesbarkeit in Listen).
+const HEAD = 'CormorantGaramond_700Bold';
 
 const VARIANT_STYLE: Record<Variant, TextStyle> = {
-  // Sora-Headings mit negativem Letterspacing (Premium-Look).
-  // lineHeight großzügiger als Cairn-Original: Soras hohe Ober-/Unterlängen
-  // werden auf iOS sonst abgeschnitten (RN clippt bei zu enger lineHeight).
-  hero: { fontFamily: HEAD_EXTRABOLD, fontSize: T.hero, lineHeight: T.hero * 1.2, letterSpacing: -1 },
-  title: { fontFamily: HEAD_EXTRABOLD, fontSize: 32, lineHeight: 42, letterSpacing: -0.8 },
-  heading: { fontFamily: HEAD_BOLD, fontSize: T.xl, lineHeight: T.xl * 1.25, letterSpacing: -0.4 },
+  hero: { fontFamily: HEAD, fontSize: T.hero + 4, lineHeight: (T.hero + 4) * 1.15, letterSpacing: 0.3 },
+  title: { fontFamily: HEAD, fontSize: 37, lineHeight: 44, letterSpacing: 0.3 },
+  heading: { fontFamily: HEAD, fontSize: T.xl + 3, lineHeight: (T.xl + 3) * 1.2, letterSpacing: 0.3 },
   // Body: System-Font (kein fontFamily gesetzt → System).
   body: { fontSize: T.md, lineHeight: T.md * 1.45 },
   label: { fontSize: T.sm, lineHeight: T.sm * 1.3, fontWeight: '600' },
   caption: { fontSize: T.xs, lineHeight: T.xs * 1.4 },
-  // Editorialer Overline: Uppercase mit weitem Tracking (Premium-Akzent).
-  eyebrow: { fontSize: T.xs, lineHeight: T.xs * 1.4, fontWeight: '700', letterSpacing: 1.6, textTransform: 'uppercase' },
+  // Tempel-Inschrift: Uppercase mit sehr weitem Tracking.
+  eyebrow: { fontSize: T.xs, lineHeight: T.xs * 1.4, fontWeight: '700', letterSpacing: 2.6, textTransform: 'uppercase' },
 };
 
 export function Type({ variant = 'body', tone = 'text', tabular = false, style, ...rest }: TypeProps) {

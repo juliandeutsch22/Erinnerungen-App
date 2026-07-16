@@ -1,28 +1,25 @@
-// Seam.tsx — fein leuchtende „Naht" zwischen zwei Flächen (VIBE §7: leuchtende
-// Nähte/seams als metallisches Detail). Trennt Abschnitte innerhalb eines Glas-
-// Panels, ohne sie in getrennte Karten zu zerlegen.
-import { LinearGradient } from 'expo-linear-gradient';
+// Seam.tsx — Mäander-Fries als Trennung zwischen Abschnitten: der klassische
+// griechische Schlüssel als fortlaufendes SVG-Pattern, ruhig und flach in
+// Lapis. DAS antike Erkennungszeichen der App.
 import React from 'react';
 import { View } from 'react-native';
+import Svg, { Defs, Path, Pattern, Rect } from 'react-native-svg';
 
 import { useColors } from '@/theme/ThemeProvider';
-import { Shadow, Spacing } from '@/theme/theme.tokens';
-
-function hexToRgba(hex: string, a: number): string {
-  const h = hex.replace('#', '');
-  return `rgba(${parseInt(h.slice(0, 2), 16)},${parseInt(h.slice(2, 4), 16)},${parseInt(h.slice(4, 6), 16)},${a})`;
-}
+import { Spacing } from '@/theme/theme.tokens';
 
 export function Seam({ marginVertical = Spacing.lg }: { marginVertical?: number }) {
   const colors = useColors();
   return (
-    <View style={{ marginVertical, height: 1, borderRadius: 1, ...Shadow.glow(colors.teal), shadowOpacity: 0.25, shadowRadius: 8 }}>
-      <LinearGradient
-        colors={['rgba(0,0,0,0)', hexToRgba(colors.teal, 0.55), 'rgba(0,0,0,0)']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={{ flex: 1, borderRadius: 1 }}
-      />
+    <View style={{ marginVertical, height: 10, opacity: 0.5 }}>
+      <Svg width="100%" height="10">
+        <Defs>
+          <Pattern id="maeander" patternUnits="userSpaceOnUse" width="12" height="10">
+            <Path d="M0 1 H12 M11 1 V9 H3 V4 H7.5 V6.5" stroke={colors.teal} strokeWidth="1.4" fill="none" />
+          </Pattern>
+        </Defs>
+        <Rect x="0" y="0" width="100%" height="10" fill="url(#maeander)" />
+      </Svg>
     </View>
   );
 }
