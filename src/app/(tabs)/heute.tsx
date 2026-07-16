@@ -3,10 +3,11 @@
 // Uhrzeit auf EINER Glass-Fläche mit Seams, plus dünne Fortschrittslinie und
 // einklappbare „Erledigt heute"-Sektion. Abhaken = Teal-Puls + Haptik.
 import { useRouter } from 'expo-router';
-import { CalendarCheck, ChevronDown, ChevronRight, Plus, Settings, Sun } from 'lucide-react-native';
+import { CalendarCheck, Plus, Settings, Sun } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 
+import { DisclosureChevron } from '@/components/DisclosureChevron';
 import { EventEditorSheet } from '@/components/EventEditorSheet';
 import { EventRow } from '@/components/EventRow';
 import { GlassPanel } from '@/components/GlassPanel';
@@ -229,10 +230,12 @@ export default function HeuteScreen() {
   const hasDone = doneToday.length > 0;
   const nothingAtAll = !hasOverdue && !hasPlan && !hasUntimed && !hasDone;
 
-  const sections: React.ReactNode[] = [];
+  const sections: { id: string; node: React.ReactNode }[] = [];
 
   if (hasOverdue) {
-    sections.push(
+    sections.push({
+      id: 'overdue',
+      node: (
       <View key="overdue">
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <Type variant="eyebrow" tone="indigo">Überfällig · {groups.overdue.length}</Type>
@@ -248,12 +251,15 @@ export default function HeuteScreen() {
           </PressableScale>
         </View>
         <View style={{ marginTop: Spacing.xs }}>{renderRows(groups.overdue)}</View>
-      </View>,
-    );
+      </View>
+      ),
+    });
   }
 
   if (hasPlan) {
-    sections.push(
+    sections.push({
+      id: 'plan',
+      node: (
       <View key="plan">
         <Type variant="eyebrow" tone="text3">Tagesplan</Type>
         <View style={{ marginTop: Spacing.xs }}>
@@ -303,21 +309,27 @@ export default function HeuteScreen() {
           {/* Marker ans Ende, wenn schon alles vorbei ist. */}
           {nowIdx === timeline.length && timeline.length > 0 && nowMarker}
         </View>
-      </View>,
-    );
+      </View>
+      ),
+    });
   }
 
   if (hasUntimed) {
-    sections.push(
+    sections.push({
+      id: 'untimed',
+      node: (
       <View key="untimed">
         <Type variant="eyebrow" tone="text3">Ohne Uhrzeit</Type>
         <View style={{ marginTop: Spacing.xs }}>{renderRows(groups.untimed)}</View>
-      </View>,
-    );
+      </View>
+      ),
+    });
   }
 
   if (hasDone) {
-    sections.push(
+    sections.push({
+      id: 'done',
+      node: (
       <View key="done">
         {/* Erledigt heute — einklappbar, Abhaken bleibt sichtbar + rückholbar. */}
         <PressableScale
@@ -329,15 +341,12 @@ export default function HeuteScreen() {
           style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
         >
           <Type variant="eyebrow" tone="text3">Erledigt · {doneToday.length}</Type>
-          {showCompleted ? (
-            <ChevronDown size={16} color={colors.text3} strokeWidth={2} />
-          ) : (
-            <ChevronRight size={16} color={colors.text3} strokeWidth={2} />
-          )}
+          <DisclosureChevron open={showCompleted} color={colors.text3} />
         </PressableScale>
         {showCompleted && <View style={{ marginTop: Spacing.xs }}>{renderRows(doneToday)}</View>}
-      </View>,
-    );
+      </View>
+      ),
+    });
   }
 
   return (
@@ -389,9 +398,10 @@ export default function HeuteScreen() {
             />
           ) : (
             sections.map((s, i) => (
-              <React.Fragment key={i}>
-                {i > 0 && <Seam marginVertical={Spacing.md} />}
-                {s}
+              <React.Fragment key={s.id}>
+                {/* Mäander nur vor „Erledigt" — die eine Haupt-Trennung. */}
+                {i > 0 && <Seam variant={s.id === 'done' ? 'ornament' : 'line'} marginVertical={Spacing.md} />}
+                {s.node}
               </React.Fragment>
             ))
           )}
@@ -425,11 +435,7 @@ export default function HeuteScreen() {
                     <Type variant="label">{formatDayHeading(day.date, today)}</Type>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
                       <Type variant="caption" tone="text3" tabular>{day.tasks.length + day.events.length}</Type>
-                      {expanded ? (
-                        <ChevronDown size={16} color={colors.text3} strokeWidth={2} />
-                      ) : (
-                        <ChevronRight size={16} color={colors.text3} strokeWidth={2} />
-                      )}
+                      <DisclosureChevron open={expanded} color={colors.text3} />
                     </View>
                   </PressableScale>
                   {expanded && (
