@@ -17,6 +17,8 @@ export const COLOR_REBRAND: ReadonlyArray<readonly [string, string]> = [
   ['#74936B', '#7E8C5C'], // Salbei → Olive
   ['#5A7A50', '#5C6B42'], // Olive → Tiefe Olive
   ['#4E7E9B', '#4E8296'], // Meerblau → Meer-Türkis
+  // Stufe 3: Ägäis (v1.3) → Santorini (v1.3.1)
+  ['#2D5C8A', '#2B5FA6'], // Lapis → Kuppel-Blau
 ];
 
 /** Alte Markenfarbe → aktuelle (folgt der Kette); unbekannte bleiben. */

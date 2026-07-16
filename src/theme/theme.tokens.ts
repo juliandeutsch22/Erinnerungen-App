@@ -16,7 +16,7 @@ export const R = { xs: 7, sm: 10, md: 13, lg: 16, xl: 18, xxl: 24, pill: 999 } a
 // ↓↓↓ DIE EINZIGEN ZWEI MARKEN-HEX (Antikes Griechenland) ↓↓↓
 // Marmor & Ägäis: gealtertes Lapis-Blau trägt die Handlung, der Oliven-Zweig
 // erdet Zweitinformationen (Überfällig, Termine, Info).
-const ACCENT_A = '#2D5C8A'; // primär / CTA (gealtertes Ägäis-Blau / Lapis)
+const ACCENT_A = '#2B5FA6'; // primär / CTA (Santorini-Kuppel-Blau)
 const ACCENT_B = '#7E8C5C'; // sekundär / info (Oliven-Zweig)
 
 // Light = DEFAULT: Marmor/Elfenbein-Neutraltöne (nie reines Weiß — Stein).
@@ -26,7 +26,7 @@ export const lightColors = {
   teal: ACCENT_A,
   indigo: ACCENT_B,
   bg: '#F4F1E8',
-  bg2: '#FBF9F1',
+  bg2: '#FDFBF4',
   bg3: '#EFEBDF',
   bg4: '#E5E0D1',
   // Chip = ruhige Stein-Well auf der Marmor-Tafel (solide, kein Alpha-Weiß).
@@ -47,7 +47,7 @@ export const lightColors = {
 // Dark = Nacht über der Ägäis: dunkler Schiefer-Marmor, Akzente eine Stufe
 // heller, damit sie auf Dunkel genauso ruhig leuchten wie Light auf Elfenbein.
 export const darkColors: typeof lightColors = {
-  teal: '#6D9CCB',
+  teal: '#7BA7DC',
   indigo: '#9DAF7E',
   bg: '#000000',
   bg2: '#101315',
@@ -61,9 +61,9 @@ export const darkColors: typeof lightColors = {
   text: '#FFFFFF',
   text2: 'rgba(255,255,255,0.70)',
   text3: 'rgba(255,255,255,0.38)',
-  success: '#6D9CCB',
+  success: '#7BA7DC',
   info: '#9DAF7E',
-  danger: '#6D9CCB',
+  danger: '#7BA7DC',
   warning: '#9DAF7E',
 };
 

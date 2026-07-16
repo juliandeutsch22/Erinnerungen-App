@@ -1,6 +1,6 @@
-// Backdrop.tsx — ruhiger Marmor-Grund hinter den Steintafeln: ein sanfter
-// Elfenbein-Verlauf (Dark: Nacht-Schiefer), ohne Aurora-Glows — die Farbe
-// tragen die Akzente, nicht der Hintergrund. Optional mit Scroll-Parallax.
+// Backdrop.tsx — Santorini-Grund hinter den Steintafeln: oben ein zarter
+// Ägäis-Himmel, der in Elfenbein-Marmor ausläuft — weiße Tafeln vor blauem
+// Himmel (Dark: Nachthimmel über der Ägäis). Optional mit Scroll-Parallax.
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -18,8 +18,8 @@ export function Backdrop({ scrollY }: { scrollY?: SharedValue<number> }) {
   const reduced = useReducedMotion();
 
   const base: [string, string, string] = isDark
-    ? ['#0B0D10', '#000000', '#0C0E0C']
-    : ['#ECE7DB', '#F6F3EA', '#E7E3D5'];
+    ? ['#0A1424', '#000000', '#0B0D10']
+    : ['#C9DCEF', '#F2F0E5', '#EAE6D8'];
 
   const parallax = useAnimatedStyle(() => {
     if (!scrollY || reduced) return { transform: [{ translateY: 0 }] };

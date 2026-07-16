@@ -64,7 +64,7 @@ export function ErrorBoundary({ error, retry }: { error: Error; retry: () => Pro
           accessibilityRole="button"
           accessibilityLabel="Erneut versuchen"
           onPress={() => { void retry(); }}
-          style={{ marginTop: 8, paddingVertical: 12, paddingHorizontal: 28, borderRadius: 999, backgroundColor: '#2D5C8A' }}
+          style={{ marginTop: 8, paddingVertical: 12, paddingHorizontal: 28, borderRadius: 999, backgroundColor: '#2B5FA6' }}
         >
           <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>Erneut versuchen</Text>
         </Pressable>

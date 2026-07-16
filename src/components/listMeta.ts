@@ -37,4 +37,4 @@ export function listIcon(name: string): LucideIcon {
 
 /** Ägäis-Töne (Iron Rule: keine fremden Akzente, kein Alarm-Rot):
  *  Lapis · Tiefsee · Meer-Türkis · Olive · Tiefe Olive · Ocker. */
-export const LIST_COLORS = ['#2D5C8A', '#1F4467', '#4E8296', '#7E8C5C', '#5C6B42', '#B08A3C'] as const;
+export const LIST_COLORS = ['#2B5FA6', '#1F4467', '#4E8296', '#7E8C5C', '#5C6B42', '#B08A3C'] as const;
