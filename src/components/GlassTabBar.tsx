@@ -7,8 +7,6 @@ import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import Svg, { Defs, Path, Pattern, Rect } from 'react-native-svg';
-
 import { Glass } from '@/components/Glass';
 import { Type } from '@/components/Type';
 import { hapticSelect } from '@/lib/haptics';
@@ -54,17 +52,6 @@ export function GlassTabBar({ state, navigation }: TabBarProps) {
         style={[styles.bar, Shadow.lg]}
         contentStyle={{ flexDirection: 'row', height: TAB_BAR_HEIGHT, alignItems: 'center' }}
       >
-        {/* Tempel-Fries: Mäander an der Oberkante — das Gebälk der Bar. */}
-        <View pointerEvents="none" style={styles.frieze}>
-          <Svg width="100%" height="7">
-            <Defs>
-              <Pattern id="bar-maeander" patternUnits="userSpaceOnUse" width="8.4" height="7">
-                <Path d="M0 0.7 H8.4 M7.7 0.7 V6.3 H2.1 V2.8 H5.25 V4.55" stroke={colors.teal} strokeWidth="1" fill="none" />
-              </Pattern>
-            </Defs>
-            <Rect x="0" y="0" width="100%" height="7" fill="url(#bar-maeander)" />
-          </Svg>
-        </View>
         {state.routes.map((route, index) => {
           const focused = state.index === index;
           const Icon = ICONS[route.name] ?? Sun;
@@ -174,13 +161,5 @@ const styles = StyleSheet.create({
   tabInner: {
     alignItems: 'center',
     gap: 2,
-  },
-  frieze: {
-    position: 'absolute',
-    top: 4,
-    left: 16,
-    right: 16,
-    height: 7,
-    opacity: 0.4,
   },
 });
