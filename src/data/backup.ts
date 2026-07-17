@@ -12,10 +12,10 @@ import { Platform, Share } from 'react-native';
 
 import type { FilterRange, SavedFilter } from '@/lib/taskFilters';
 import { remapListColor } from './colorRebrand';
-import { getListRepository, getPhotoRepository, getTaskRepository } from './index';
+import { getListRepository, getNoteRepository, getPhotoRepository, getTaskRepository } from './index';
 import { DEFAULT_LIST_ID } from './ListRepository';
 import type { EventPhoto } from './PhotoRepository';
-import type { List, Rrule, Task } from './types';
+import type { List, Note, Rrule, Task } from './types';
 import { newId } from './types';
 
 /** Ein Foto im Backup: Verknüpfung + eingebettete Bilddaten (Base64). */
@@ -30,10 +30,11 @@ export type BackupPhoto = {
 
 export type BackupBundle = {
   app: 'stille';
-  schemaVersion: 2;
+  schemaVersion: 3;
   exportedAt: string;
   lists: List[];
   tasks: Task[];
+  notes: Note[];
   savedFilters: SavedFilter[];
   photos: BackupPhoto[];
 };
@@ -47,9 +48,10 @@ export type BackupSources = {
 };
 
 export async function buildBackup(sources: BackupSources, now: Date = new Date()): Promise<BackupBundle> {
-  const [lists, tasks, photoLinks] = await Promise.all([
+  const [lists, tasks, notes, photoLinks] = await Promise.all([
     getListRepository().getAll(),
     getTaskRepository().getAll(),
+    getNoteRepository().getAll(),
     getPhotoRepository().getAll(),
   ]);
 
@@ -62,10 +64,11 @@ export async function buildBackup(sources: BackupSources, now: Date = new Date()
 
   return {
     app: 'stille',
-    schemaVersion: 2,
+    schemaVersion: 3,
     exportedAt: now.toISOString(),
     lists,
     tasks,
+    notes,
     savedFilters: sources.savedFilters,
     photos,
   };
@@ -127,12 +130,13 @@ export type ImportSinks = {
   writePhotoFromBase64?: (ext: string, base64: string) => Promise<string | null>;
 };
 
-export type ImportResult = { lists: number; tasks: number; filters: number; photos: number };
+export type ImportResult = { lists: number; tasks: number; notes: number; filters: number; photos: number };
 
 /**
  * Validiert + importiert ein Backup. Ersetzt den kompletten Bestand
- * (Wiederherstellung, kein Merge). Akzeptiert schemaVersion 1 (Listen/Aufgaben)
- * und 2 (zusätzlich Filter + Fotos). Wirft bei ungültigem Format.
+ * (Wiederherstellung, kein Merge). Akzeptiert schemaVersion 1 (Listen/Aufgaben),
+ * 2 (zusätzlich Filter + Fotos) und 3 (zusätzlich Notizen). Wirft bei
+ * ungültigem Format.
  */
 export async function importBackup(json: string, sinks: ImportSinks = {}): Promise<ImportResult> {
   let parsed: unknown;
@@ -141,12 +145,13 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
   } catch {
     throw new Error('Kein gültiges JSON.');
   }
-  if (!isRecord(parsed) || parsed.app !== 'stille' || (parsed.schemaVersion !== 1 && parsed.schemaVersion !== 2)) {
+  if (!isRecord(parsed) || parsed.app !== 'stille' || ![1, 2, 3].includes(parsed.schemaVersion as number)) {
     throw new Error('Kein Erinnerungen-Backup (app/schemaVersion fehlt).');
   }
   const rawLists = Array.isArray(parsed.lists) ? parsed.lists : [];
   const rawTasks = Array.isArray(parsed.tasks) ? parsed.tasks : [];
   const rawPhotos = Array.isArray(parsed.photos) ? parsed.photos : [];
+  const rawNotes = Array.isArray(parsed.notes) ? parsed.notes : [];
 
   const lists: List[] = [];
   for (const l of rawLists) {
@@ -192,6 +197,22 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
     });
   }
 
+  // Notizen: taskId nur behalten, wenn die Aufgabe im Backup existiert;
+  // eventId zeigt auf den Gerätekalender und bleibt wie bei Fotos erhalten.
+  const taskIds = new Set(tasks.map((t) => t.id));
+  const notes: Note[] = [];
+  for (const n of rawNotes) {
+    if (!isRecord(n) || !str(n.id) || !str(n.body)) continue;
+    notes.push({
+      id: n.id,
+      body: n.body,
+      taskId: str(n.taskId) && taskIds.has(n.taskId) ? n.taskId : null,
+      eventId: str(n.eventId) ? n.eventId : null,
+      createdAt: str(n.createdAt) ? n.createdAt : new Date().toISOString(),
+      updatedAt: str(n.updatedAt) ? n.updatedAt : new Date().toISOString(),
+    });
+  }
+
   const filters = parseSavedFilters(parsed.savedFilters);
 
   // Fotos: Base64 zurück in echte Container-Dateien schreiben, dann neu verknüpfen.
@@ -213,13 +234,16 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
   const listRepo = getListRepository();
   const taskRepo = getTaskRepository();
   const photoRepo = getPhotoRepository();
+  const noteRepo = getNoteRepository();
   await taskRepo.clearAll();
   await listRepo.clearAll();
   await photoRepo.clearAll();
+  await noteRepo.clearAll();
   for (const l of lists) await listRepo.create(l);
   for (const t of tasks) await taskRepo.create(t);
+  for (const n of notes) await noteRepo.create(n);
   await photoRepo.restore(photos);
   sinks.setSavedFilters?.(filters);
 
-  return { lists: lists.length, tasks: tasks.length, filters: filters.length, photos: photos.length };
+  return { lists: lists.length, tasks: tasks.length, notes: notes.length, filters: filters.length, photos: photos.length };
 }

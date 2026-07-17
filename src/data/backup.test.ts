@@ -2,13 +2,15 @@
 import { exportToJsonString, importBackup } from './backup';
 import {
   __setListRepositoryForTests,
+  __setNoteRepositoryForTests,
   __setPhotoRepositoryForTests,
   __setTaskRepositoryForTests,
 } from './index';
 import { InMemoryListRepository } from './ListRepository';
+import { InMemoryNoteRepository } from './NoteRepository';
 import { InMemoryPhotoRepository } from './PhotoRepository';
 import { InMemoryTaskRepository } from './TaskRepository';
-import { getListRepository, getPhotoRepository, getTaskRepository } from './index';
+import { getListRepository, getNoteRepository, getPhotoRepository, getTaskRepository } from './index';
 import type { SavedFilter } from '@/lib/taskFilters';
 import type { Task } from './types';
 
@@ -40,12 +42,14 @@ describe('Backup', () => {
     __setListRepositoryForTests(new InMemoryListRepository());
     __setTaskRepositoryForTests(new InMemoryTaskRepository());
     __setPhotoRepositoryForTests(new InMemoryPhotoRepository());
+    __setNoteRepositoryForTests(new InMemoryNoteRepository());
   });
 
   afterEach(() => {
     __setListRepositoryForTests(null);
     __setTaskRepositoryForTests(null);
     __setPhotoRepositoryForTests(null);
+    __setNoteRepositoryForTests(null);
   });
 
   it('Roundtrip: Export → Import stellt Listen + Aufgaben wieder her', async () => {
@@ -53,6 +57,14 @@ describe('Backup', () => {
     await getTaskRepository().create(task({ id: 't1', listId: 'l1', title: 'Milch', dueDate: '2026-07-04', dueTime: '09:00', rrule: 'weekly', notificationId: 'notif-alt' }));
     await getTaskRepository().create(task({ id: 't2', title: 'Steuer', completedAt: '2026-07-02T10:00:00.000Z' }));
     await getTaskRepository().create(task({ id: 't3', title: 'Agenda vorbereiten', eventId: 'evt-42' }));
+    await getNoteRepository().create({
+      id: 'n1',
+      body: 'Meeting-Notizen\nPunkte für Q3',
+      taskId: 't3',
+      eventId: 'evt-42',
+      createdAt: '2026-07-02T09:00:00.000Z',
+      updatedAt: '2026-07-02T09:30:00.000Z',
+    });
 
     const json = await exportToJsonString(noPhotos, new Date('2026-07-03T12:00:00.000Z'));
 
@@ -60,9 +72,10 @@ describe('Backup', () => {
     __setListRepositoryForTests(new InMemoryListRepository());
     __setTaskRepositoryForTests(new InMemoryTaskRepository());
     __setPhotoRepositoryForTests(new InMemoryPhotoRepository());
+    __setNoteRepositoryForTests(new InMemoryNoteRepository());
 
     const result = await importBackup(json);
-    expect(result).toEqual({ lists: 2, tasks: 3, filters: 0, photos: 0 }); // Standardliste + Einkauf
+    expect(result).toEqual({ lists: 2, tasks: 3, notes: 1, filters: 0, photos: 0 }); // Standardliste + Einkauf
 
     const tasks = await getTaskRepository().getAll();
     const milch = tasks.find((t) => t.id === 't1')!;
@@ -80,6 +93,13 @@ describe('Backup', () => {
     expect(lists.map((l) => l.name).sort()).toEqual(['Einkauf', 'Erinnerungen']);
     // Alte Marken-Farbe (Indigo) zieht über die Kette auf die Ägäis-Palette um.
     expect(lists.find((l) => l.id === 'l1')!.color).toBe('#7E8C5C');
+
+    // Notiz überlebt den Roundtrip samt Verknüpfungen.
+    const restoredNotes = await getNoteRepository().getAll();
+    expect(restoredNotes).toHaveLength(1);
+    expect(restoredNotes[0].body).toContain('Meeting-Notizen');
+    expect(restoredNotes[0].taskId).toBe('t3');
+    expect(restoredNotes[0].eventId).toBe('evt-42');
   });
 
   it('Roundtrip: Projekt-Ziel und Deadline bleiben erhalten', async () => {
@@ -158,7 +178,7 @@ describe('Backup', () => {
       tasks: [{ id: 'x', listId: 'default', title: 'Alt' }],
     });
     const result = await importBackup(json);
-    expect(result).toEqual({ lists: 0, tasks: 1, filters: 0, photos: 0 });
+    expect(result).toEqual({ lists: 0, tasks: 1, notes: 0, filters: 0, photos: 0 });
   });
 
   it('Aufgaben mit unbekannter Liste fallen in die Standardliste', async () => {

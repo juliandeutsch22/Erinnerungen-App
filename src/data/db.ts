@@ -40,6 +40,16 @@ export function getDb(): Promise<SQLiteDatabase> {
         );
         CREATE INDEX IF NOT EXISTS idx_tasks_list ON tasks (list_id);
         CREATE INDEX IF NOT EXISTS idx_tasks_due ON tasks (due_date);
+        CREATE TABLE IF NOT EXISTS notes (
+          id TEXT PRIMARY KEY NOT NULL,
+          body TEXT NOT NULL,
+          task_id TEXT,
+          event_id TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_notes_task ON notes (task_id);
+        CREATE INDEX IF NOT EXISTS idx_notes_event ON notes (event_id);
         CREATE TABLE IF NOT EXISTS event_photos (
           id TEXT PRIMARY KEY NOT NULL,
           event_id TEXT NOT NULL,

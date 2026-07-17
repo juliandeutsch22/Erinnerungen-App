@@ -79,6 +79,20 @@ export type NewList = {
   deadline?: string | null;
 };
 
+/** Eine Notiz: Inhalt ohne Handlung — kein Datum, kein „erledigt".
+ *  Titel = erste Zeile des Textes (iOS-Notizen-Verhalten, siehe noteLogic).
+ *  Optional an EINE Erinnerung (taskId) und/oder EINEN Termin (eventId)
+ *  gehängt; eine Erinnerung/ein Termin kann mehrere Notizen tragen. */
+export type Note = {
+  id: string;
+  body: string;
+  taskId: string | null;
+  /** EventKit-Event-ID (wie bei Fotos). */
+  eventId: string | null;
+  createdAt: string; // ISO
+  updatedAt: string; // ISO
+};
+
 /** Dependency-freier ID-Generator (ein Nutzer, ein Gerät — kein UUID nötig). */
 export function newId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
