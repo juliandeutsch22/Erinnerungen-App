@@ -31,6 +31,18 @@ export function notesForEvent(notes: Note[], eventId: string): Note[] {
   return notes.filter((n) => n.eventId === eventId && n.deletedAt === null);
 }
 
+/** Suche: die Zeile, in der der Treffer steht (statt stur der Vorschau).
+ *  Titelzeilen-Treffer → Vorschau (der Titel steht ohnehin darüber). */
+export function noteMatchLine(body: string, query: string): string {
+  const q = query.trim().toLowerCase();
+  if (!q) return notePreview(body);
+  const lines = body.split('\n');
+  const titleIdx = lines.findIndex((l) => l.trim().length > 0);
+  const hit = lines.find((l, i) => i !== titleIdx && l.toLowerCase().includes(q))?.trim() ?? '';
+  if (!hit) return notePreview(body);
+  return hit.length > 120 ? `${hit.slice(0, 119)}…` : hit;
+}
+
 /** Aktive Notizen — alles außer Papierkorb. */
 export function activeNotes(notes: Note[]): Note[] {
   return notes.filter((n) => n.deletedAt === null);

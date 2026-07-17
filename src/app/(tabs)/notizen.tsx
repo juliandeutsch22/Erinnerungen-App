@@ -162,13 +162,12 @@ function NoteRow({ note, today, onPress }: { note: Note; today: string; onPress:
       <Type variant="heading" numberOfLines={1} style={{ fontSize: T.lg, lineHeight: T.lg * 1.3 }}>
         {noteTitle(note.body)}
       </Type>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+      {/* Vorschau links in voller Breite, Datum ruhig rechts außen. */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md }}>
+        <Type variant="caption" tone="text2" numberOfLines={1} style={{ flex: 1 }}>
+          {preview || ' '}
+        </Type>
         <Type variant="caption" tone="text3" tabular>{dateLabel}</Type>
-        {preview ? (
-          <Type variant="caption" tone="text2" numberOfLines={1} style={{ flexShrink: 1 }}>
-            {preview}
-          </Type>
-        ) : null}
       </View>
     </PressableScale>
   );

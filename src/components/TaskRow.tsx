@@ -6,6 +6,7 @@ import React, { useMemo, useRef } from 'react';
 import { View } from 'react-native';
 import ReanimatedSwipeable, { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 
+import { Highlighted } from '@/components/Highlighted';
 import { PressableScale } from '@/components/PressableScale';
 import { TaskCheck } from '@/components/TaskCheck';
 import { Type } from '@/components/Type';
@@ -32,6 +33,7 @@ export function TaskRow({
   list,
   showDue = true,
   showEventLink = true,
+  highlight,
   onToggle,
   onPress,
   onReschedule,
@@ -45,6 +47,8 @@ export function TaskRow({
   showDue?: boolean | 'time-only';
   /** Termin-Verknüpfungs-Glyph zeigen; unter dem verknüpften Termin selbst überflüssig. */
   showEventLink?: boolean;
+  /** Suchbegriff: Fundstellen in Titel und Notiz werden hervorgehoben. */
+  highlight?: string;
   onToggle: (next: boolean) => void;
   onPress: () => void;
   onReschedule?: () => void;
@@ -96,7 +100,7 @@ export function TaskRow({
               style={{ flexShrink: 1, textDecorationLine: done ? 'line-through' : 'none' }}
               numberOfLines={2}
             >
-              {task.title}
+              <Highlighted text={task.title} query={highlight} />
             </Type>
             {task.flagged && <Flag size={13} color={colors.indigo} fill={colors.indigo} strokeWidth={2} />}
             {task.rrule && <Repeat size={13} color={colors.text3} strokeWidth={2} />}
@@ -120,7 +124,7 @@ export function TaskRow({
               )}
               {task.note ? (
                 <Type variant="caption" tone="text3" numberOfLines={1} style={{ flexShrink: 1 }}>
-                  {task.note}
+                  <Highlighted text={task.note} query={highlight} />
                 </Type>
               ) : null}
             </View>

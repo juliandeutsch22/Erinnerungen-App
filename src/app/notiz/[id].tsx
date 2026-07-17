@@ -11,6 +11,7 @@ import { KeyboardAvoidingView, Platform, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Backdrop } from '@/components/Backdrop';
+import { KeyboardDoneBar, keyboardDoneProps } from '@/components/KeyboardDone';
 import { NoteLinkSheet } from '@/components/NoteLinkSheet';
 import { PressableScale } from '@/components/PressableScale';
 import { Type } from '@/components/Type';
@@ -167,6 +168,18 @@ export default function NotizScreen() {
             {updatedLabel}
           </Type>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            {/* Zuweisen wandert als Icon in den Kopf — die Schreibfläche bleibt leer. */}
+            <PressableScale
+              accessibilityLabel="Notiz zuweisen"
+              onPress={() => {
+                flush();
+                hapticSelect();
+                setLinkSheet(true);
+              }}
+              style={{ padding: Spacing.sm }}
+            >
+              <Link2 size={20} color={colors.text3} strokeWidth={2} />
+            </PressableScale>
             <PressableScale
               accessibilityLabel={note?.pinned ? 'Notiz lösen' : 'Notiz anheften'}
               onPress={togglePin}
@@ -185,20 +198,9 @@ export default function NotizScreen() {
           </View>
         </View>
 
-        {/* Zuweisen: Notiz an Erinnerung/Termin hängen — Chips zeigen den Stand. */}
+        {/* Verknüpfungs-Chips nur, wenn tatsächlich etwas verknüpft ist. */}
+        {(linkedTask || linkedEventTitle) && note && (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: Spacing.sm, paddingHorizontal: Spacing.lg, paddingTop: Spacing.xs }}>
-          <PressableScale
-            accessibilityLabel="Notiz zuweisen"
-            onPress={() => {
-              flush();
-              hapticSelect();
-              setLinkSheet(true);
-            }}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 5, paddingHorizontal: Spacing.sm, borderRadius: R.pill, backgroundColor: colors.chip, borderWidth: 1, borderColor: colors.chipBorder }}
-          >
-            <Link2 size={13} color={colors.teal} strokeWidth={2.2} />
-            <Type variant="caption" tone="teal">Zuweisen</Type>
-          </PressableScale>
           {linkedTask && note && (
             <PressableScale
               accessibilityLabel={`Verknüpfung mit „${linkedTask.title}" lösen`}
@@ -228,59 +230,79 @@ export default function NotizScreen() {
             </PressableScale>
           )}
         </View>
+        )}
 
-        {/* Titel — erste Zeile des body, groß in der Antiqua (iOS-Notizen-Look).
-            Enter springt in den Text. */}
-        <TextInput
-          value={title ?? ''}
-          onChangeText={onChangeTitle}
-          autoFocus={loaded && (title ?? '').length === 0 && rest.length === 0}
-          placeholder="Titel"
-          placeholderTextColor={colors.text3}
-          returnKeyType="next"
-          submitBehavior="submit"
-          onSubmitEditing={() => bodyRef.current?.focus()}
-          accessibilityLabel="Titel der Notiz"
-          style={[
-            {
-              fontFamily: TITLE_FONT,
-              fontSize: T.xl + 5,
-              lineHeight: (T.xl + 5) * 1.25,
-              letterSpacing: 0.3,
-              color: colors.text,
-              paddingHorizontal: Spacing.lg,
-              paddingTop: Spacing.md,
-              paddingBottom: 0,
-            },
-            webNoOutline,
-          ]}
-        />
+        {/* Schreibfläche: eine ruhige, flache Tafel — der Tempel-Hintergrund
+            scheint nicht durch den Text. */}
+        <View
+          style={{
+            flex: 1,
+            marginTop: Spacing.sm,
+            marginHorizontal: Spacing.md,
+            marginBottom: insets.bottom + Spacing.md,
+            borderRadius: R.lg,
+            backgroundColor: colors.bg2,
+            borderWidth: 1,
+            borderColor: colors.border,
+            overflow: 'hidden',
+          }}
+        >
+          {/* Titel — erste Zeile des body, groß in der Antiqua (iOS-Notizen-Look).
+              Enter springt in den Text. */}
+          <TextInput
+            value={title ?? ''}
+            onChangeText={onChangeTitle}
+            autoFocus={loaded && (title ?? '').length === 0 && rest.length === 0}
+            placeholder="Titel"
+            placeholderTextColor={colors.text3}
+            returnKeyType="next"
+            submitBehavior="submit"
+            onSubmitEditing={() => bodyRef.current?.focus()}
+            accessibilityLabel="Titel der Notiz"
+            {...keyboardDoneProps}
+            style={[
+              {
+                fontFamily: TITLE_FONT,
+                fontSize: T.xl + 5,
+                lineHeight: (T.xl + 5) * 1.25,
+                letterSpacing: 0.3,
+                color: colors.text,
+                paddingHorizontal: Spacing.lg,
+                paddingTop: Spacing.md,
+                paddingBottom: 0,
+              },
+              webNoOutline,
+            ]}
+          />
 
-        {/* Der Text — alles nach der Titelzeile. */}
-        <TextInput
-          ref={bodyRef}
-          value={rest}
-          onChangeText={onChangeRest}
-          multiline
-          placeholder="Notiz…"
-          placeholderTextColor={colors.text3}
-          textAlignVertical="top"
-          accessibilityLabel="Notiztext"
-          scrollEnabled
-          style={[
-            {
-              flex: 1,
-              fontSize: T.md + 1,
-              lineHeight: (T.md + 1) * 1.5,
-              color: colors.text,
-              paddingHorizontal: Spacing.lg,
-              paddingTop: Spacing.xs,
-              paddingBottom: insets.bottom + Spacing.lg,
-            },
-            webNoOutline,
-          ]}
-        />
+          {/* Der Text — alles nach der Titelzeile. */}
+          <TextInput
+            ref={bodyRef}
+            value={rest}
+            onChangeText={onChangeRest}
+            multiline
+            placeholder="Notiz…"
+            placeholderTextColor={colors.text3}
+            textAlignVertical="top"
+            accessibilityLabel="Notiztext"
+            scrollEnabled
+            {...keyboardDoneProps}
+            style={[
+              {
+                flex: 1,
+                fontSize: T.md + 1,
+                lineHeight: (T.md + 1) * 1.5,
+                color: colors.text,
+                paddingHorizontal: Spacing.lg,
+                paddingTop: Spacing.xs,
+                paddingBottom: Spacing.lg,
+              },
+              webNoOutline,
+            ]}
+          />
+        </View>
       </KeyboardAvoidingView>
+      <KeyboardDoneBar />
       {linkSheet && id && <NoteLinkSheet noteId={id} onClose={() => setLinkSheet(false)} />}
     </View>
   );

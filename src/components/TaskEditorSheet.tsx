@@ -11,6 +11,7 @@ import { BottomSheet } from '@/components/BottomSheet';
 import { DisclosureChevron } from '@/components/DisclosureChevron';
 import { Chip } from '@/components/Chip';
 import { GlassButton } from '@/components/GlassButton';
+import { KeyboardDoneBar, keyboardDoneProps } from '@/components/KeyboardDone';
 import { LinkedNotes } from '@/components/LinkedNotes';
 import { listIcon } from '@/components/listMeta';
 import { MiniCalendar } from '@/components/MiniCalendar';
@@ -207,6 +208,7 @@ export function TaskEditorSheet({
         placeholderTextColor={colors.text3}
         multiline
         accessibilityLabel="Notiz"
+        {...keyboardDoneProps}
         style={[
           { fontSize: T.md, color: colors.text2, paddingVertical: Spacing.sm, marginBottom: Spacing.sm, minHeight: 36 },
           webNoOutline,
@@ -422,6 +424,7 @@ export function TaskEditorSheet({
           <LinkedNotes taskId={task.id} onNavigate={onClose} />
         </View>
       )}
+      <KeyboardDoneBar />
     </BottomSheet>
   );
 }

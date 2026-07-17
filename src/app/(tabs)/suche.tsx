@@ -7,6 +7,7 @@ import { TextInput, View } from 'react-native';
 
 import { Glass } from '@/components/Glass';
 import { GlassPanel } from '@/components/GlassPanel';
+import { Highlighted } from '@/components/Highlighted';
 import { listIcon } from '@/components/listMeta';
 import { PressableScale } from '@/components/PressableScale';
 import { RescheduleSheet } from '@/components/RescheduleSheet';
@@ -22,7 +23,7 @@ import { useNotes } from '@/data/noteQueries';
 import { useCompleteTask, useLists, useReopenTask, useTasks } from '@/data/queries';
 import type { Task } from '@/data/types';
 import { todayStr } from '@/lib/dates';
-import { notePreview, noteTitle } from '@/lib/noteLogic';
+import { noteMatchLine, noteTitle } from '@/lib/noteLogic';
 import { webNoOutline } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
 import { Shadow, Spacing, T } from '@/theme/theme.tokens';
@@ -146,6 +147,7 @@ export default function SucheScreen() {
                           task={t}
                           today={today}
                           list={t.listId !== 'default' ? listById.get(t.listId) : undefined}
+                          highlight={q}
                           onToggle={toggle(t)}
                           onPress={() => setEditorTask(t)}
                           onReschedule={() => setRescheduleTask(t)}
@@ -161,7 +163,8 @@ export default function SucheScreen() {
                     <Type variant="eyebrow" tone="text3">Notizen</Type>
                     <View style={{ marginTop: Spacing.xs }}>
                       {noteHits.map((n) => {
-                        const preview = notePreview(n.body);
+                        // Die Zeile mit dem Treffer zeigen — nicht stur die Vorschau.
+                        const matchLine = noteMatchLine(n.body, q);
                         return (
                           <PressableScale
                             key={n.id}
@@ -171,8 +174,14 @@ export default function SucheScreen() {
                           >
                             <NotebookPen size={18} color={colors.text3} strokeWidth={2} />
                             <View style={{ flex: 1, gap: 1 }}>
-                              <Type variant="body" numberOfLines={1}>{noteTitle(n.body)}</Type>
-                              {!!preview && <Type variant="caption" tone="text3" numberOfLines={1}>{preview}</Type>}
+                              <Type variant="body" numberOfLines={1}>
+                                <Highlighted text={noteTitle(n.body)} query={q} />
+                              </Type>
+                              {!!matchLine && (
+                                <Type variant="caption" tone="text3" numberOfLines={1}>
+                                  <Highlighted text={matchLine} query={q} />
+                                </Type>
+                              )}
                             </View>
                           </PressableScale>
                         );
