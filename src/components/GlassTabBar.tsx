@@ -1,7 +1,7 @@
 // GlassTabBar.tsx — Floating-Glass-Tab-Bar (position:absolute, damit der Blur den
 // Inhalt dahinter sieht). Aktiver Tab in Akzent-Teal, eine Bewegung pro Aktion
 // (Spring.snappy beim Wechsel), Reduced-Motion-gegated.
-import { CalendarDays, ListTodo, type LucideIcon, Search, Sun } from 'lucide-react-native';
+import { CalendarDays, ListTodo, type LucideIcon, NotebookPen, Search, Sun } from 'lucide-react-native';
 import React from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
@@ -18,6 +18,7 @@ import { Shadow, Spacing } from '@/theme/theme.tokens';
 const ICONS: Record<string, LucideIcon> = {
   heute: Sun,
   kalender: CalendarDays,
+  notizen: NotebookPen,
   listen: ListTodo,
   suche: Search,
 };
@@ -25,6 +26,7 @@ const ICONS: Record<string, LucideIcon> = {
 const LABELS: Record<string, string> = {
   heute: 'Heute',
   kalender: 'Kalender',
+  notizen: 'Notizen',
   listen: 'Listen',
   suche: 'Suche',
 };

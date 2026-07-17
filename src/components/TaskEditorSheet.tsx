@@ -3,13 +3,15 @@
 // Detail-Zeilen (Liste / Fällig / Wiederholung / Flagge) mit aktuellem Wert,
 // die erst beim Antippen ihre Chips aufklappen — keine Chip-Wand. Der
 // Primär-Button sitzt fest im Sheet-Footer. Löschen zweistufig.
-import { CalendarDays, CalendarX2, ChevronDown, ChevronRight, Clock, Flag, ListChecks, type LucideIcon, Plus, Repeat, Tag as TagIcon, Trash2, X } from 'lucide-react-native';
+import { CalendarDays, CalendarX2, Clock, Flag, ListChecks, type LucideIcon, Plus, Repeat, Tag as TagIcon, Trash2, X } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
 import { BottomSheet } from '@/components/BottomSheet';
+import { DisclosureChevron } from '@/components/DisclosureChevron';
 import { Chip } from '@/components/Chip';
 import { GlassButton } from '@/components/GlassButton';
+import { LinkedNotes } from '@/components/LinkedNotes';
 import { listIcon } from '@/components/listMeta';
 import { MiniCalendar } from '@/components/MiniCalendar';
 import { PressableScale } from '@/components/PressableScale';
@@ -413,6 +415,13 @@ export function TaskEditorSheet({
           </View>
         )}
       </View>
+
+      {/* Verknüpfte Notizen — nur im Bearbeiten-Modus (neue Aufgaben haben noch keine ID). */}
+      {isEdit && task && (
+        <View style={{ paddingTop: Spacing.lg }}>
+          <LinkedNotes taskId={task.id} onNavigate={onClose} />
+        </View>
+      )}
     </BottomSheet>
   );
 }
@@ -448,11 +457,7 @@ function DetailRow({
       <Icon size={18} color={iconColor} strokeWidth={2} />
       <Type variant="body" style={{ flex: 1 }}>{label}</Type>
       <Type variant="label" tone={valueTone} numberOfLines={1} style={{ maxWidth: 170 }}>{value}</Type>
-      {expanded ? (
-        <ChevronDown size={16} color={colors.text3} strokeWidth={2} />
-      ) : (
-        <ChevronRight size={16} color={colors.text3} strokeWidth={2} />
-      )}
+      <DisclosureChevron open={expanded} color={colors.text3} />
     </PressableScale>
   );
 }

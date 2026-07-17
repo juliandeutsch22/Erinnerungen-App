@@ -1,14 +1,15 @@
 // TaskRow.tsx — eine Aufgaben-Zeile: Haken (Teal-Puls) + Titel + Meta-Zeile.
 // Swipe rechts = erledigt, Swipe links = „Neu planen" (Fahrplan §3.6).
 // Überfällig trägt Indigo (ruhig), nie Alarm-Rot.
-import { Check, Flag, Link2, ListChecks, Repeat } from 'lucide-react-native';
-import React, { useRef } from 'react';
+import { Check, Flag, Link2, ListChecks, NotebookPen, Repeat } from 'lucide-react-native';
+import React, { useMemo, useRef } from 'react';
 import { View } from 'react-native';
 import ReanimatedSwipeable, { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 
 import { PressableScale } from '@/components/PressableScale';
 import { TaskCheck } from '@/components/TaskCheck';
 import { Type } from '@/components/Type';
+import { useNotes } from '@/data/noteQueries';
 import type { List, Task } from '@/data/types';
 import { formatDueDate } from '@/lib/dates';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
@@ -52,6 +53,9 @@ export function TaskRow({
 }) {
   const colors = useColors();
   const done = task.completedAt !== null;
+  // Verknüpfte Notiz? Kleiner Glyph in der Titelzeile (analog zum Termin-Link).
+  const { data: notes } = useNotes();
+  const hasNote = useMemo(() => (notes ?? []).some((n) => n.taskId === task.id), [notes, task.id]);
   const overdue = isOverdue(task, today);
   const progress = subtaskProgress(task.subtasks);
   const swipeRef = useRef<SwipeableMethods>(null);
@@ -97,6 +101,7 @@ export function TaskRow({
             {task.flagged && <Flag size={13} color={colors.indigo} fill={colors.indigo} strokeWidth={2} />}
             {task.rrule && <Repeat size={13} color={colors.text3} strokeWidth={2} />}
             {showEventLink && task.eventId && <Link2 size={13} color={colors.text3} strokeWidth={2} />}
+            {hasNote && <NotebookPen size={13} color={colors.text3} strokeWidth={2} />}
           </View>
           {(metaParts.length > 0 || task.note || progress.total > 0) && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>

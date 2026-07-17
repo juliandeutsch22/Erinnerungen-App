@@ -2,13 +2,14 @@
 // des Quell-Kalenders, Titel, Zeit-Label, optionaler Foto-Indikator.
 // Gesten wie die Aufgaben-Zeile (gleiche Sprache): Tap = bearbeiten,
 // Swipe rechts = Fotos anhängen (Rückblick), Swipe links = bearbeiten.
-import { ImageIcon, Pencil } from 'lucide-react-native';
-import React, { useRef } from 'react';
+import { ImageIcon, NotebookPen, Pencil } from 'lucide-react-native';
+import React, { useMemo, useRef } from 'react';
 import { View } from 'react-native';
 import ReanimatedSwipeable, { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 
 import { PressableScale } from '@/components/PressableScale';
 import { Type } from '@/components/Type';
+import { useNotes } from '@/data/noteQueries';
 import { useAddPhotos } from '@/data/photoQueries';
 import { eventTimeLabel } from '@/lib/calendarLogic';
 import type { DeviceCalendar, DeviceEvent } from '@/lib/deviceCalendar';
@@ -36,6 +37,9 @@ export function EventRow({
 }) {
   const colors = useColors();
   const addPhotos = useAddPhotos();
+  // Verknüpfte Notizen? Kleiner Indikator neben dem Foto-Zähler.
+  const { data: notes } = useNotes();
+  const noteCount = useMemo(() => (notes ?? []).filter((n) => n.eventId === event.id).length, [notes, event.id]);
   const swipeRef = useRef<SwipeableMethods>(null);
 
   const onPhotos = async () => {
@@ -64,6 +68,7 @@ export function EventRow({
               <Type variant="caption" tone="teal" tabular>{photoCount}</Type>
             </View>
           )}
+          {noteCount > 0 && <NotebookPen size={11} color={colors.text3} strokeWidth={2} />}
         </View>
       </View>
     </PressableScale>

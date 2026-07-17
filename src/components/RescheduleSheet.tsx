@@ -7,11 +7,12 @@
 // Lücken heute/morgen und schlägt konkrete Blöcke vor — ein Tipp gibt der
 // Aufgabe eine Uhrzeit in echter freier Zeit. Ohne Kalenderzugriff werden
 // sinnvolle Standardzeiten vorgeschlagen.
-import { CalendarClock, CalendarDays, CalendarX2, ChevronDown, ChevronRight, Clock, Moon, Sun, type LucideIcon } from 'lucide-react-native';
+import { CalendarClock, CalendarDays, CalendarX2, Clock, Moon, Sun, type LucideIcon } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 
 import { BottomSheet } from '@/components/BottomSheet';
+import { DisclosureChevron } from '@/components/DisclosureChevron';
 import { MiniCalendar } from '@/components/MiniCalendar';
 import { PressableScale } from '@/components/PressableScale';
 import { Expanded, Group, RowDivider } from '@/components/SheetParts';
@@ -81,7 +82,7 @@ export function RescheduleSheet({ task, onClose }: { task: Task; onClose: () => 
       <Icon size={18} color={tone === 'text3' ? colors.text3 : colors.teal} strokeWidth={2} />
       <Type variant="body" style={{ flex: 1 }}>{label}</Type>
       {expanded !== undefined &&
-        (expanded ? <ChevronDown size={16} color={colors.text3} strokeWidth={2} /> : <ChevronRight size={16} color={colors.text3} strokeWidth={2} />)}
+        <DisclosureChevron open={expanded} color={colors.text3} />}
     </PressableScale>
   );
 

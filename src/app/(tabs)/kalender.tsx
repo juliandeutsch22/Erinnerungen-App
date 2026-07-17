@@ -210,7 +210,7 @@ export default function KalenderScreen() {
           {/* Erinnerungen des Tages */}
           {dayTasks.length > 0 && (
             <>
-              {(dayEvents.length > 0 || permission === 'denied') && <Seam marginVertical={Spacing.md} />}
+              {(dayEvents.length > 0 || permission === 'denied') && <Seam variant="ornament" marginVertical={Spacing.md} />}
               <Type variant="eyebrow" tone="teal">Erinnerungen</Type>
               <View style={{ marginTop: Spacing.xs }}>
                 {dayTasks.map((task) => (

@@ -2,11 +2,12 @@
 // Smart-Ansicht: 'geplant' (chronologisch gruppiert) / 'alle' (nach Liste).
 // Offene zuerst (fällige oben), Erledigt-Sektion einklappbar (30-Tage-Fenster).
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowUpDown, CalendarClock, ChevronDown, ChevronLeft, ChevronRight, Pencil, Plus } from 'lucide-react-native';
+import { ArrowUpDown, CalendarClock, ChevronLeft, Pencil, Plus } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { View } from 'react-native';
 
 import { GlassButton } from '@/components/GlassButton';
+import { DisclosureChevron } from '@/components/DisclosureChevron';
 import { GlassPanel } from '@/components/GlassPanel';
 import { ListEditorSheet } from '@/components/ListEditorSheet';
 import { listIcon } from '@/components/listMeta';
@@ -169,7 +170,7 @@ export default function ListeDetailScreen() {
           {/* Erledigt — einklappbar, automatisch nur die letzten 30 Tage. */}
           {completed.length > 0 && (
             <>
-              <Seam marginVertical={Spacing.md} />
+              <Seam variant="ornament" marginVertical={Spacing.md} />
               <PressableScale
                 accessibilityLabel={showCompleted ? 'Erledigte ausblenden' : 'Erledigte anzeigen'}
                 onPress={() => {
@@ -179,11 +180,7 @@ export default function ListeDetailScreen() {
                 style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
               >
                 <Type variant="eyebrow" tone="text3">Erledigt · {completed.length}</Type>
-                {showCompleted ? (
-                  <ChevronDown size={16} color={colors.text3} strokeWidth={2} />
-                ) : (
-                  <ChevronRight size={16} color={colors.text3} strokeWidth={2} />
-                )}
+                <DisclosureChevron open={showCompleted} color={colors.text3} />
               </PressableScale>
               {showCompleted && <View style={{ marginTop: Spacing.xs }}>{completed.map((t) => renderRow(t, isSmartView))}</View>}
             </>

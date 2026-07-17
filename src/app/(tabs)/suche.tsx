@@ -1,7 +1,7 @@
 // suche.tsx — Suche über alles (Fahrplan §3.7): Aufgaben (Titel + Notiz,
-// offen wie erledigt) und Listen. Live-Filter, Treffer öffnen den Editor.
+// offen wie erledigt), Listen und Notizen. Live-Filter, Treffer öffnen den Editor.
 import { useRouter } from 'expo-router';
-import { Search } from 'lucide-react-native';
+import { NotebookPen, Search } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { TextInput, View } from 'react-native';
 
@@ -18,9 +18,11 @@ import { TaskEditorSheet } from '@/components/TaskEditorSheet';
 import { TaskQuickSheet } from '@/components/TaskQuickSheet';
 import { TaskRow } from '@/components/TaskRow';
 import { Type } from '@/components/Type';
+import { useNotes } from '@/data/noteQueries';
 import { useCompleteTask, useLists, useReopenTask, useTasks } from '@/data/queries';
 import type { Task } from '@/data/types';
 import { todayStr } from '@/lib/dates';
+import { notePreview, noteTitle } from '@/lib/noteLogic';
 import { webNoOutline } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
 import { Shadow, Spacing, T } from '@/theme/theme.tokens';
@@ -30,6 +32,7 @@ export default function SucheScreen() {
   const router = useRouter();
   const { data: tasks } = useTasks();
   const { data: lists } = useLists();
+  const { data: notes } = useNotes();
   const complete = useCompleteTask();
   const reopen = useReopenTask();
 
@@ -55,6 +58,11 @@ export default function SucheScreen() {
     return (lists ?? []).filter((l) => l.name.toLowerCase().includes(q));
   }, [lists, q]);
 
+  const noteHits = useMemo(() => {
+    if (!q) return [];
+    return (notes ?? []).filter((n) => n.body.toLowerCase().includes(q)).slice(0, 30);
+  }, [notes, q]);
+
   const toggle = (task: Task) => (next: boolean) => {
     if (next) complete.mutate(task);
     else reopen.mutate(task.id);
@@ -68,7 +76,7 @@ export default function SucheScreen() {
           <Type variant="title">Suche</Type>
           {/* Ruhige Zähl-Zeile — dieselbe Stimme wie die Tages-Bilanz auf Heute. */}
           <Type variant="caption" tone="text3" tabular>
-            {`${(tasks ?? []).length} ${(tasks ?? []).length === 1 ? 'Aufgabe' : 'Aufgaben'} · ${(lists ?? []).length} ${(lists ?? []).length === 1 ? 'Liste' : 'Listen'} durchsuchbar`}
+            {`${(tasks ?? []).length} ${(tasks ?? []).length === 1 ? 'Aufgabe' : 'Aufgaben'} · ${(lists ?? []).length} ${(lists ?? []).length === 1 ? 'Liste' : 'Listen'} · ${(notes ?? []).length} ${(notes ?? []).length === 1 ? 'Notiz' : 'Notizen'} durchsuchbar`}
           </Type>
         </View>
       </Reveal>
@@ -95,7 +103,7 @@ export default function SucheScreen() {
       {q.length > 0 && (
         <Reveal delay={90}>
           <GlassPanel>
-            {taskHits.length === 0 && listHits.length === 0 ? (
+            {taskHits.length === 0 && listHits.length === 0 && noteHits.length === 0 ? (
               <EmptyState
                 icon={<Search size={20} color={colors.teal} strokeWidth={2} />}
                 title="Keine Treffer"
@@ -122,7 +130,7 @@ export default function SucheScreen() {
                         );
                       })}
                     </View>
-                    {taskHits.length > 0 && <Seam marginVertical={Spacing.md} />}
+                    {taskHits.length > 0 && <Seam variant="ornament" marginVertical={Spacing.md} />}
                   </>
                 )}
                 {taskHits.length > 0 && (
@@ -141,6 +149,31 @@ export default function SucheScreen() {
                           onLongPress={() => setQuickTask(t)}
                         />
                       ))}
+                    </View>
+                  </>
+                )}
+                {noteHits.length > 0 && (
+                  <>
+                    {(taskHits.length > 0 || listHits.length > 0) && <Seam marginVertical={Spacing.md} />}
+                    <Type variant="eyebrow" tone="text3">Notizen</Type>
+                    <View style={{ marginTop: Spacing.xs }}>
+                      {noteHits.map((n) => {
+                        const preview = notePreview(n.body);
+                        return (
+                          <PressableScale
+                            key={n.id}
+                            accessibilityLabel={`Notiz ${noteTitle(n.body)} öffnen`}
+                            onPress={() => router.push(`/notiz/${n.id}`)}
+                            style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.sm + 2 }}
+                          >
+                            <NotebookPen size={18} color={colors.text3} strokeWidth={2} />
+                            <View style={{ flex: 1, gap: 1 }}>
+                              <Type variant="body" numberOfLines={1}>{noteTitle(n.body)}</Type>
+                              {!!preview && <Type variant="caption" tone="text3" numberOfLines={1}>{preview}</Type>}
+                            </View>
+                          </PressableScale>
+                        );
+                      })}
                     </View>
                   </>
                 )}

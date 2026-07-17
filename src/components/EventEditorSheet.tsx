@@ -2,13 +2,15 @@
 // Formsprache des Aufgaben-Editors: Titel + Notiz oben, kompakte Detail-Zeilen
 // (Kalender / Beginnt / Endet), Primär-Button fest im Footer. Termine können
 // sich über mehrere Tage erstrecken; Uhrzeiten über natives iOS-Rad.
-import { CalendarDays, ChevronDown, ChevronRight, Plus, Trash2, X } from 'lucide-react-native';
+import { CalendarDays, Plus, Trash2, X } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
 import { BottomSheet } from '@/components/BottomSheet';
+import { DisclosureChevron } from '@/components/DisclosureChevron';
 import { Chip } from '@/components/Chip';
 import { GlassButton } from '@/components/GlassButton';
+import { LinkedNotes } from '@/components/LinkedNotes';
 import { MiniCalendar } from '@/components/MiniCalendar';
 import { PhotoStrip } from '@/components/PhotoStrip';
 import { PressableScale } from '@/components/PressableScale';
@@ -205,11 +207,7 @@ export function EventEditorSheet({
               <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: currentCalendar?.color ?? colors.indigo }} />
               <Type variant="body" style={{ flex: 1 }}>Kalender</Type>
               <Type variant="label" tone="text2" numberOfLines={1} style={{ maxWidth: 170 }}>{currentCalendar?.title ?? '—'}</Type>
-              {section === 'calendar' ? (
-                <ChevronDown size={16} color={colors.text3} strokeWidth={2} />
-              ) : (
-                <ChevronRight size={16} color={colors.text3} strokeWidth={2} />
-              )}
+              <DisclosureChevron open={section === 'calendar'} color={colors.text3} />
             </PressableScale>
             {section === 'calendar' && (
               <Expanded>
@@ -286,6 +284,16 @@ export function EventEditorSheet({
           <Hairline />
           <View style={{ marginTop: Spacing.md }}>
             <EventTasks eventId={event.id} eventDay={startDay} />
+          </View>
+        </View>
+      )}
+
+      {/* Verknüpfte Notizen — erst für gespeicherte Termine (brauchen eine Event-ID). */}
+      {isEdit && event && (
+        <View style={{ marginTop: Spacing.md }}>
+          <Hairline />
+          <View style={{ marginTop: Spacing.md }}>
+            <LinkedNotes eventId={event.id} onNavigate={onClose} />
           </View>
         </View>
       )}
@@ -427,11 +435,7 @@ function WhenRowView({
         <View style={{ width: 18 }} />
         <Type variant="body" style={{ flex: 1 }}>{label}</Type>
         <Type variant="label" tone="teal" numberOfLines={1} style={{ maxWidth: 190 }}>{value}</Type>
-        {expanded ? (
-          <ChevronDown size={16} color={colors.text3} strokeWidth={2} />
-        ) : (
-          <ChevronRight size={16} color={colors.text3} strokeWidth={2} />
-        )}
+        <DisclosureChevron open={expanded} color={colors.text3} />
       </PressableScale>
       {expanded && (
         <Expanded>
