@@ -62,6 +62,8 @@ describe('Backup', () => {
       body: 'Meeting-Notizen\nPunkte für Q3',
       taskId: 't3',
       eventId: 'evt-42',
+      pinned: true,
+      deletedAt: null,
       createdAt: '2026-07-02T09:00:00.000Z',
       updatedAt: '2026-07-02T09:30:00.000Z',
     });
@@ -100,6 +102,9 @@ describe('Backup', () => {
     expect(restoredNotes[0].body).toContain('Meeting-Notizen');
     expect(restoredNotes[0].taskId).toBe('t3');
     expect(restoredNotes[0].eventId).toBe('evt-42');
+    // Anheften überlebt; ältere Backups ohne das Feld → false (siehe Import-Defaults).
+    expect(restoredNotes[0].pinned).toBe(true);
+    expect(restoredNotes[0].deletedAt).toBeNull();
   });
 
   it('Roundtrip: Projekt-Ziel und Deadline bleiben erhalten', async () => {

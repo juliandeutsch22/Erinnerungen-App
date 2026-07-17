@@ -60,7 +60,7 @@ export default function SucheScreen() {
 
   const noteHits = useMemo(() => {
     if (!q) return [];
-    return (notes ?? []).filter((n) => n.body.toLowerCase().includes(q)).slice(0, 30);
+    return (notes ?? []).filter((n) => n.deletedAt === null && n.body.toLowerCase().includes(q)).slice(0, 30);
   }, [notes, q]);
 
   const toggle = (task: Task) => (next: boolean) => {
@@ -76,7 +76,10 @@ export default function SucheScreen() {
           <Type variant="title">Suche</Type>
           {/* Ruhige Zähl-Zeile — dieselbe Stimme wie die Tages-Bilanz auf Heute. */}
           <Type variant="caption" tone="text3" tabular>
-            {`${(tasks ?? []).length} ${(tasks ?? []).length === 1 ? 'Aufgabe' : 'Aufgaben'} · ${(lists ?? []).length} ${(lists ?? []).length === 1 ? 'Liste' : 'Listen'} · ${(notes ?? []).length} ${(notes ?? []).length === 1 ? 'Notiz' : 'Notizen'} durchsuchbar`}
+            {(() => {
+              const noteCount = (notes ?? []).filter((n) => n.deletedAt === null).length;
+              return `${(tasks ?? []).length} ${(tasks ?? []).length === 1 ? 'Aufgabe' : 'Aufgaben'} · ${(lists ?? []).length} ${(lists ?? []).length === 1 ? 'Liste' : 'Listen'} · ${noteCount} ${noteCount === 1 ? 'Notiz' : 'Notizen'} durchsuchbar`;
+            })()}
           </Type>
         </View>
       </Reveal>

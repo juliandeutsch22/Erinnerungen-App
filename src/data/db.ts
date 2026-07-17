@@ -45,6 +45,8 @@ export function getDb(): Promise<SQLiteDatabase> {
           body TEXT NOT NULL,
           task_id TEXT,
           event_id TEXT,
+          pinned INTEGER NOT NULL DEFAULT 0,
+          deleted_at TEXT,
           created_at TEXT NOT NULL,
           updated_at TEXT NOT NULL
         );
@@ -70,6 +72,13 @@ export function getDb(): Promise<SQLiteDatabase> {
       for (const col of ['goal TEXT', 'deadline TEXT']) {
         try {
           await db.execAsync(`ALTER TABLE lists ADD COLUMN ${col};`);
+        } catch {
+          /* Spalte existiert bereits */
+        }
+      }
+      for (const col of ['pinned INTEGER NOT NULL DEFAULT 0', 'deleted_at TEXT']) {
+        try {
+          await db.execAsync(`ALTER TABLE notes ADD COLUMN ${col};`);
         } catch {
           /* Spalte existiert bereits */
         }

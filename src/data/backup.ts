@@ -208,6 +208,9 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
       body: n.body,
       taskId: str(n.taskId) && taskIds.has(n.taskId) ? n.taskId : null,
       eventId: str(n.eventId) ? n.eventId : null,
+      // Ältere Backups (ohne Anheften/Papierkorb) → Standardwerte.
+      pinned: n.pinned === true,
+      deletedAt: str(n.deletedAt) ? n.deletedAt : null,
       createdAt: str(n.createdAt) ? n.createdAt : new Date().toISOString(),
       updatedAt: str(n.updatedAt) ? n.updatedAt : new Date().toISOString(),
     });

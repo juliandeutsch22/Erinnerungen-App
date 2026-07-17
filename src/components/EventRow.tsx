@@ -39,7 +39,7 @@ export function EventRow({
   const addPhotos = useAddPhotos();
   // Verknüpfte Notizen? Kleiner Indikator neben dem Foto-Zähler.
   const { data: notes } = useNotes();
-  const noteCount = useMemo(() => (notes ?? []).filter((n) => n.eventId === event.id).length, [notes, event.id]);
+  const noteCount = useMemo(() => (notes ?? []).filter((n) => n.eventId === event.id && n.deletedAt === null).length, [notes, event.id]);
   const swipeRef = useRef<SwipeableMethods>(null);
 
   const onPhotos = async () => {

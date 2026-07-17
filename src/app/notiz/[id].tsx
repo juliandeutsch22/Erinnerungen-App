@@ -1,9 +1,11 @@
 // notiz/[id].tsx — Vollbild-Notiz-Editor nach iOS-Notizen-Muster:
 // KEIN Speichern-Button — Autosave beim Tippen (debounced) und beim Verlassen.
-// Erste Zeile = Titel (erscheint in der Liste), „Zuletzt bearbeitet" oben.
-// Schreiben braucht Platz: eigene Route statt Sheet.
+// Die erste Zeile ist der Titel und wird wie in iOS Notes groß gesetzt
+// (eigenes Eingabefeld in der Antiqua der Überschriften; gespeichert wird
+// weiterhin EIN body-String: Titel + '\n' + Rest). „Zuletzt bearbeitet" oben,
+// Anheften im Kopf, Löschen legt die Notiz in den Papierkorb (30 Tage).
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { CalendarDays, ChevronLeft, Link2, ListTodo, Trash2, X } from 'lucide-react-native';
+import { CalendarDays, ChevronLeft, Link2, ListTodo, Pin, Trash2, X } from 'lucide-react-native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,6 +25,12 @@ import { useColors } from '@/theme/ThemeProvider';
 import { R, Spacing, T } from '@/theme/theme.tokens';
 
 const AUTOSAVE_MS = 600;
+const TITLE_FONT = 'CormorantGaramond_700Bold';
+
+/** Titel + Rest wieder zu EINEM body-String zusammensetzen. */
+function compose(title: string, rest: string): string {
+  return rest.length > 0 ? `${title}\n${rest}` : title;
+}
 
 export default function NotizScreen() {
   const colors = useColors();
@@ -36,10 +44,16 @@ export default function NotizScreen() {
   const note = (notes ?? []).find((n) => n.id === id);
 
   // Lokaler Text — einmal aus der Notiz geladen, danach führt der Editor.
-  const [body, setBody] = useState<string | null>(null);
-  const loaded = body !== null;
+  // Erste Zeile (Titel) und Rest sind getrennte Felder, body bleibt die Quelle.
+  const [title, setTitle] = useState<string | null>(null);
+  const [rest, setRest] = useState<string>('');
+  const loaded = title !== null;
   useEffect(() => {
-    if (!loaded && note) setBody(note.body);
+    if (!loaded && note) {
+      const idx = note.body.indexOf('\n');
+      setTitle(idx === -1 ? note.body : note.body.slice(0, idx));
+      setRest(idx === -1 ? '' : note.body.slice(idx + 1));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [note?.id, loaded]);
 
@@ -55,11 +69,30 @@ export default function NotizScreen() {
       updateNote.mutate({ id, patch: { body: latest.current } });
     }
   };
-  const onChange = (text: string) => {
-    setBody(text);
-    latest.current = text;
+  const schedule = (nextTitle: string, nextRest: string) => {
+    latest.current = compose(nextTitle, nextRest);
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(flush, AUTOSAVE_MS);
+  };
+  const onChangeTitle = (text: string) => {
+    // Zeilenumbrüche (Einfügen mehrzeiligen Texts) wandern in den Rest.
+    if (text.includes('\n')) {
+      const idx = text.indexOf('\n');
+      const head = text.slice(0, idx);
+      const tail = text.slice(idx + 1);
+      const nextRest = tail.length > 0 ? (rest.length > 0 ? `${tail}\n${rest}` : tail) : rest;
+      setTitle(head);
+      setRest(nextRest);
+      schedule(head, nextRest);
+      bodyRef.current?.focus();
+      return;
+    }
+    setTitle(text);
+    schedule(text, rest);
+  };
+  const onChangeRest = (text: string) => {
+    setRest(text);
+    schedule(title ?? '', text);
   };
   useEffect(() => {
     if (note && saved.current === null) saved.current = note.body;
@@ -67,6 +100,8 @@ export default function NotizScreen() {
   }, [note?.id]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => () => flush(), []);
+
+  const bodyRef = useRef<TextInput>(null);
 
   // Zuweisung: Chips zeigen die verknüpfte Erinnerung / den Termin.
   const [linkSheet, setLinkSheet] = useState(false);
@@ -86,16 +121,18 @@ export default function NotizScreen() {
     return (events ?? []).find((e) => e.id === note.eventId)?.title ?? 'Termin';
   }, [events, note?.eventId]);
 
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  // Löschen = Papierkorb (30 Tage, im Tab wiederherstellbar) — kein Bestätigen nötig.
   const remove = () => {
-    if (!confirmDelete) {
-      hapticSelect();
-      setConfirmDelete(true);
-      return;
-    }
+    hapticSelect();
     latest.current = null; // nichts mehr speichern
-    if (id) deleteNote.mutate(id);
+    if (id) updateNote.mutate({ id, patch: { deletedAt: new Date().toISOString() } });
     router.back();
+  };
+
+  const togglePin = () => {
+    if (!note) return;
+    hapticSelect();
+    updateNote.mutate({ id: note.id, patch: { pinned: !note.pinned } });
   };
 
   const updatedLabel = note
@@ -106,7 +143,7 @@ export default function NotizScreen() {
     <View style={{ flex: 1 }}>
       <Backdrop />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        {/* Kopf: zurück · Zuletzt bearbeitet · löschen */}
+        {/* Kopf: zurück · Zuletzt bearbeitet · anheften · löschen */}
         <View
           style={{
             paddingTop: insets.top + Spacing.sm,
@@ -129,13 +166,23 @@ export default function NotizScreen() {
           <Type variant="caption" tone="text3" tabular>
             {updatedLabel}
           </Type>
-          <PressableScale
-            accessibilityLabel={confirmDelete ? 'Endgültig löschen' : 'Notiz löschen'}
-            onPress={remove}
-            style={{ padding: Spacing.sm }}
-          >
-            <Trash2 size={20} color={confirmDelete ? colors.indigo : colors.text3} strokeWidth={2} />
-          </PressableScale>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <PressableScale
+              accessibilityLabel={note?.pinned ? 'Notiz lösen' : 'Notiz anheften'}
+              onPress={togglePin}
+              style={{ padding: Spacing.sm }}
+            >
+              <Pin
+                size={20}
+                color={note?.pinned ? colors.teal : colors.text3}
+                fill={note?.pinned ? colors.teal : 'none'}
+                strokeWidth={2}
+              />
+            </PressableScale>
+            <PressableScale accessibilityLabel="Notiz löschen" onPress={remove} style={{ padding: Spacing.sm }}>
+              <Trash2 size={20} color={colors.text3} strokeWidth={2} />
+            </PressableScale>
+          </View>
         </View>
 
         {/* Zuweisen: Notiz an Erinnerung/Termin hängen — Chips zeigen den Stand. */}
@@ -182,12 +229,39 @@ export default function NotizScreen() {
           )}
         </View>
 
-        {/* Der Text — ein großes Feld, die erste Zeile wird zum Titel. */}
+        {/* Titel — erste Zeile des body, groß in der Antiqua (iOS-Notizen-Look).
+            Enter springt in den Text. */}
         <TextInput
-          value={body ?? ''}
-          onChangeText={onChange}
+          value={title ?? ''}
+          onChangeText={onChangeTitle}
+          autoFocus={loaded && (title ?? '').length === 0 && rest.length === 0}
+          placeholder="Titel"
+          placeholderTextColor={colors.text3}
+          returnKeyType="next"
+          submitBehavior="submit"
+          onSubmitEditing={() => bodyRef.current?.focus()}
+          accessibilityLabel="Titel der Notiz"
+          style={[
+            {
+              fontFamily: TITLE_FONT,
+              fontSize: T.xl + 5,
+              lineHeight: (T.xl + 5) * 1.25,
+              letterSpacing: 0.3,
+              color: colors.text,
+              paddingHorizontal: Spacing.lg,
+              paddingTop: Spacing.md,
+              paddingBottom: 0,
+            },
+            webNoOutline,
+          ]}
+        />
+
+        {/* Der Text — alles nach der Titelzeile. */}
+        <TextInput
+          ref={bodyRef}
+          value={rest}
+          onChangeText={onChangeRest}
           multiline
-          autoFocus={loaded && (body ?? '').length === 0}
           placeholder="Notiz…"
           placeholderTextColor={colors.text3}
           textAlignVertical="top"
@@ -200,7 +274,7 @@ export default function NotizScreen() {
               lineHeight: (T.md + 1) * 1.5,
               color: colors.text,
               paddingHorizontal: Spacing.lg,
-              paddingTop: Spacing.md,
+              paddingTop: Spacing.xs,
               paddingBottom: insets.bottom + Spacing.lg,
             },
             webNoOutline,

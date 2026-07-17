@@ -55,7 +55,7 @@ export function TaskRow({
   const done = task.completedAt !== null;
   // Verknüpfte Notiz? Kleiner Glyph in der Titelzeile (analog zum Termin-Link).
   const { data: notes } = useNotes();
-  const hasNote = useMemo(() => (notes ?? []).some((n) => n.taskId === task.id), [notes, task.id]);
+  const hasNote = useMemo(() => (notes ?? []).some((n) => n.taskId === task.id && n.deletedAt === null), [notes, task.id]);
   const overdue = isOverdue(task, today);
   const progress = subtaskProgress(task.subtasks);
   const swipeRef = useRef<SwipeableMethods>(null);

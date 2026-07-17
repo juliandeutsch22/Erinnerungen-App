@@ -31,7 +31,9 @@ export function LinkedNotes({
 
   const linked = useMemo(
     () =>
-      (notes ?? []).filter((n) => (taskId ? n.taskId === taskId : false) || (eventId ? n.eventId === eventId : false)),
+      (notes ?? []).filter(
+        (n) => n.deletedAt === null && ((taskId ? n.taskId === taskId : false) || (eventId ? n.eventId === eventId : false)),
+      ),
     [notes, taskId, eventId],
   );
 

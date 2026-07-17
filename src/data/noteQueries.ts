@@ -29,6 +29,8 @@ export function useCreateNote() {
         body: input.body ?? '',
         taskId: input.taskId ?? null,
         eventId: input.eventId ?? null,
+        pinned: false,
+        deletedAt: null,
         createdAt: now,
         updatedAt: now,
       };

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Erinnerungen",
     "slug": "stille",
-    "version": "1.4.0",
+    "version": "1.5.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "stille",
@@ -10,7 +10,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "app.julian.stille",
-      "buildNumber": "5"
+      "buildNumber": "6"
     },
     "android": {
       "package": "app.julian.stille",

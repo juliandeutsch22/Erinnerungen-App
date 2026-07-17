@@ -89,6 +89,10 @@ export type Note = {
   taskId: string | null;
   /** EventKit-Event-ID (wie bei Fotos). */
   eventId: string | null;
+  /** Angeheftet — steht in der Liste oben vor den Datumsgruppen. */
+  pinned: boolean;
+  /** Papierkorb: gesetzt = „Zuletzt gelöscht" (30 Tage), null = aktiv. */
+  deletedAt: string | null; // ISO
   createdAt: string; // ISO
   updatedAt: string; // ISO
 };
