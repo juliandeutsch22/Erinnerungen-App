@@ -345,7 +345,10 @@ export default function NotizScreen() {
         >
           <ScrollView
             keyboardShouldPersistTaps="handled"
-            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+            // 'on-drag' statt 'interactive': das halb-offene Ziehen ließ das
+            // Feld fokussiert → iOS holte die Tastatur zurück und sprang zum
+            // Cursor ans Notiz-Ende (Refokus-Schleife bei langen Notizen).
+            keyboardDismissMode="on-drag"
             // Immer scroll-/bouncefähig — sonst greift der Wisch-Dismiss
             // bei kurzen Notizen nie (nichts zu scrollen = keine Geste).
             alwaysBounceVertical
@@ -388,6 +391,9 @@ export default function NotizScreen() {
             textAlignVertical="top"
             accessibilityLabel="Notiztext"
             scrollEnabled={false}
+            // Scroll-Berührungen auf dem Text gehen an die Scroll-Fläche —
+            // sonst fokussiert ein Wisch das Feld und öffnet die Tastatur.
+            rejectResponderTermination={false}
             {...keyboardDoneProps}
             style={[
               {
