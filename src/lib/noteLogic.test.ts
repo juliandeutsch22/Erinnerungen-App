@@ -2,7 +2,19 @@
 // Datumsgruppen und Papierkorb-Fenster.
 import type { Note } from '@/data/types';
 
-import { expiredTrash, groupNotes, notePreview, notesForEvent, notesForTask, noteTitle, trashedNotes } from './noteLogic';
+import {
+  checklistItems,
+  checklistProgress,
+  continueChecklist,
+  expiredTrash,
+  groupNotes,
+  notePreview,
+  notesForEvent,
+  notesForTask,
+  noteTitle,
+  toggleChecklistItem,
+  trashedNotes,
+} from './noteLogic';
 
 const note = (body: string, taskId: string | null = null, eventId: string | null = null, extra: Partial<Note> = {}): Note => ({
   id: 'n1',
@@ -68,6 +80,35 @@ describe('groupNotes', () => {
     const groups = groupNotes([at('2026-07-17T08:00:00.000Z', { pinned: true })], today);
     expect(groups).toHaveLength(1);
     expect(groups[0].key).toBe('pinned');
+  });
+});
+
+describe('Checklisten', () => {
+  const body = 'Einkauf\n- [ ] Milch\n- [x] Brot\n- Oliven\nNotiztext';
+
+  it('erkennt Zeilen inkl. nacktem „- Text" als offen', () => {
+    expect(checklistItems(body)).toEqual([
+      { lineIndex: 1, text: 'Milch', done: false },
+      { lineIndex: 2, text: 'Brot', done: true },
+      { lineIndex: 3, text: 'Oliven', done: false },
+    ]);
+    expect(checklistProgress(body)).toEqual({ done: 1, total: 3 });
+  });
+
+  it('Toggle schaltet um und normalisiert', () => {
+    expect(toggleChecklistItem(body, 1)).toContain('- [x] Milch');
+    expect(toggleChecklistItem(body, 2)).toContain('- [ ] Brot');
+    expect(toggleChecklistItem(body, 3)).toContain('- [x] Oliven');
+    expect(toggleChecklistItem(body, 0)).toBe(body); // keine Checklisten-Zeile
+  });
+
+  it('Enter setzt die Liste fort, Enter auf leerer Zeile beendet sie', () => {
+    const prev = 'A\n- [ ] Milch';
+    expect(continueChecklist(prev, `${prev}\n`)).toBe(`${prev}\n- [ ] `);
+    const empty = 'A\n- [ ] ';
+    expect(continueChecklist(empty, `${empty}\n`)).toBe('A\n');
+    // Enter mitten im Fließtext bleibt unangetastet.
+    expect(continueChecklist('Hallo', 'Hallo\n')).toBe('Hallo\n');
   });
 });
 

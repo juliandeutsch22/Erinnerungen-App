@@ -6,7 +6,7 @@
 // „Zuletzt gelöscht" (30 Tage) unten: Tippen stellt wieder her,
 // Swipe links löscht endgültig; Abgelaufenes wird beim Öffnen entfernt.
 import { useRouter } from 'expo-router';
-import { NotebookPen, Pin, Plus } from 'lucide-react-native';
+import { ListChecks, NotebookPen, Pin, Plus } from 'lucide-react-native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import ReanimatedSwipeable, { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
@@ -23,7 +23,7 @@ import { useCreateNote, useDeleteNote, useNotes, useUpdateNote } from '@/data/no
 import type { Note } from '@/data/types';
 import { formatDueDate, toDateStr, todayStr } from '@/lib/dates';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
-import { activeNotes, expiredTrash, groupNotes, notePreview, noteTitle, trashedNotes } from '@/lib/noteLogic';
+import { activeNotes, checklistProgress, expiredTrash, groupNotes, notePreview, noteTitle, trashedNotes } from '@/lib/noteLogic';
 import { TAB_BAR_SAFE_BOTTOM } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
 import { Spacing, T } from '@/theme/theme.tokens';
@@ -164,11 +164,21 @@ function NoteRow({ note, today, onPress }: { note: Note; today: string; onPress:
       <Type variant="heading" numberOfLines={1} style={{ fontSize: T.lg, lineHeight: T.lg * 1.3 }}>
         {noteTitle(note.body)}
       </Type>
-      {/* Vorschau links in voller Breite, Datum ruhig rechts außen. */}
+      {/* Vorschau links in voller Breite, Checklisten-Stand + Datum rechts. */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md }}>
         <Type variant="caption" tone="text2" numberOfLines={1} style={{ flex: 1 }}>
           {preview || ' '}
         </Type>
+        {(() => {
+          const p = checklistProgress(note.body);
+          if (p.total === 0) return null;
+          return (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+              <ListChecks size={11} color={p.done === p.total ? colors.teal : colors.text3} strokeWidth={2} />
+              <Type variant="caption" tone={p.done === p.total ? 'teal' : 'text3'} tabular>{p.done}/{p.total}</Type>
+            </View>
+          );
+        })()}
         <Type variant="caption" tone="text3" tabular>{dateLabel}</Type>
       </View>
     </PressableScale>

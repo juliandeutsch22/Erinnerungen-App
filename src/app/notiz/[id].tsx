@@ -5,7 +5,7 @@
 // weiterhin EIN body-String: Titel + '\n' + Rest). „Zuletzt bearbeitet" oben,
 // Anheften im Kopf, Löschen legt die Notiz in den Papierkorb (30 Tage).
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { CalendarDays, ChevronLeft, Link2, ListTodo, Pin, Trash2, X } from 'lucide-react-native';
+import { CalendarDays, ChevronLeft, Link2, ListChecks, ListTodo, Pin, Trash2, X } from 'lucide-react-native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,7 +20,8 @@ import { useDeleteNote, useNotes, useUpdateNote } from '@/data/noteQueries';
 import { useTasks } from '@/data/queries';
 import { addDays, todayStr } from '@/lib/dates';
 import { hasCalendarPermission } from '@/lib/deviceCalendar';
-import { hapticSelect } from '@/lib/haptics';
+import { hapticSelect, hapticSuccess } from '@/lib/haptics';
+import { checklistItems, continueChecklist, toggleChecklistItem } from '@/lib/noteLogic';
 import { webNoOutline } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
 import { R, Spacing, T } from '@/theme/theme.tokens';
@@ -92,8 +93,44 @@ export default function NotizScreen() {
     schedule(text, rest);
   };
   const onChangeRest = (text: string) => {
-    setRest(text);
-    schedule(title ?? '', text);
+    // Enter in einer „- [ ]"-Zeile setzt die Checkliste fort (iOS-Notes-Gefühl).
+    const withChecklist = continueChecklist(rest, text);
+    setRest(withChecklist);
+    schedule(title ?? '', withChecklist);
+  };
+
+  // Checkliste: Cursorzeile merken (für den Kopf-Knopf) + Items der Notiz.
+  const selRef = useRef({ start: 0, end: 0 });
+  const composed = compose(title ?? '', rest);
+  const checkItems = useMemo(() => checklistItems(composed), [composed]);
+
+  const applyComposed = (nextComposed: string) => {
+    const idx = nextComposed.indexOf('\n');
+    const nextTitle = idx === -1 ? nextComposed : nextComposed.slice(0, idx);
+    const nextRest = idx === -1 ? '' : nextComposed.slice(idx + 1);
+    setTitle(nextTitle);
+    setRest(nextRest);
+    latest.current = nextComposed;
+    flush();
+  };
+
+  const toggleItem = (lineIndex: number) => {
+    hapticSuccess();
+    applyComposed(toggleChecklistItem(composed, lineIndex));
+  };
+
+  /** Kopf-Knopf: macht die Cursorzeile zur Checklisten-Zeile (oder startet eine). */
+  const insertChecklist = () => {
+    hapticSelect();
+    const pos = Math.min(selRef.current.start, rest.length);
+    const lineStart = rest.lastIndexOf('\n', Math.max(0, pos - 1)) + 1;
+    const lineEnd = rest.indexOf('\n', lineStart);
+    const line = rest.slice(lineStart, lineEnd === -1 ? undefined : lineEnd);
+    if (/^\s*- /.test(line)) return; // schon Checkliste
+    const next = `${rest.slice(0, lineStart)}- [ ] ${rest.slice(lineStart)}`;
+    setRest(next);
+    schedule(title ?? '', next);
+    bodyRef.current?.focus();
   };
   useEffect(() => {
     if (note && saved.current === null) saved.current = note.body;
@@ -168,6 +205,9 @@ export default function NotizScreen() {
             {updatedLabel}
           </Type>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <PressableScale accessibilityLabel="Checkliste einfügen" onPress={insertChecklist} style={{ padding: Spacing.sm }}>
+              <ListChecks size={20} color={colors.text3} strokeWidth={2} />
+            </PressableScale>
             {/* Zuweisen wandert als Icon in den Kopf — die Schreibfläche bleibt leer. */}
             <PressableScale
               accessibilityLabel="Notiz zuweisen"
@@ -286,6 +326,9 @@ export default function NotizScreen() {
             textAlignVertical="top"
             accessibilityLabel="Notiztext"
             scrollEnabled
+            onSelectionChange={(e) => {
+              selRef.current = e.nativeEvent.selection;
+            }}
             {...keyboardDoneProps}
             style={[
               {
@@ -300,6 +343,45 @@ export default function NotizScreen() {
               webNoOutline,
             ]}
           />
+
+          {/* Abhak-Karte: alle „- [ ]"-Zeilen der Notiz, Tippen hakt ab und
+              schreibt direkt in den Text zurück. */}
+          {checkItems.length > 0 && (
+            <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm }}>
+              <Type variant="eyebrow" tone="text3">Checkliste · {checkItems.filter((i) => i.done).length}/{checkItems.length}</Type>
+              {checkItems.map((item) => (
+                <PressableScale
+                  key={item.lineIndex}
+                  accessibilityLabel={`${item.text} ${item.done ? 'wieder öffnen' : 'abhaken'}`}
+                  onPress={() => toggleItem(item.lineIndex)}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.xs + 2 }}
+                >
+                  <View
+                    style={{
+                      width: 18,
+                      height: 18,
+                      borderRadius: 9,
+                      borderWidth: 1.5,
+                      borderColor: item.done ? colors.teal : colors.border3,
+                      backgroundColor: item.done ? colors.teal : 'transparent',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {item.done && <Type variant="caption" style={{ color: '#FFFFFF', fontSize: 11, lineHeight: 13 }}>✓</Type>}
+                  </View>
+                  <Type
+                    variant="body"
+                    tone={item.done ? 'text3' : 'text'}
+                    numberOfLines={1}
+                    style={{ flex: 1, textDecorationLine: item.done ? 'line-through' : 'none' }}
+                  >
+                    {item.text}
+                  </Type>
+                </PressableScale>
+              ))}
+            </View>
+          )}
         </View>
       </KeyboardAvoidingView>
       <KeyboardDoneBar />
