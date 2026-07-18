@@ -180,7 +180,7 @@ export default function KalenderScreen() {
           {permission === 'denied' && deviceCalendarAvailable && (
             <EmptyState
               title="Kein Kalenderzugriff"
-              body="Erlaube den Zugriff unter iOS-Einstellungen → Erinnerungen → Kalender, dann erscheinen deine Termine hier."
+              body="Erlaube den Zugriff unter iOS-Einstellungen → Stoa → Kalender, dann erscheinen deine Termine hier."
             />
           )}
           {!deviceCalendarAvailable && (

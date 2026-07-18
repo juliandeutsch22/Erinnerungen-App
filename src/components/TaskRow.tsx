@@ -82,8 +82,9 @@ export function TaskRow({
         alignItems: 'center',
         gap: Spacing.md,
         paddingVertical: Spacing.sm + 2,
-        // Deckende Fläche, damit beim Swipen die Aktion dahinter nicht durchscheint.
-        backgroundColor: 'transparent',
+        // Deckende Fläche in Tafel-Farbe: beim Swipen scheint die Aktion
+        // dahinter sonst durch den Zeileninhalt (Text-Überlagerung).
+        backgroundColor: colors.bg2,
       }}
     >
       <TaskCheck

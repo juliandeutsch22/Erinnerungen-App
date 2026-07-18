@@ -52,7 +52,7 @@ export function EventRow({
       accessibilityLabel={`Termin ${event.title} bearbeiten`}
       onPress={onPress}
       pressedScale={0.99}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.sm + 2, backgroundColor: 'transparent' }}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.sm + 2, backgroundColor: colors.bg2 }}
     >
       <View style={{ width: 4, alignSelf: 'stretch', borderRadius: R.pill, backgroundColor: calendar?.color ?? colors.indigo }} />
       <View style={{ flex: 1, gap: 1 }}>

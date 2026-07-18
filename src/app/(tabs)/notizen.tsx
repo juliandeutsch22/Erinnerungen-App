@@ -157,7 +157,7 @@ function NoteRow({ note, today, onPress }: { note: Note; today: string; onPress:
       accessibilityLabel={`Notiz „${noteTitle(note.body)}" öffnen`}
       onPress={onPress}
       pressedScale={0.99}
-      style={{ paddingVertical: Spacing.sm, gap: 2, backgroundColor: 'transparent' }}
+      style={{ paddingVertical: Spacing.sm, gap: 2, backgroundColor: colors.bg2 }}
     >
       <Type variant="heading" numberOfLines={1} style={{ fontSize: T.lg, lineHeight: T.lg * 1.3 }}>
         {noteTitle(note.body)}
@@ -227,7 +227,7 @@ function TrashRow({ note, today }: { note: Note; today: string }) {
         updateNote.mutate({ id: note.id, patch: { deletedAt: null } });
       }}
       pressedScale={0.99}
-      style={{ paddingVertical: Spacing.sm, gap: 2, backgroundColor: 'transparent' }}
+      style={{ paddingVertical: Spacing.sm, gap: 2, backgroundColor: colors.bg2 }}
     >
       <Type variant="body" tone="text2" numberOfLines={1}>{noteTitle(note.body)}</Type>
       <Type variant="caption" tone="text3" tabular>Gelöscht: {deletedLabel}</Type>

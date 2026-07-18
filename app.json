@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Erinnerungen",
+    "name": "Stoa",
     "slug": "stille",
-    "version": "1.5.3",
+    "version": "1.6.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "stille",
@@ -10,7 +10,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "app.julian.stille",
-      "buildNumber": "9"
+      "buildNumber": "10"
     },
     "android": {
       "package": "app.julian.stille",
