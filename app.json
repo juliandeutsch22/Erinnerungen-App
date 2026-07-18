@@ -2,7 +2,7 @@
   "expo": {
     "name": "Stoa",
     "slug": "stille",
-    "version": "1.8.1",
+    "version": "1.8.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "stille",
@@ -10,7 +10,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "app.julian.stille",
-      "buildNumber": "13"
+      "buildNumber": "14"
     },
     "android": {
       "package": "app.julian.stille",

@@ -2,7 +2,7 @@
 // Swipe rechts = erledigt, Swipe links = „Neu planen" (Fahrplan §3.6).
 // Überfällig trägt Indigo (ruhig), nie Alarm-Rot.
 import { Check, Flag, Link2, ListChecks, NotebookPen, Repeat } from 'lucide-react-native';
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import ReanimatedSwipeable, { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 
@@ -63,6 +63,7 @@ export function TaskRow({
   const overdue = isOverdue(task, today);
   const progress = subtaskProgress(task.subtasks);
   const swipeRef = useRef<SwipeableMethods>(null);
+  const [swiping, setSwiping] = useState(false);
 
   const metaParts: { text: string; tone: 'indigo' | 'teal' | 'text3' }[] = [];
   if (showDue === 'time-only') {
@@ -82,9 +83,9 @@ export function TaskRow({
         alignItems: 'center',
         gap: Spacing.md,
         paddingVertical: Spacing.sm + 2,
-        // Deckende Fläche in Tafel-Farbe: beim Swipen scheint die Aktion
-        // dahinter sonst durch den Zeileninhalt (Text-Überlagerung).
-        backgroundColor: colors.bg2,
+        // Deckend NUR während der Geste (sonst weiße Box auf der Marmor-Textur);
+        // beim Wischen scheint die Aktion sonst durch den Zeileninhalt.
+        backgroundColor: swiping ? colors.bg2 : 'transparent',
       }}
     >
       <TaskCheck
@@ -197,6 +198,8 @@ export function TaskRow({
             )
           : undefined
       }
+      onSwipeableOpenStartDrag={() => setSwiping(true)}
+      onSwipeableClose={() => setSwiping(false)}
       onSwipeableWillOpen={(direction) => {
         swipeRef.current?.close();
         // direction = Bewegungsrichtung der Zeile (ReanimatedSwipeable):

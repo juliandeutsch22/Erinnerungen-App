@@ -3,7 +3,7 @@
 // Gesten wie die Aufgaben-Zeile (gleiche Sprache): Tap = bearbeiten,
 // Swipe rechts = Fotos anhängen (Rückblick), Swipe links = bearbeiten.
 import { ImageIcon, NotebookPen, Pencil } from 'lucide-react-native';
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import ReanimatedSwipeable, { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 
@@ -41,6 +41,7 @@ export function EventRow({
   const { data: notes } = useNotes();
   const noteCount = useMemo(() => (notes ?? []).filter((n) => n.eventId === event.id && n.deletedAt === null).length, [notes, event.id]);
   const swipeRef = useRef<SwipeableMethods>(null);
+  const [swiping, setSwiping] = useState(false);
 
   const onPhotos = async () => {
     const uris = await pickAndStorePhotos();
@@ -52,7 +53,7 @@ export function EventRow({
       accessibilityLabel={`Termin ${event.title} bearbeiten`}
       onPress={onPress}
       pressedScale={0.99}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.sm + 2, backgroundColor: colors.bg2 }}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.sm + 2, backgroundColor: swiping ? colors.bg2 : 'transparent' }}
     >
       <View style={{ width: 4, alignSelf: 'stretch', borderRadius: R.pill, backgroundColor: calendar?.color ?? colors.indigo }} />
       <View style={{ flex: 1, gap: 1 }}>
@@ -104,6 +105,8 @@ export function EventRow({
           </View>
         </View>
       )}
+      onSwipeableOpenStartDrag={() => setSwiping(true)}
+      onSwipeableClose={() => setSwiping(false)}
       onSwipeableWillOpen={(direction) => {
         swipeRef.current?.close();
         hapticSelect();

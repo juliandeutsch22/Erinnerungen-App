@@ -148,6 +148,7 @@ function NoteRow({ note, today, onPress }: { note: Note; today: string; onPress:
   const colors = useColors();
   const updateNote = useUpdateNote();
   const swipeRef = useRef<SwipeableMethods>(null);
+  const [swiping, setSwiping] = useState(false);
 
   const dateLabel = formatDueDate(toDateStr(new Date(note.updatedAt)), today);
   const preview = notePreview(note.body);
@@ -157,7 +158,8 @@ function NoteRow({ note, today, onPress }: { note: Note; today: string; onPress:
       accessibilityLabel={`Notiz „${noteTitle(note.body)}" öffnen`}
       onPress={onPress}
       pressedScale={0.99}
-      style={{ paddingVertical: Spacing.sm, gap: 2, backgroundColor: colors.bg2 }}
+      // Deckend NUR während der Geste — sonst weiße Box auf der Marmor-Textur.
+      style={{ paddingVertical: Spacing.sm, gap: 2, backgroundColor: swiping ? colors.bg2 : 'transparent' }}
     >
       <Type variant="heading" numberOfLines={1} style={{ fontSize: T.lg, lineHeight: T.lg * 1.3 }}>
         {noteTitle(note.body)}
@@ -193,6 +195,8 @@ function NoteRow({ note, today, onPress }: { note: Note; today: string; onPress:
           <Type variant="label" tone="indigo">Löschen</Type>
         </View>
       )}
+      onSwipeableOpenStartDrag={() => setSwiping(true)}
+      onSwipeableClose={() => setSwiping(false)}
       onSwipeableWillOpen={(direction) => {
         swipeRef.current?.close();
         hapticSelect();
@@ -216,6 +220,7 @@ function TrashRow({ note, today }: { note: Note; today: string }) {
   const updateNote = useUpdateNote();
   const deleteNote = useDeleteNote();
   const swipeRef = useRef<SwipeableMethods>(null);
+  const [swiping, setSwiping] = useState(false);
 
   const deletedLabel = note.deletedAt ? formatDueDate(toDateStr(new Date(note.deletedAt)), today) : '';
 
@@ -227,7 +232,7 @@ function TrashRow({ note, today }: { note: Note; today: string }) {
         updateNote.mutate({ id: note.id, patch: { deletedAt: null } });
       }}
       pressedScale={0.99}
-      style={{ paddingVertical: Spacing.sm, gap: 2, backgroundColor: colors.bg2 }}
+      style={{ paddingVertical: Spacing.sm, gap: 2, backgroundColor: swiping ? colors.bg2 : 'transparent' }}
     >
       <Type variant="body" tone="text2" numberOfLines={1}>{noteTitle(note.body)}</Type>
       <Type variant="caption" tone="text3" tabular>Gelöscht: {deletedLabel}</Type>
@@ -245,6 +250,8 @@ function TrashRow({ note, today }: { note: Note; today: string }) {
           <Type variant="label" tone="indigo">Endgültig löschen</Type>
         </View>
       )}
+      onSwipeableOpenStartDrag={() => setSwiping(true)}
+      onSwipeableClose={() => setSwiping(false)}
       onSwipeableWillOpen={() => {
         // Nur eine Aktionsseite — jede Öffnung IST das endgültige Löschen.
         swipeRef.current?.close();
