@@ -8,7 +8,10 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 
 import { CalendarMonth, type MonthAnchor, monthGridRange } from '@/components/CalendarMonth';
+import { Chip } from '@/components/Chip';
+import { DayTimeAxis } from '@/components/DayTimeAxis';
 import { EventEditorSheet } from '@/components/EventEditorSheet';
+import { WeekStrip } from '@/components/WeekStrip';
 import { EventRow } from '@/components/EventRow';
 import { GlassPanel } from '@/components/GlassPanel';
 import { PressableScale } from '@/components/PressableScale';
@@ -26,6 +29,7 @@ import { useDeviceCalendars, useDeviceEvents } from '@/data/calendarQueries';
 import { useCompleteTask, useLists, useReopenTask, useTasks } from '@/data/queries';
 import type { Task } from '@/data/types';
 import { bucketEventsByDay } from '@/lib/calendarLogic';
+import { buildDayTimeline } from '@/lib/dayTimeline';
 import { formatDayHeading, parseDateStr, todayStr } from '@/lib/dates';
 import { deviceCalendarAvailable, type DeviceEvent, ensureCalendarPermission } from '@/lib/deviceCalendar';
 import { hapticSelect } from '@/lib/haptics';
@@ -45,6 +49,15 @@ export default function KalenderScreen() {
   const [permission, setPermission] = useState<Permission>(deviceCalendarAvailable ? 'unknown' : 'denied');
   const [anchor, setAnchor] = useState<MonthAnchor>({ year: t.getFullYear(), month: t.getMonth() });
   const [selected, setSelected] = useState(today);
+  const [view, setView] = useState<'monat' | 'woche'>('monat');
+
+  // Wochenansicht: Tageswahl zieht den Anker mit, damit die Event-Range
+  // (Monatsgitter enthält volle Wochen) den Tag immer abdeckt.
+  const selectDay = (day: string) => {
+    setSelected(day);
+    const d = parseDateStr(day);
+    setAnchor({ year: d.getFullYear(), month: d.getMonth() });
+  };
   const [editorEvent, setEditorEvent] = useState<DeviceEvent | null | undefined>(undefined);
   const [editorTask, setEditorTask] = useState<Task | null>(null);
   const [rescheduleTask, setRescheduleTask] = useState<Task | null>(null);
@@ -104,6 +117,11 @@ export default function KalenderScreen() {
     [openTaskDays, selected],
   );
 
+  // Wochenansicht: Stundenachse (Einträge mit Zeit) + „Ohne Uhrzeit"-Rest.
+  const timeline = useMemo(() => buildDayTimeline(dayEvents, dayTasks, selected), [dayEvents, dayTasks, selected]);
+  const untimedEvents = useMemo(() => dayEvents.filter((e) => e.allDay), [dayEvents]);
+  const untimedTasks = useMemo(() => dayTasks.filter((t) => !t.dueTime), [dayTasks]);
+
   const toggle = (task: Task) => (next: boolean) => {
     if (next) complete.mutate(task);
     else reopen.mutate(task.id);
@@ -158,7 +176,16 @@ export default function KalenderScreen() {
 
       <Reveal delay={80}>
         <GlassPanel>
-          <CalendarMonth anchor={anchor} onAnchorChange={setAnchor} selected={selected} onSelect={setSelected} markers={markers} onDayLongPress={handleDayLongPress} />
+          {/* Monat ↔ Woche — die Woche zeigt unten die Stundenachse des Tags. */}
+          <View style={{ flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.sm }}>
+            <Chip label="Monat" active={view === 'monat'} accessibilityLabel="Monatsansicht" onPress={() => setView('monat')} />
+            <Chip label="Woche" active={view === 'woche'} accessibilityLabel="Wochenansicht" onPress={() => setView('woche')} />
+          </View>
+          {view === 'monat' ? (
+            <CalendarMonth anchor={anchor} onAnchorChange={setAnchor} selected={selected} onSelect={setSelected} markers={markers} onDayLongPress={handleDayLongPress} />
+          ) : (
+            <WeekStrip selected={selected} today={today} markers={markers} onSelect={selectDay} />
+          )}
         </GlassPanel>
       </Reveal>
 
@@ -192,6 +219,49 @@ export default function KalenderScreen() {
           {granted && !eventsLoading && dayEvents.length === 0 && dayTasks.length === 0 && (
             <EmptyState icon={<Sun size={20} color={colors.teal} strokeWidth={2} />} body="Nichts geplant an diesem Tag." />
           )}
+          {view === 'woche' && (dayEvents.length > 0 || dayTasks.length > 0) ? (
+            <>
+              {/* Stundenachse: Termine als Blöcke, Aufgaben mit Uhrzeit als Chips. */}
+              <DayTimeAxis
+                entries={timeline}
+                calendarById={calendarById}
+                onPressEvent={(e) => setEditorEvent(e.event)}
+                onPressTask={(e) => setEditorTask(e.task)}
+              />
+              {(untimedEvents.length > 0 || untimedTasks.length > 0) && (
+                <>
+                  <Seam marginVertical={Spacing.md} />
+                  <Type variant="eyebrow" tone="text3">Ohne Uhrzeit</Type>
+                  <View style={{ marginTop: Spacing.xs }}>
+                    {untimedEvents.map((ev) => (
+                      <EventRow
+                        key={ev.key}
+                        event={ev}
+                        calendar={calendarById.get(ev.calendarId)}
+                        day={selected}
+                        photoCount={photoCounts.get(ev.id) ?? 0}
+                        onPress={() => setEditorEvent(ev)}
+                      />
+                    ))}
+                    {untimedTasks.map((task) => (
+                      <TaskRow
+                        key={task.id}
+                        task={task}
+                        today={today}
+                        showDue="time-only"
+                        list={task.listId !== 'default' ? listById.get(task.listId) : undefined}
+                        onToggle={toggle(task)}
+                        onPress={() => setEditorTask(task)}
+                        onReschedule={() => setRescheduleTask(task)}
+                        onLongPress={() => setQuickTask(task)}
+                      />
+                    ))}
+                  </View>
+                </>
+              )}
+            </>
+          ) : (
+            <>
           {granted && dayEvents.length > 0 && (
             <View style={{ marginTop: Spacing.xs }}>
               {dayEvents.map((ev) => (
@@ -227,6 +297,8 @@ export default function KalenderScreen() {
                   />
                 ))}
               </View>
+            </>
+          )}
             </>
           )}
           </Reveal>
