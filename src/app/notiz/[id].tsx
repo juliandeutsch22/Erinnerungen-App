@@ -8,7 +8,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CalendarDays, ChevronLeft, Link2, ListChecks, ListTodo, Pin, Plus, Trash2, X } from 'lucide-react-native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Backdrop } from '@/components/Backdrop';
@@ -163,6 +163,19 @@ export default function NotizScreen() {
   const bodyRef = useRef<TextInput>(null);
   const draftRef = useRef<TextInput>(null);
 
+  // Tastatur offen? → prominenter „Fertig"-Knopf oben rechts (Apple-Muster).
+  const [kbVisible, setKbVisible] = useState(false);
+  useEffect(() => {
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const s = Keyboard.addListener(showEvt, () => setKbVisible(true));
+    const h = Keyboard.addListener(hideEvt, () => setKbVisible(false));
+    return () => {
+      s.remove();
+      h.remove();
+    };
+  }, []);
+
   // Zuweisung: Chips zeigen die verknüpfte Erinnerung / den Termin.
   const [linkSheet, setLinkSheet] = useState(false);
   const { data: tasks } = useTasks();
@@ -227,6 +240,18 @@ export default function NotizScreen() {
           <Type variant="caption" tone="text3" tabular>
             {updatedLabel}
           </Type>
+          {kbVisible ? (
+            <PressableScale
+              accessibilityLabel="Fertig — Tastatur schließen"
+              onPress={() => {
+                flush();
+                Keyboard.dismiss();
+              }}
+              style={{ paddingVertical: Spacing.sm, paddingHorizontal: Spacing.md }}
+            >
+              <Type variant="label" tone="teal">Fertig</Type>
+            </PressableScale>
+          ) : (
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <PressableScale
               accessibilityLabel="Checkliste öffnen"
@@ -266,6 +291,7 @@ export default function NotizScreen() {
               <Trash2 size={20} color={colors.text3} strokeWidth={2} />
             </PressableScale>
           </View>
+          )}
         </View>
 
         {/* Verknüpfungs-Chips nur, wenn tatsächlich etwas verknüpft ist. */}
@@ -320,6 +346,9 @@ export default function NotizScreen() {
           <ScrollView
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+            // Immer scroll-/bouncefähig — sonst greift der Wisch-Dismiss
+            // bei kurzen Notizen nie (nichts zu scrollen = keine Geste).
+            alwaysBounceVertical
             contentContainerStyle={{ paddingBottom: Spacing.lg }}
           >
           <TextInput
