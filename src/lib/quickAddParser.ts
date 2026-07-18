@@ -99,6 +99,46 @@ export function parseQuickAdd(input: string, today: string): QuickAddResult {
     if (!dueDate) dueDate = nextDayOfMonth(today, Number(m[1]));
   });
 
+  // 3a. Relative Spannen: „in 3 tagen", „in 2 wochen", „in 1 monat", „in 2 jahren".
+  strip(/(?<=\s)in\s+(\d{1,2})\s+(tag(?:en)?|tage|woche(?:n)?|monat(?:en)?|jahr(?:en)?)(?=[\s,.!]|$)/i, (m) => {
+    if (dueDate) return;
+    const n = Number(m[1]);
+    const unit = m[2].toLowerCase();
+    if (unit.startsWith('tag')) dueDate = addDays(today, n);
+    else if (unit.startsWith('woche')) dueDate = addDays(today, n * 7);
+    else {
+      const t = parseDateStr(today);
+      const d = new Date(t.getFullYear(), t.getMonth() + (unit.startsWith('monat') ? n : n * 12), t.getDate());
+      // Monatsüberlauf (31. + 1 Monat) → letzter Tag des Zielmonats.
+      if (d.getDate() !== t.getDate()) d.setDate(0);
+      dueDate = toDateStr(d);
+    }
+  });
+
+  // 3b. „ende des monats" / „monatsende" → letzter Tag des aktuellen Monats.
+  strip(/(?<=\s)(?:am\s+)?(?:ende des monats|monatsende)(?=[\s,.!]|$)/i, () => {
+    if (!dueDate) {
+      const t = parseDateStr(today);
+      dueDate = toDateStr(new Date(t.getFullYear(), t.getMonth() + 1, 0));
+    }
+  });
+
+  // 3c. „nächste woche" → kommender Montag; „nächsten monat" → der 1.
+  strip(/(?<=\s)nächste\s+woche(?=[\s,.!]|$)/i, () => {
+    if (!dueDate) dueDate = nextWeekday(today, 1);
+  });
+  strip(/(?<=\s)nächsten?\s+monat(?=[\s,.!]|$)/i, () => {
+    if (!dueDate) {
+      const t = parseDateStr(today);
+      dueDate = toDateStr(new Date(t.getFullYear(), t.getMonth() + 1, 1));
+    }
+  });
+
+  // 3d. „(am) wochenende" → kommender Samstag.
+  strip(/(?<=\s)(?:am\s+)?wochenende(?=[\s,.!]|$)/i, () => {
+    if (!dueDate) dueDate = nextWeekday(today, 6);
+  });
+
   // 3. Relativ: heute / morgen / übermorgen.
   strip(/(?<=\s)übermorgen(?=[\s,.!]|$)/i, () => { dueDate = dueDate ?? addDays(today, 2); });
   strip(/(?<=\s)morgen(?=[\s,.!]|$)/i, () => { dueDate = dueDate ?? addDays(today, 1); });

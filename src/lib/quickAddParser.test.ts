@@ -142,4 +142,24 @@ describe('parseQuickAdd', () => {
     const r = parseQuickAdd('Test 25:99', TODAY);
     expect(r.dueTime).toBeNull();
   });
+
+  // TODAY = Freitag, 3. Juli 2026
+  it('relative Spannen: „in N tagen/wochen/monaten"', () => {
+    expect(parseQuickAdd('Zähler ablesen in 3 wochen', TODAY).dueDate).toBe('2026-07-24');
+    expect(parseQuickAdd('Paket in 2 tagen', TODAY).dueDate).toBe('2026-07-05');
+    expect(parseQuickAdd('Miete prüfen in 1 monat', TODAY).dueDate).toBe('2026-08-03');
+    expect(parseQuickAdd('TÜV in 1 jahr', TODAY).dueDate).toBe('2027-07-03');
+    expect(parseQuickAdd('Zähler ablesen in 3 wochen', TODAY).title).toBe('Zähler ablesen');
+  });
+
+  it('„ende des monats" → letzter Tag des Monats', () => {
+    expect(parseQuickAdd('Bericht ende des monats', TODAY).dueDate).toBe('2026-07-31');
+    expect(parseQuickAdd('Abrechnung monatsende', TODAY).dueDate).toBe('2026-07-31');
+  });
+
+  it('„nächste woche" → Montag, „nächsten monat" → der 1., „wochenende" → Samstag', () => {
+    expect(parseQuickAdd('Zahnarzt nächste woche', TODAY).dueDate).toBe('2026-07-06');
+    expect(parseQuickAdd('Kündigung nächsten monat', TODAY).dueDate).toBe('2026-08-01');
+    expect(parseQuickAdd('Grillen am wochenende', TODAY).dueDate).toBe('2026-07-04');
+  });
 });
