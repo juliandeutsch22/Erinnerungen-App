@@ -198,7 +198,9 @@ export function TaskRow({
       }
       onSwipeableWillOpen={(direction) => {
         swipeRef.current?.close();
-        if (direction === 'left') {
+        // direction = Bewegungsrichtung der Zeile (ReanimatedSwipeable):
+        // 'right' = nach rechts gewischt → LINKE Aktion (Erledigt) offen.
+        if (direction === 'right') {
           hapticSuccess();
           onToggle(true);
         } else {

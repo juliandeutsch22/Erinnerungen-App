@@ -107,7 +107,9 @@ export function EventRow({
       onSwipeableWillOpen={(direction) => {
         swipeRef.current?.close();
         hapticSelect();
-        if (direction === 'left') {
+        // direction = Bewegungsrichtung der Zeile (ReanimatedSwipeable):
+        // 'right' = nach rechts gewischt → LINKE Aktion (Fotos) offen.
+        if (direction === 'right') {
           if (photosAvailable) void onPhotos();
         } else {
           onPress();

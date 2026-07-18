@@ -196,7 +196,9 @@ function NoteRow({ note, today, onPress }: { note: Note; today: string; onPress:
       onSwipeableWillOpen={(direction) => {
         swipeRef.current?.close();
         hapticSelect();
-        if (direction === 'left') {
+        // direction = Bewegungsrichtung der Zeile (ReanimatedSwipeable):
+        // 'right' = nach rechts gewischt → LINKE Aktion (Anheften) offen.
+        if (direction === 'right') {
           updateNote.mutate({ id: note.id, patch: { pinned: !note.pinned } });
         } else {
           updateNote.mutate({ id: note.id, patch: { deletedAt: new Date().toISOString() } });
@@ -243,12 +245,11 @@ function TrashRow({ note, today }: { note: Note; today: string }) {
           <Type variant="label" tone="indigo">Endgültig löschen</Type>
         </View>
       )}
-      onSwipeableWillOpen={(direction) => {
+      onSwipeableWillOpen={() => {
+        // Nur eine Aktionsseite — jede Öffnung IST das endgültige Löschen.
         swipeRef.current?.close();
-        if (direction === 'right') {
-          hapticSelect();
-          deleteNote.mutate(note.id);
-        }
+        hapticSelect();
+        deleteNote.mutate(note.id);
       }}
     >
       {row}
