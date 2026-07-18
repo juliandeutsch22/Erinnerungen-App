@@ -1,11 +1,12 @@
 // notiz/[id].tsx — Vollbild-Notiz-Editor nach iOS-Notizen-Muster:
 // KEIN Speichern-Button — Autosave beim Tippen (debounced) und beim Verlassen.
-// Die erste Zeile ist der Titel und wird wie in iOS Notes groß gesetzt
-// (eigenes Eingabefeld in der Antiqua der Überschriften; gespeichert wird
-// weiterhin EIN body-String: Titel + '\n' + Rest). „Zuletzt bearbeitet" oben,
-// Anheften im Kopf, Löschen legt die Notiz in den Papierkorb (30 Tage).
+// Die erste Zeile ist der Titel (Antiqua), darunter freier Text, darunter die
+// Checkliste als EIGENER editierbarer Block (keine rohen „- [ ]"-Marker im
+// Textfeld). Gespeichert wird weiterhin EIN body-String: Titel + Text +
+// „- [ ]"-Zeilen am Ende — Suche/Backup/Import bleiben Plain Text.
+// Tastatur: Wisch nach unten (interactive) oder „Fertig"-Leiste.
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { CalendarDays, ChevronLeft, Link2, ListChecks, ListTodo, Pin, Trash2, X } from 'lucide-react-native';
+import { CalendarDays, ChevronLeft, Link2, ListChecks, ListTodo, Pin, Plus, Trash2, X } from 'lucide-react-native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,17 +22,38 @@ import { useTasks } from '@/data/queries';
 import { addDays, todayStr } from '@/lib/dates';
 import { hasCalendarPermission } from '@/lib/deviceCalendar';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
-import { checklistItems, continueChecklist, toggleChecklistItem } from '@/lib/noteLogic';
 import { webNoOutline } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
 import { R, Spacing, T } from '@/theme/theme.tokens';
 
 const AUTOSAVE_MS = 600;
 const TITLE_FONT = 'CormorantGaramond_700Bold';
+const CHECK_RE = /^\s*- (?:\[( |x)\] )?(.*)$/;
 
-/** Titel + Rest wieder zu EINEM body-String zusammensetzen. */
-function compose(title: string, rest: string): string {
-  return rest.length > 0 ? `${title}\n${rest}` : title;
+type Item = { text: string; done: boolean };
+
+/** body → Titel, freier Text (ohne Checkzeilen) und Checklisten-Items. */
+function splitBody(body: string): { title: string; free: string; items: Item[] } {
+  const lines = body.split('\n');
+  const title = lines[0] ?? '';
+  const freeLines: string[] = [];
+  const items: Item[] = [];
+  for (const line of lines.slice(1)) {
+    const m = CHECK_RE.exec(line);
+    if (m && m[2].trim().length > 0) items.push({ text: m[2].trim(), done: m[1] === 'x' });
+    else freeLines.push(line);
+  }
+  // Leere Restzeilen am Ende (durch herausgelöste Checkzeilen) abschneiden.
+  while (freeLines.length > 0 && freeLines[freeLines.length - 1].trim() === '') freeLines.pop();
+  return { title, free: freeLines.join('\n'), items };
+}
+
+/** Titel + Text + Checkliste wieder zu EINEM body-String zusammensetzen. */
+function composeBody(title: string, free: string, items: Item[]): string {
+  const parts = [title];
+  if (free.length > 0) parts.push(free);
+  for (const it of items) parts.push(`- [${it.done ? 'x' : ' '}] ${it.text}`);
+  return parts.join('\n');
 }
 
 export default function NotizScreen() {
@@ -45,16 +67,20 @@ export default function NotizScreen() {
 
   const note = (notes ?? []).find((n) => n.id === id);
 
-  // Lokaler Text — einmal aus der Notiz geladen, danach führt der Editor.
-  // Erste Zeile (Titel) und Rest sind getrennte Felder, body bleibt die Quelle.
+  // Lokaler Zustand — einmal aus der Notiz geladen, danach führt der Editor.
   const [title, setTitle] = useState<string | null>(null);
-  const [rest, setRest] = useState<string>('');
+  const [free, setFree] = useState('');
+  const [items, setItems] = useState<Item[]>([]);
+  const [draft, setDraft] = useState('');
+  const [showChecklist, setShowChecklist] = useState(false);
   const loaded = title !== null;
   useEffect(() => {
     if (!loaded && note) {
-      const idx = note.body.indexOf('\n');
-      setTitle(idx === -1 ? note.body : note.body.slice(0, idx));
-      setRest(idx === -1 ? '' : note.body.slice(idx + 1));
+      const s = splitBody(note.body);
+      setTitle(s.title);
+      setFree(s.free);
+      setItems(s.items);
+      if (s.items.length > 0) setShowChecklist(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [note?.id, loaded]);
@@ -71,66 +97,10 @@ export default function NotizScreen() {
       updateNote.mutate({ id, patch: { body: latest.current } });
     }
   };
-  const schedule = (nextTitle: string, nextRest: string) => {
-    latest.current = compose(nextTitle, nextRest);
+  const schedule = (t: string, f: string, its: Item[]) => {
+    latest.current = composeBody(t, f, its);
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(flush, AUTOSAVE_MS);
-  };
-  const onChangeTitle = (text: string) => {
-    // Zeilenumbrüche (Einfügen mehrzeiligen Texts) wandern in den Rest.
-    if (text.includes('\n')) {
-      const idx = text.indexOf('\n');
-      const head = text.slice(0, idx);
-      const tail = text.slice(idx + 1);
-      const nextRest = tail.length > 0 ? (rest.length > 0 ? `${tail}\n${rest}` : tail) : rest;
-      setTitle(head);
-      setRest(nextRest);
-      schedule(head, nextRest);
-      bodyRef.current?.focus();
-      return;
-    }
-    setTitle(text);
-    schedule(text, rest);
-  };
-  const onChangeRest = (text: string) => {
-    // Enter in einer „- [ ]"-Zeile setzt die Checkliste fort (iOS-Notes-Gefühl).
-    const withChecklist = continueChecklist(rest, text);
-    setRest(withChecklist);
-    schedule(title ?? '', withChecklist);
-  };
-
-  // Checkliste: Cursorzeile merken (für den Kopf-Knopf) + Items der Notiz.
-  const selRef = useRef({ start: 0, end: 0 });
-  const composed = compose(title ?? '', rest);
-  const checkItems = useMemo(() => checklistItems(composed), [composed]);
-
-  const applyComposed = (nextComposed: string) => {
-    const idx = nextComposed.indexOf('\n');
-    const nextTitle = idx === -1 ? nextComposed : nextComposed.slice(0, idx);
-    const nextRest = idx === -1 ? '' : nextComposed.slice(idx + 1);
-    setTitle(nextTitle);
-    setRest(nextRest);
-    latest.current = nextComposed;
-    flush();
-  };
-
-  const toggleItem = (lineIndex: number) => {
-    hapticSuccess();
-    applyComposed(toggleChecklistItem(composed, lineIndex));
-  };
-
-  /** Kopf-Knopf: macht die Cursorzeile zur Checklisten-Zeile (oder startet eine). */
-  const insertChecklist = () => {
-    hapticSelect();
-    const pos = Math.min(selRef.current.start, rest.length);
-    const lineStart = rest.lastIndexOf('\n', Math.max(0, pos - 1)) + 1;
-    const lineEnd = rest.indexOf('\n', lineStart);
-    const line = rest.slice(lineStart, lineEnd === -1 ? undefined : lineEnd);
-    if (/^\s*- /.test(line)) return; // schon Checkliste
-    const next = `${rest.slice(0, lineStart)}- [ ] ${rest.slice(lineStart)}`;
-    setRest(next);
-    schedule(title ?? '', next);
-    bodyRef.current?.focus();
   };
   useEffect(() => {
     if (note && saved.current === null) saved.current = note.body;
@@ -139,7 +109,59 @@ export default function NotizScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => () => flush(), []);
 
+  const onChangeTitle = (text: string) => {
+    // Zeilenumbrüche (Einfügen mehrzeiligen Texts) wandern in den Text.
+    if (text.includes('\n')) {
+      const idx = text.indexOf('\n');
+      const head = text.slice(0, idx);
+      const tail = text.slice(idx + 1);
+      const nextFree = tail.length > 0 ? (free.length > 0 ? `${tail}\n${free}` : tail) : free;
+      setTitle(head);
+      setFree(nextFree);
+      schedule(head, nextFree, items);
+      bodyRef.current?.focus();
+      return;
+    }
+    setTitle(text);
+    schedule(text, free, items);
+  };
+  const onChangeFree = (text: string) => {
+    setFree(text);
+    schedule(title ?? '', text, items);
+  };
+
+  // Checklisten-Aktionen: direkt am Block, kein Marker-Tippen nötig.
+  const setItemsAnd = (next: Item[], immediate = false) => {
+    setItems(next);
+    if (immediate) {
+      latest.current = composeBody(title ?? '', free, next);
+      flush();
+    } else {
+      schedule(title ?? '', free, next);
+    }
+  };
+  const toggleItem = (i: number) => {
+    hapticSuccess();
+    setItemsAnd(items.map((it, k) => (k === i ? { ...it, done: !it.done } : it)), true);
+  };
+  const editItem = (i: number, text: string) => {
+    setItemsAnd(items.map((it, k) => (k === i ? { ...it, text } : it)));
+  };
+  const removeItem = (i: number) => {
+    hapticSelect();
+    setItemsAnd(items.filter((_, k) => k !== i), true);
+  };
+  const addDraft = () => {
+    const text = draft.trim();
+    if (!text) return;
+    setItemsAnd([...items, { text, done: false }], true);
+    setDraft('');
+    // Fokus sicher im Feld halten (Web verliert ihn beim Re-Render) — zügig weiter tippen.
+    setTimeout(() => draftRef.current?.focus(), 30);
+  };
+
   const bodyRef = useRef<TextInput>(null);
+  const draftRef = useRef<TextInput>(null);
 
   // Zuweisung: Chips zeigen die verknüpfte Erinnerung / den Termin.
   const [linkSheet, setLinkSheet] = useState(false);
@@ -176,12 +198,13 @@ export default function NotizScreen() {
   const updatedLabel = note
     ? new Date(note.updatedAt).toLocaleString('de-DE', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })
     : '';
+  const doneCount = items.filter((i) => i.done).length;
 
   return (
     <View style={{ flex: 1 }}>
       <Backdrop />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        {/* Kopf: zurück · Zuletzt bearbeitet · anheften · löschen */}
+        {/* Kopf: zurück · Zuletzt bearbeitet · Checkliste · zuweisen · anheften · löschen */}
         <View
           style={{
             paddingTop: insets.top + Spacing.sm,
@@ -205,10 +228,17 @@ export default function NotizScreen() {
             {updatedLabel}
           </Type>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <PressableScale accessibilityLabel="Checkliste einfügen" onPress={insertChecklist} style={{ padding: Spacing.sm }}>
-              <ListChecks size={20} color={colors.text3} strokeWidth={2} />
+            <PressableScale
+              accessibilityLabel="Checkliste öffnen"
+              onPress={() => {
+                hapticSelect();
+                setShowChecklist(true);
+                setTimeout(() => draftRef.current?.focus(), 80);
+              }}
+              style={{ padding: Spacing.sm }}
+            >
+              <ListChecks size={20} color={showChecklist ? colors.teal : colors.text3} strokeWidth={2} />
             </PressableScale>
-            {/* Zuweisen wandert als Icon in den Kopf — die Schreibfläche bleibt leer. */}
             <PressableScale
               accessibilityLabel="Notiz zuweisen"
               onPress={() => {
@@ -272,8 +302,8 @@ export default function NotizScreen() {
         </View>
         )}
 
-        {/* Schreibfläche: eine ruhige, flache Tafel — der Tempel-Hintergrund
-            scheint nicht durch den Text. */}
+        {/* Schreibfläche: Titel + Text + Checklisten-Block in einer Scroll-Fläche.
+            Wisch nach unten schließt die Tastatur (interactive). */}
         <View
           style={{
             flex: 1,
@@ -287,15 +317,15 @@ export default function NotizScreen() {
             overflow: 'hidden',
           }}
         >
-          {/* Gemeinsame Scroll-Fläche: der Text wächst frei, die Abhak-Karte
-              steht DARUNTER statt das Textfeld zusammenzudrücken. */}
-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: Spacing.lg }}>
-          {/* Titel — erste Zeile des body, groß in der Antiqua (iOS-Notizen-Look).
-              Enter springt in den Text. */}
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+            contentContainerStyle={{ paddingBottom: Spacing.lg }}
+          >
           <TextInput
             value={title ?? ''}
             onChangeText={onChangeTitle}
-            autoFocus={loaded && (title ?? '').length === 0 && rest.length === 0}
+            autoFocus={loaded && (title ?? '').length === 0 && free.length === 0 && items.length === 0}
             placeholder="Titel"
             placeholderTextColor={colors.text3}
             returnKeyType="next"
@@ -318,24 +348,21 @@ export default function NotizScreen() {
             ]}
           />
 
-          {/* Der Text — alles nach der Titelzeile. */}
+          {/* Freier Text — ohne Checklisten-Marker, wächst mit dem Inhalt. */}
           <TextInput
             ref={bodyRef}
-            value={rest}
-            onChangeText={onChangeRest}
+            value={free}
+            onChangeText={onChangeFree}
             multiline
             placeholder="Notiz…"
             placeholderTextColor={colors.text3}
             textAlignVertical="top"
             accessibilityLabel="Notiztext"
             scrollEnabled={false}
-            onSelectionChange={(e) => {
-              selRef.current = e.nativeEvent.selection;
-            }}
             {...keyboardDoneProps}
             style={[
               {
-                minHeight: 180,
+                minHeight: showChecklist ? 90 : 180,
                 fontSize: T.md + 1,
                 lineHeight: (T.md + 1) * 1.5,
                 color: colors.text,
@@ -347,42 +374,74 @@ export default function NotizScreen() {
             ]}
           />
 
-          {/* Abhak-Karte: alle „- [ ]"-Zeilen der Notiz, Tippen hakt ab und
-              schreibt direkt in den Text zurück. */}
-          {checkItems.length > 0 && (
+          {/* Checklisten-Block: direkt editierbar — abhaken, umbenennen,
+              entfernen, unten zügig neue Punkte anfügen. */}
+          {(showChecklist || items.length > 0) && (
             <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm }}>
-              <Type variant="eyebrow" tone="text3">Checkliste · {checkItems.filter((i) => i.done).length}/{checkItems.length}</Type>
-              {checkItems.map((item) => (
-                <PressableScale
-                  key={item.lineIndex}
-                  accessibilityLabel={`${item.text} ${item.done ? 'wieder öffnen' : 'abhaken'}`}
-                  onPress={() => toggleItem(item.lineIndex)}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.xs + 2 }}
-                >
-                  <View
-                    style={{
-                      width: 18,
-                      height: 18,
-                      borderRadius: 9,
-                      borderWidth: 1.5,
-                      borderColor: item.done ? colors.teal : colors.border3,
-                      backgroundColor: item.done ? colors.teal : 'transparent',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
+              <Type variant="eyebrow" tone="text3">
+                Checkliste{items.length > 0 ? ` · ${doneCount}/${items.length}` : ''}
+              </Type>
+              {items.map((item, i) => (
+                <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.xs }}>
+                  <PressableScale
+                    accessibilityLabel={`${item.text || 'Punkt'} ${item.done ? 'wieder öffnen' : 'abhaken'}`}
+                    onPress={() => toggleItem(i)}
+                    style={{ padding: 2 }}
                   >
-                    {item.done && <Type variant="caption" style={{ color: '#FFFFFF', fontSize: 11, lineHeight: 13 }}>✓</Type>}
-                  </View>
-                  <Type
-                    variant="body"
-                    tone={item.done ? 'text3' : 'text'}
-                    numberOfLines={1}
-                    style={{ flex: 1, textDecorationLine: item.done ? 'line-through' : 'none' }}
-                  >
-                    {item.text}
-                  </Type>
-                </PressableScale>
+                    <View
+                      style={{
+                        width: 20,
+                        height: 20,
+                        borderRadius: 10,
+                        borderWidth: 1.5,
+                        borderColor: item.done ? colors.teal : colors.border3,
+                        backgroundColor: item.done ? colors.teal : 'transparent',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {item.done && <Type variant="caption" style={{ color: '#FFFFFF', fontSize: 12, lineHeight: 14 }}>✓</Type>}
+                    </View>
+                  </PressableScale>
+                  <TextInput
+                    value={item.text}
+                    onChangeText={(t) => editItem(i, t)}
+                    accessibilityLabel={`Punkt ${i + 1} bearbeiten`}
+                    {...keyboardDoneProps}
+                    style={[
+                      {
+                        flex: 1,
+                        fontSize: T.md,
+                        color: item.done ? colors.text3 : colors.text,
+                        textDecorationLine: item.done ? 'line-through' : 'none',
+                        paddingVertical: 2,
+                      },
+                      webNoOutline,
+                    ]}
+                  />
+                  <PressableScale accessibilityLabel={`Punkt ${item.text} entfernen`} onPress={() => removeItem(i)} style={{ padding: Spacing.xs }}>
+                    <X size={14} color={colors.text3} strokeWidth={2} />
+                  </PressableScale>
+                </View>
               ))}
+              {/* Neuer Punkt — Enter fügt an und bleibt im Feld. */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.xs }}>
+                <Plus size={18} color={colors.teal} strokeWidth={2.2} />
+                <TextInput
+                  ref={draftRef}
+                  value={draft}
+                  onChangeText={setDraft}
+                  placeholder="Neuer Punkt"
+                  placeholderTextColor={colors.text3}
+                  returnKeyType="done"
+                  submitBehavior="submit"
+                  onSubmitEditing={addDraft}
+                  onBlur={addDraft}
+                  accessibilityLabel="Neuer Checklisten-Punkt"
+                  {...keyboardDoneProps}
+                  style={[{ flex: 1, fontSize: T.md, color: colors.text, paddingVertical: 2 }, webNoOutline]}
+                />
+              </View>
             </View>
           )}
           </ScrollView>
