@@ -1,6 +1,7 @@
 // ListEditorSheet.tsx — Liste anlegen/bearbeiten: Name, Icon (kuratiert),
 // Akzentfarbe (Teal/Indigo-Familie). Löschen zweistufig, Standardliste nie.
-import { CalendarClock, CalendarX2, Trash2 } from 'lucide-react-native';
+import { CalendarClock, CalendarX2, CopyPlus, Trash2 } from 'lucide-react-native';
+import { useQueryClient } from '@tanstack/react-query';
 import React, { useState } from 'react';
 import { TextInput, View } from 'react-native';
 
@@ -10,11 +11,13 @@ import { LIST_COLORS, LIST_ICONS } from '@/components/listMeta';
 import { MiniCalendar } from '@/components/MiniCalendar';
 import { PressableScale } from '@/components/PressableScale';
 import { Type } from '@/components/Type';
+import { getListRepository, getTaskRepository } from '@/data';
 import { DEFAULT_LIST_ID } from '@/data/ListRepository';
-import { useCreateList, useDeleteList, useUpdateList } from '@/data/queries';
+import { queryKeys, useCreateList, useDeleteList, useTasks, useUpdateList } from '@/data/queries';
 import type { List } from '@/data/types';
 import { deadlineLabel, todayStr } from '@/lib/dates';
-import { hapticSelect } from '@/lib/haptics';
+import { duplicateListWithTasks } from '@/lib/duplicateList';
+import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { webNoOutline } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
 import { R, Spacing, T } from '@/theme/theme.tokens';
@@ -32,6 +35,20 @@ export function ListEditorSheet({ list, onClose }: { list: List | null; onClose:
   const [deadline, setDeadline] = useState<string | null>(list?.deadline ?? null);
   const [showCalendar, setShowCalendar] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const qc = useQueryClient();
+  const { data: allTasks } = useTasks();
+
+  // Vorlagen-Duplikat: Kopie + frische Aufgaben in einem Rutsch anlegen.
+  const duplicate = async () => {
+    if (!list) return;
+    const { list: copy, tasks: copiedTasks } = duplicateListWithTasks(list, allTasks ?? []);
+    await getListRepository().create(copy);
+    for (const t of copiedTasks) await getTaskRepository().create(t);
+    await qc.invalidateQueries({ queryKey: queryKeys.lists });
+    await qc.invalidateQueries({ queryKey: queryKeys.tasks });
+    hapticSuccess();
+    onClose();
+  };
 
   const today = todayStr();
   const isEdit = list !== null;
@@ -178,6 +195,18 @@ export function ListEditorSheet({ list, onClose }: { list: List | null; onClose:
       <GlassButton accessibilityLabel={isEdit ? 'Änderungen sichern' : 'Liste anlegen'} onPress={save} disabled={!canSave}>
         <Type variant="label" style={{ color: '#FFFFFF' }}>{isEdit ? 'Sichern' : 'Anlegen'}</Type>
       </GlassButton>
+
+      {/* Vorlagen: Liste samt Aufgaben frisch duplizieren („Packliste Reise"). */}
+      {isEdit && list && (
+        <PressableScale
+          accessibilityLabel="Liste duplizieren"
+          onPress={() => void duplicate()}
+          style={{ alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, padding: Spacing.md, marginTop: Spacing.sm }}
+        >
+          <CopyPlus size={15} color={colors.teal} strokeWidth={2} />
+          <Type variant="label" tone="teal">Duplizieren — als frische Vorlage</Type>
+        </PressableScale>
+      )}
 
       {canDelete && (
         <PressableScale
