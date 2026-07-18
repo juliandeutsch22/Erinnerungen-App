@@ -3,12 +3,14 @@
 import { useQueryClient } from '@tanstack/react-query';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, Download, FolderOpen, Upload } from 'lucide-react-native';
+import { ChevronLeft, ClipboardPaste, CloudDownload, Download, FolderOpen, Upload } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { TextInput, View } from 'react-native';
 
 import { Chip } from '@/components/Chip';
 import { GlassButton } from '@/components/GlassButton';
+import { ImportRemindersSheet } from '@/components/ImportRemindersSheet';
+import { PasteNoteSheet } from '@/components/PasteNoteSheet';
 import { GlassPanel } from '@/components/GlassPanel';
 import { PressableScale } from '@/components/PressableScale';
 import { Reveal } from '@/components/Reveal';
@@ -26,6 +28,7 @@ import {
 } from '@/lib/backupFile';
 import { queryKeys } from '@/data/queries';
 import { requestReschedule } from '@/lib/notifications';
+import { deviceRemindersAvailable } from '@/lib/deviceReminders';
 import { hapticSuccess } from '@/lib/haptics';
 import { webNoOutline } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
@@ -69,6 +72,8 @@ export default function EinstellungenScreen() {
   const [importText, setImportText] = useState('');
   const [confirmImport, setConfirmImport] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [showReminderImport, setShowReminderImport] = useState(false);
+  const [showPasteNote, setShowPasteNote] = useState(false);
 
   const doExport = async () => {
     const json = await exportToJsonString({
@@ -278,11 +283,52 @@ export default function EinstellungenScreen() {
         </GlassPanel>
       </Reveal>
 
+      <Reveal delay={170}>
+        <GlassPanel>
+          <Type variant="label" tone="text2">Umzug von Apple-Apps</Type>
+          {deviceRemindersAvailable && (
+            <>
+              <Type variant="caption" tone="text3" style={{ marginTop: 2 }}>
+                Holt deine offenen Apple-Erinnerungen als Aufgaben herüber — rein lesend, beliebig
+                wiederholbar, ohne Duplikate.
+              </Type>
+              <GlassButton
+                size="sm"
+                accessibilityLabel="Aus Apple Erinnerungen importieren"
+                onPress={() => setShowReminderImport(true)}
+                style={{ marginTop: Spacing.md, alignSelf: 'flex-start' }}
+              >
+                <CloudDownload size={15} color="#FFFFFF" strokeWidth={2.2} />
+                <Type variant="label" style={{ color: '#FFFFFF' }}>Aus Apple Erinnerungen</Type>
+              </GlassButton>
+              <Seam />
+            </>
+          )}
+          <Type variant="caption" tone="text3" style={{ marginTop: 2 }}>
+            Apple Notizen haben keine Schnittstelle — der Umzug geht per Kopieren &amp; Einfügen,
+            Notiz für Notiz.
+          </Type>
+          <GlassButton
+            size="sm"
+            variant="secondary"
+            accessibilityLabel="Notizen einfügen"
+            onPress={() => setShowPasteNote(true)}
+            style={{ marginTop: Spacing.md, alignSelf: 'flex-start' }}
+          >
+            <ClipboardPaste size={15} color={colors.teal} strokeWidth={2.2} />
+            <Type variant="label" tone="teal">Notizen einfügen</Type>
+          </GlassButton>
+        </GlassPanel>
+      </Reveal>
+
       <Reveal delay={200}>
         <Type variant="caption" tone="text3" style={{ textAlign: 'center', marginTop: Spacing.sm }}>
-          Erinnerungen · Version {appVersion}
+          Stoa · Version {appVersion}
         </Type>
       </Reveal>
+
+      {showReminderImport && <ImportRemindersSheet onClose={() => setShowReminderImport(false)} />}
+      {showPasteNote && <PasteNoteSheet onClose={() => setShowPasteNote(false)} />}
     </Screen>
   );
 }

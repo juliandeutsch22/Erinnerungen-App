@@ -2,7 +2,7 @@
   "expo": {
     "name": "Stoa",
     "slug": "stille",
-    "version": "1.6.0",
+    "version": "1.7.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "stille",
@@ -10,7 +10,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "app.julian.stille",
-      "buildNumber": "10"
+      "buildNumber": "11"
     },
     "android": {
       "package": "app.julian.stille",
@@ -45,7 +45,8 @@
       [
         "expo-calendar",
         {
-          "calendarPermission": "Erinnerungen zeigt deine Kalender-Termine neben deinen Aufgaben an — alles bleibt auf dem Gerät."
+          "calendarPermission": "Stoa zeigt deine Kalender-Termine neben deinen Aufgaben an — alles bleibt auf dem Gerät.",
+          "remindersPermission": "Stoa liest deine Apple-Erinnerungen nur für den einmaligen Import — alles bleibt auf dem Gerät."
         }
       ],
       "@react-native-community/datetimepicker",

@@ -20,6 +20,8 @@ type SettingsState = {
   summaryTime: string;
   /** Gespeicherte Smart-Filter (Feature: eigene Ansichten). */
   savedFilters: SavedFilter[];
+  /** Bereits importierte Apple-Erinnerungs-IDs (Dedupe bei erneutem Import). */
+  importedReminderIds: string[];
   /** true, sobald der persistierte Zustand geladen wurde (verhindert Flash). */
   _hasHydrated: boolean;
   setThemePref: (p: ThemePref) => void;
@@ -31,6 +33,7 @@ type SettingsState = {
   removeSavedFilter: (id: string) => void;
   /** Ersetzt alle Filter (Backup-Wiederherstellung). */
   setSavedFilters: (f: SavedFilter[]) => void;
+  addImportedReminderIds: (ids: string[]) => void;
   setHasHydrated: (v: boolean) => void;
 };
 
@@ -43,6 +46,7 @@ export const useSettings = create<SettingsState>()(
       summaryEnabled: true,
       summaryTime: '09:00',
       savedFilters: [],
+      importedReminderIds: [],
       _hasHydrated: false,
       setThemePref: (themePref) => set({ themePref }),
       setMotionPref: (motionPref) => set({ motionPref }),
@@ -52,6 +56,8 @@ export const useSettings = create<SettingsState>()(
       addSavedFilter: (f) => set((s) => ({ savedFilters: [...s.savedFilters, f] })),
       removeSavedFilter: (id) => set((s) => ({ savedFilters: s.savedFilters.filter((x) => x.id !== id) })),
       setSavedFilters: (savedFilters) => set({ savedFilters }),
+      addImportedReminderIds: (ids) =>
+        set((s) => ({ importedReminderIds: [...new Set([...s.importedReminderIds, ...ids])] })),
       setHasHydrated: (_hasHydrated) => set({ _hasHydrated }),
     }),
     {
@@ -65,6 +71,7 @@ export const useSettings = create<SettingsState>()(
         summaryEnabled: s.summaryEnabled,
         summaryTime: s.summaryTime,
         savedFilters: s.savedFilters,
+        importedReminderIds: s.importedReminderIds,
       }),
       // state ist der rehydrierte Store inkl. Actions → kein Bezug auf useSettings
       // während der (ggf. synchronen) Erstellung nötig.
