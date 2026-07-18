@@ -46,7 +46,10 @@ export function useUpdateNote() {
   const invalidate = useInvalidateNotes();
   return useMutation({
     mutationFn: async ({ id, patch }: { id: string; patch: Partial<Omit<Note, 'id' | 'createdAt'>> }) => {
-      await getNoteRepository().update(id, { ...patch, updatedAt: new Date().toISOString() });
+      // „Zuletzt bearbeitet" nur bei inhaltlichen Änderungen stempeln —
+      // Anheften/Verknüpfen/Papierkorb sollen die Sortierung nicht anfassen.
+      const stamped = 'body' in patch ? { ...patch, updatedAt: new Date().toISOString() } : patch;
+      await getNoteRepository().update(id, stamped);
     },
     onSuccess: invalidate,
   });
