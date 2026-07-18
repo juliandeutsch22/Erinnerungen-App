@@ -3,11 +3,12 @@
 // Gesten wie die Aufgaben-Zeile (gleiche Sprache): Tap = bearbeiten,
 // Swipe rechts = Fotos anhängen (Rückblick), Swipe links = bearbeiten.
 import { ImageIcon, NotebookPen, Pencil } from 'lucide-react-native';
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { View } from 'react-native';
 import ReanimatedSwipeable, { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 
 import { PressableScale } from '@/components/PressableScale';
+import { SwipeActionSlide } from '@/components/SwipeActionSlide';
 import { Type } from '@/components/Type';
 import { useNotes } from '@/data/noteQueries';
 import { useAddPhotos } from '@/data/photoQueries';
@@ -41,7 +42,6 @@ export function EventRow({
   const { data: notes } = useNotes();
   const noteCount = useMemo(() => (notes ?? []).filter((n) => n.eventId === event.id && n.deletedAt === null).length, [notes, event.id]);
   const swipeRef = useRef<SwipeableMethods>(null);
-  const [swiping, setSwiping] = useState(false);
 
   const onPhotos = async () => {
     const uris = await pickAndStorePhotos();
@@ -53,7 +53,7 @@ export function EventRow({
       accessibilityLabel={`Termin ${event.title} bearbeiten`}
       onPress={onPress}
       pressedScale={0.99}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.sm + 2, backgroundColor: swiping ? colors.bg2 : 'transparent' }}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.sm + 2, backgroundColor: 'transparent' }}
     >
       <View style={{ width: 4, alignSelf: 'stretch', borderRadius: R.pill, backgroundColor: calendar?.color ?? colors.indigo }} />
       <View style={{ flex: 1, gap: 1 }}>
@@ -86,27 +86,21 @@ export function EventRow({
       // Swipe rechts → Fotos (nur wo der Picker verfügbar ist).
       renderLeftActions={
         photosAvailable
-          ? () => (
-              <View style={{ justifyContent: 'center', alignItems: 'flex-start', paddingHorizontal: Spacing.md, minWidth: 96 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
-                  <ImageIcon size={16} color={colors.teal} strokeWidth={2.4} />
-                  <Type variant="label" tone="teal">Fotos</Type>
-                </View>
-              </View>
+          ? (_progress, translation) => (
+              <SwipeActionSlide side="left" width={90} translation={translation} color={colors.teal}>
+                <ImageIcon size={18} color="#FFFFFF" strokeWidth={2.4} />
+                <Type variant="label" style={{ color: '#FFFFFF', fontSize: T.sm }}>Fotos</Type>
+              </SwipeActionSlide>
             )
           : undefined
       }
       // Swipe links → bearbeiten.
-      renderRightActions={() => (
-        <View style={{ justifyContent: 'center', alignItems: 'flex-end', paddingHorizontal: Spacing.md, minWidth: 104 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, paddingVertical: Spacing.xs, paddingHorizontal: Spacing.sm, borderRadius: R.pill, backgroundColor: `${colors.indigo}1A` }}>
-            <Pencil size={14} color={colors.indigo} strokeWidth={2} />
-            <Type variant="label" tone="indigo" style={{ fontSize: T.sm }}>Bearbeiten</Type>
-          </View>
-        </View>
+      renderRightActions={(_progress, translation) => (
+        <SwipeActionSlide side="right" width={110} translation={translation} color={colors.indigo}>
+          <Pencil size={16} color="#FFFFFF" strokeWidth={2} />
+          <Type variant="label" style={{ color: '#FFFFFF', fontSize: T.sm }}>Bearbeiten</Type>
+        </SwipeActionSlide>
       )}
-      onSwipeableOpenStartDrag={() => setSwiping(true)}
-      onSwipeableClose={() => setSwiping(false)}
       onSwipeableWillOpen={(direction) => {
         swipeRef.current?.close();
         hapticSelect();

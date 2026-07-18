@@ -7,7 +7,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CalendarDays, ChevronLeft, Link2, ListChecks, ListTodo, Pin, Trash2, X } from 'lucide-react-native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Backdrop } from '@/components/Backdrop';
@@ -287,6 +287,9 @@ export default function NotizScreen() {
             overflow: 'hidden',
           }}
         >
+          {/* Gemeinsame Scroll-Fläche: der Text wächst frei, die Abhak-Karte
+              steht DARUNTER statt das Textfeld zusammenzudrücken. */}
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: Spacing.lg }}>
           {/* Titel — erste Zeile des body, groß in der Antiqua (iOS-Notizen-Look).
               Enter springt in den Text. */}
           <TextInput
@@ -325,20 +328,20 @@ export default function NotizScreen() {
             placeholderTextColor={colors.text3}
             textAlignVertical="top"
             accessibilityLabel="Notiztext"
-            scrollEnabled
+            scrollEnabled={false}
             onSelectionChange={(e) => {
               selRef.current = e.nativeEvent.selection;
             }}
             {...keyboardDoneProps}
             style={[
               {
-                flex: 1,
+                minHeight: 180,
                 fontSize: T.md + 1,
                 lineHeight: (T.md + 1) * 1.5,
                 color: colors.text,
                 paddingHorizontal: Spacing.lg,
                 paddingTop: Spacing.xs,
-                paddingBottom: Spacing.lg,
+                paddingBottom: Spacing.md,
               },
               webNoOutline,
             ]}
@@ -382,6 +385,7 @@ export default function NotizScreen() {
               ))}
             </View>
           )}
+          </ScrollView>
         </View>
       </KeyboardAvoidingView>
       <KeyboardDoneBar />

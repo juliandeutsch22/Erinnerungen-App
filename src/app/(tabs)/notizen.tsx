@@ -18,6 +18,7 @@ import { Reveal } from '@/components/Reveal';
 import { Screen } from '@/components/Screen';
 import { Seam } from '@/components/Seam';
 import { EmptyState, LoadingState } from '@/components/StateView';
+import { SwipeActionSlide } from '@/components/SwipeActionSlide';
 import { Type } from '@/components/Type';
 import { useCreateNote, useDeleteNote, useNotes, useUpdateNote } from '@/data/noteQueries';
 import type { Note } from '@/data/types';
@@ -148,7 +149,6 @@ function NoteRow({ note, today, onPress }: { note: Note; today: string; onPress:
   const colors = useColors();
   const updateNote = useUpdateNote();
   const swipeRef = useRef<SwipeableMethods>(null);
-  const [swiping, setSwiping] = useState(false);
 
   const dateLabel = formatDueDate(toDateStr(new Date(note.updatedAt)), today);
   const preview = notePreview(note.body);
@@ -158,8 +158,7 @@ function NoteRow({ note, today, onPress }: { note: Note; today: string; onPress:
       accessibilityLabel={`Notiz „${noteTitle(note.body)}" öffnen`}
       onPress={onPress}
       pressedScale={0.99}
-      // Deckend NUR während der Geste — sonst weiße Box auf der Marmor-Textur.
-      style={{ paddingVertical: Spacing.sm, gap: 2, backgroundColor: swiping ? colors.bg2 : 'transparent' }}
+      style={{ paddingVertical: Spacing.sm, gap: 2, backgroundColor: 'transparent' }}
     >
       <Type variant="heading" numberOfLines={1} style={{ fontSize: T.lg, lineHeight: T.lg * 1.3 }}>
         {noteTitle(note.body)}
@@ -192,21 +191,17 @@ function NoteRow({ note, today, onPress }: { note: Note; today: string; onPress:
       rightThreshold={56}
       overshootLeft={false}
       overshootRight={false}
-      renderLeftActions={() => (
-        <View style={{ justifyContent: 'center', alignItems: 'flex-start', paddingHorizontal: Spacing.md, minWidth: 96 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
-            <Pin size={15} color={colors.teal} strokeWidth={2.2} />
-            <Type variant="label" tone="teal">{note.pinned ? 'Lösen' : 'Anheften'}</Type>
-          </View>
-        </View>
+      renderLeftActions={(_progress, translation) => (
+        <SwipeActionSlide side="left" width={100} translation={translation} color={colors.teal}>
+          <Pin size={17} color="#FFFFFF" strokeWidth={2.2} />
+          <Type variant="label" style={{ color: '#FFFFFF', fontSize: T.sm }}>{note.pinned ? 'Lösen' : 'Anheften'}</Type>
+        </SwipeActionSlide>
       )}
-      renderRightActions={() => (
-        <View style={{ justifyContent: 'center', alignItems: 'flex-end', paddingHorizontal: Spacing.md, minWidth: 96 }}>
-          <Type variant="label" tone="indigo">Löschen</Type>
-        </View>
+      renderRightActions={(_progress, translation) => (
+        <SwipeActionSlide side="right" width={96} translation={translation} color={colors.indigo}>
+          <Type variant="label" style={{ color: '#FFFFFF', fontSize: T.sm }}>Löschen</Type>
+        </SwipeActionSlide>
       )}
-      onSwipeableOpenStartDrag={() => setSwiping(true)}
-      onSwipeableClose={() => setSwiping(false)}
       onSwipeableWillOpen={(direction) => {
         swipeRef.current?.close();
         hapticSelect();
@@ -230,7 +225,6 @@ function TrashRow({ note, today }: { note: Note; today: string }) {
   const updateNote = useUpdateNote();
   const deleteNote = useDeleteNote();
   const swipeRef = useRef<SwipeableMethods>(null);
-  const [swiping, setSwiping] = useState(false);
 
   const deletedLabel = note.deletedAt ? formatDueDate(toDateStr(new Date(note.deletedAt)), today) : '';
 
@@ -242,7 +236,7 @@ function TrashRow({ note, today }: { note: Note; today: string }) {
         updateNote.mutate({ id: note.id, patch: { deletedAt: null } });
       }}
       pressedScale={0.99}
-      style={{ paddingVertical: Spacing.sm, gap: 2, backgroundColor: swiping ? colors.bg2 : 'transparent' }}
+      style={{ paddingVertical: Spacing.sm, gap: 2, backgroundColor: 'transparent' }}
     >
       <Type variant="body" tone="text2" numberOfLines={1}>{noteTitle(note.body)}</Type>
       <Type variant="caption" tone="text3" tabular>Gelöscht: {deletedLabel}</Type>
@@ -255,13 +249,11 @@ function TrashRow({ note, today }: { note: Note; today: string }) {
       friction={2}
       rightThreshold={56}
       overshootRight={false}
-      renderRightActions={() => (
-        <View style={{ justifyContent: 'center', alignItems: 'flex-end', paddingHorizontal: Spacing.md, minWidth: 120 }}>
-          <Type variant="label" tone="indigo">Endgültig löschen</Type>
-        </View>
+      renderRightActions={(_progress, translation) => (
+        <SwipeActionSlide side="right" width={130} translation={translation} color={colors.indigo}>
+          <Type variant="label" style={{ color: '#FFFFFF', fontSize: T.sm }}>Endgültig löschen</Type>
+        </SwipeActionSlide>
       )}
-      onSwipeableOpenStartDrag={() => setSwiping(true)}
-      onSwipeableClose={() => setSwiping(false)}
       onSwipeableWillOpen={() => {
         // Nur eine Aktionsseite — jede Öffnung IST das endgültige Löschen.
         swipeRef.current?.close();

@@ -2,12 +2,13 @@
 // Swipe rechts = erledigt, Swipe links = „Neu planen" (Fahrplan §3.6).
 // Überfällig trägt Indigo (ruhig), nie Alarm-Rot.
 import { Check, Flag, Link2, ListChecks, NotebookPen, Repeat } from 'lucide-react-native';
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { View } from 'react-native';
 import ReanimatedSwipeable, { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 
 import { Highlighted } from '@/components/Highlighted';
 import { PressableScale } from '@/components/PressableScale';
+import { SwipeActionSlide } from '@/components/SwipeActionSlide';
 import { TaskCheck } from '@/components/TaskCheck';
 import { Type } from '@/components/Type';
 import { useNotes } from '@/data/noteQueries';
@@ -63,7 +64,6 @@ export function TaskRow({
   const overdue = isOverdue(task, today);
   const progress = subtaskProgress(task.subtasks);
   const swipeRef = useRef<SwipeableMethods>(null);
-  const [swiping, setSwiping] = useState(false);
 
   const metaParts: { text: string; tone: 'indigo' | 'teal' | 'text3' }[] = [];
   if (showDue === 'time-only') {
@@ -83,9 +83,9 @@ export function TaskRow({
         alignItems: 'center',
         gap: Spacing.md,
         paddingVertical: Spacing.sm + 2,
-        // Deckend NUR während der Geste (sonst weiße Box auf der Marmor-Textur);
-        // beim Wischen scheint die Aktion sonst durch den Zeileninhalt.
-        backgroundColor: swiping ? colors.bg2 : 'transparent',
+        // Transparent — die Aktionen gleiten geclippt herein (SwipeActionSlide)
+        // und liegen dadurch nie unter dem Zeileninhalt.
+        backgroundColor: 'transparent',
       }}
     >
       <TaskCheck
@@ -156,50 +156,21 @@ export function TaskRow({
       rightThreshold={56}
       overshootLeft={false}
       overshootRight={false}
-      renderLeftActions={() => (
-        <View
-          style={{
-            justifyContent: 'center',
-            alignItems: 'flex-start',
-            paddingHorizontal: Spacing.md,
-            minWidth: 88,
-          }}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
-            <Check size={16} color={colors.teal} strokeWidth={2.4} />
-            <Type variant="label" tone="teal">Erledigt</Type>
-          </View>
-        </View>
+      renderLeftActions={(_progress, translation) => (
+        <SwipeActionSlide side="left" width={100} translation={translation} color={colors.teal}>
+          <Check size={18} color="#FFFFFF" strokeWidth={2.4} />
+          <Type variant="label" style={{ color: '#FFFFFF', fontSize: T.sm }}>Erledigt</Type>
+        </SwipeActionSlide>
       )}
       renderRightActions={
         onReschedule
-          ? () => (
-              <View
-                style={{
-                  justifyContent: 'center',
-                  alignItems: 'flex-end',
-                  paddingHorizontal: Spacing.md,
-                  minWidth: 104,
-                }}
-              >
-                <View
-                  style={{
-                    paddingVertical: Spacing.xs,
-                    paddingHorizontal: Spacing.sm,
-                    borderRadius: R.pill,
-                    backgroundColor: `${colors.indigo}1A`,
-                  }}
-                >
-                  <Type variant="label" tone="indigo" style={{ fontSize: T.sm }}>
-                    Neu planen
-                  </Type>
-                </View>
-              </View>
+          ? (_progress, translation) => (
+              <SwipeActionSlide side="right" width={110} translation={translation} color={colors.indigo}>
+                <Type variant="label" style={{ color: '#FFFFFF', fontSize: T.sm }}>Neu planen</Type>
+              </SwipeActionSlide>
             )
           : undefined
       }
-      onSwipeableOpenStartDrag={() => setSwiping(true)}
-      onSwipeableClose={() => setSwiping(false)}
       onSwipeableWillOpen={(direction) => {
         swipeRef.current?.close();
         // direction = Bewegungsrichtung der Zeile (ReanimatedSwipeable):
