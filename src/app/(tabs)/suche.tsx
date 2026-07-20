@@ -73,7 +73,7 @@ export default function SucheScreen() {
       (allChatMessages ?? []).filter((m) => m.content.toLowerCase().includes(q)).map((m) => m.chatId),
     );
     return (chats ?? [])
-      .filter((c) => c.title.toLowerCase().includes(q) || matchingChatIds.has(c.id))
+      .filter((c) => c.deletedAt === null && (c.title.toLowerCase().includes(q) || matchingChatIds.has(c.id)))
       .slice(0, 20);
   }, [chats, allChatMessages, q]);
 

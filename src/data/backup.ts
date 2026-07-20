@@ -235,6 +235,7 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
       taskId: str(c.taskId) ? c.taskId : null,
       noteId: str(c.noteId) ? c.noteId : null,
       context: str(c.context) ? c.context : null,
+      deletedAt: str(c.deletedAt) ? c.deletedAt : null,
       createdAt: str(c.createdAt) ? c.createdAt : new Date().toISOString(),
       updatedAt: str(c.updatedAt) ? c.updatedAt : new Date().toISOString(),
     });

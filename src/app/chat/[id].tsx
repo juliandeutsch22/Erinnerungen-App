@@ -4,12 +4,13 @@
 // tappbar (z. B. vorbefüllte Airbnb-/Booking-Suchen). Der Termin-Kontext
 // steckt als Snapshot im Chat und wandert in die System-Instruction.
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowUp, CalendarDays, ChevronLeft, ListTodo, NotebookPen, Sparkles, Trash2 } from 'lucide-react-native';
+import { ArrowUp, CalendarDays, ChevronLeft, Link2, ListTodo, NotebookPen, Sparkles, Trash2 } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Linking, Platform, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Backdrop } from '@/components/Backdrop';
+import { ChatLinkSheet } from '@/components/ChatLinkSheet';
 import { keyboardDoneProps, KeyboardDoneBar } from '@/components/KeyboardDone';
 import { PressableScale } from '@/components/PressableScale';
 import { LoadingState } from '@/components/StateView';
@@ -17,10 +18,10 @@ import { Type } from '@/components/Type';
 import * as Clipboard from 'expo-clipboard';
 
 import { useAppendMessage, useChatMessages, useChats, useDeleteChat, useUpdateChat } from '@/data/chatQueries';
-import { useCreateNote, useNotes } from '@/data/noteQueries';
-import { useTasks } from '@/data/queries';
+import { useCreateNote, useNotes, useUpdateNote } from '@/data/noteQueries';
+import { useCreateTask, useTasks } from '@/data/queries';
 import type { ChatMessage } from '@/data/types';
-import { askAssistant, buildNoteContext, buildTaskContext } from '@/lib/assistant';
+import { askAssistant, buildNoteContext, buildTaskContext, extractActions } from '@/lib/assistant';
 import { noteTitle } from '@/lib/noteLogic';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { webNoOutline } from '@/theme/layout';
@@ -69,7 +70,7 @@ export default function ChatScreen() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, ask } = useLocalSearchParams<{ id: string; ask?: string }>();
   const { data: chats } = useChats();
   const { data: messages } = useChatMessages(id);
   const appendMessage = useAppendMessage();
@@ -100,11 +101,36 @@ export default function ChatScreen() {
   const ContextIcon = linkedNote ? NotebookPen : linkedTask ? ListTodo : CalendarDays;
 
   const [draft, setDraft] = useState('');
+  const [linkSheet, setLinkSheet] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedNoteIds, setSavedNoteIds] = useState<Set<string>>(new Set());
+  const [appliedActionIds, setAppliedActionIds] = useState<Set<string>>(new Set());
   const createNote = useCreateNote();
+  const createTask = useCreateTask();
+  const updateNote = useUpdateNote();
   const scrollRef = useRef<ScrollView>(null);
+
+  /** Aktions-Block übernehmen: Aufgaben anlegen, Checkliste an die Notiz anhängen. */
+  const applyActions = async (m: ChatMessage) => {
+    const { actions } = extractActions(m.content);
+    if (!actions) return;
+    hapticSuccess();
+    for (const a of actions.aufgaben) {
+      await createTask.mutateAsync({
+        listId: 'default',
+        title: a.titel,
+        dueDate: a.datum ?? null,
+        dueTime: a.zeit ?? null,
+        eventId: chat?.eventId ?? null,
+      });
+    }
+    if (actions.checkliste.length > 0 && linkedNote) {
+      const lines = actions.checkliste.map((c) => `- [ ] ${c}`).join('\n');
+      updateNote.mutate({ id: linkedNote.id, patch: { body: `${linkedNote.body}\n${lines}` } });
+    }
+    setAppliedActionIds((prev) => new Set(prev).add(m.id));
+  };
 
   /** Antwort holen für einen gegebenen Verlauf (send + retry teilen sich das). */
   const requestAnswer = async (history: ChatMessage[]) => {
@@ -136,7 +162,7 @@ export default function ChatScreen() {
   const saveAsNote = (m: ChatMessage) => {
     hapticSuccess();
     createNote.mutate(
-      { body: m.content, taskId: chat?.taskId ?? null, eventId: chat?.eventId ?? null },
+      { body: extractActions(m.content).clean, taskId: chat?.taskId ?? null, eventId: chat?.eventId ?? null },
       { onSuccess: () => setSavedNoteIds((prev) => new Set(prev).add(m.id)) },
     );
   };
@@ -147,8 +173,8 @@ export default function ChatScreen() {
     return () => clearTimeout(t);
   }, [messages?.length, pending]);
 
-  const send = async () => {
-    const text = draft.trim();
+  const sendText = async (raw: string) => {
+    const text = raw.trim();
     if (!text || !id || !chat || pending) return;
     setDraft('');
     setError(null);
@@ -160,6 +186,16 @@ export default function ChatScreen() {
     }
     await requestAnswer([...(messages ?? []), userMsg]);
   };
+  const send = () => sendText(draft);
+
+  // „Plane meinen Tag" & Co.: mitgegebene Frage einmalig automatisch senden.
+  const autoAsked = useRef(false);
+  useEffect(() => {
+    if (!ask || autoAsked.current || !chat || !messages || messages.length > 0 || pending) return;
+    autoAsked.current = true;
+    void sendText(ask);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ask, chat?.id, messages?.length]);
 
   const remove = () => {
     hapticSelect();
@@ -203,9 +239,21 @@ export default function ChatScreen() {
               </PressableScale>
             )}
           </View>
-          <PressableScale accessibilityLabel="Chat löschen" onPress={remove} style={{ padding: Spacing.sm }}>
-            <Trash2 size={20} color={colors.text3} strokeWidth={2} />
-          </PressableScale>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <PressableScale
+              accessibilityLabel="Chat zuweisen"
+              onPress={() => {
+                hapticSelect();
+                setLinkSheet(true);
+              }}
+              style={{ padding: Spacing.sm }}
+            >
+              <Link2 size={20} color={colors.text3} strokeWidth={2} />
+            </PressableScale>
+            <PressableScale accessibilityLabel="Chat löschen" onPress={remove} style={{ padding: Spacing.sm }}>
+              <Trash2 size={20} color={colors.text3} strokeWidth={2} />
+            </PressableScale>
+          </View>
         </View>
 
         {/* Verlauf */}
@@ -230,11 +278,13 @@ export default function ChatScreen() {
               </Type>
             </View>
           )}
-          {(messages ?? []).map((m) => (
+          {(messages ?? []).map((m) => {
+            const { clean, actions } = m.role === 'assistant' ? extractActions(m.content) : { clean: m.content, actions: null };
+            return (
             <View key={m.id} style={{ alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '88%' }}>
               <PressableScale
                 accessibilityLabel={`Nachricht kopieren`}
-                onLongPress={() => void copyMessage(m.content)}
+                onLongPress={() => void copyMessage(clean)}
                 pressedScale={0.99}
                 style={{
                   backgroundColor: m.role === 'user' ? `${colors.teal}1A` : colors.bg2,
@@ -245,8 +295,47 @@ export default function ChatScreen() {
                   paddingHorizontal: Spacing.md,
                 }}
               >
-                <LinkedText content={m.content} color={colors.teal} />
+                <LinkedText content={clean} color={colors.teal} />
               </PressableScale>
+              {/* Aktions-Karte: strukturierte Vorschläge mit einem Tipp übernehmen. */}
+              {actions && (
+                <View
+                  style={{
+                    marginTop: Spacing.xs,
+                    borderWidth: 1,
+                    borderColor: `${colors.teal}44`,
+                    backgroundColor: `${colors.teal}0D`,
+                    borderRadius: R.md,
+                    padding: Spacing.sm,
+                    gap: 3,
+                  }}
+                >
+                  {actions.aufgaben.map((a, i) => (
+                    <Type key={`a${i}`} variant="caption" tone="text2" numberOfLines={1}>
+                      ☐ {a.titel}{a.datum ? ` · ${a.datum}` : ''}{a.zeit ? ` ${a.zeit}` : ''}
+                    </Type>
+                  ))}
+                  {actions.checkliste.map((c, i) => (
+                    <Type key={`c${i}`} variant="caption" tone="text2" numberOfLines={1}>
+                      ☐ {c} <Type variant="caption" tone="text3">(Notiz-Checkliste)</Type>
+                    </Type>
+                  ))}
+                  <PressableScale
+                    accessibilityLabel="Vorschläge übernehmen"
+                    onPress={() => void applyActions(m)}
+                    disabled={appliedActionIds.has(m.id)}
+                    style={{ paddingTop: 4 }}
+                  >
+                    <Type variant="label" tone={appliedActionIds.has(m.id) ? 'text3' : 'teal'}>
+                      {appliedActionIds.has(m.id)
+                        ? 'Übernommen ✓'
+                        : actions.aufgaben.length > 0
+                          ? `${actions.aufgaben.length + actions.checkliste.length} ${actions.aufgaben.length + actions.checkliste.length === 1 ? 'Vorschlag' : 'Vorschläge'} übernehmen`
+                          : 'In die Notiz-Checkliste übernehmen'}
+                    </Type>
+                  </PressableScale>
+                </View>
+              )}
               {/* Antworten lassen sich mit einem Tipp als Notiz ablegen —
                   inklusive der Verknüpfung des Chats (Aufgabe/Termin). */}
               {m.role === 'assistant' && (
@@ -263,7 +352,8 @@ export default function ChatScreen() {
                 </PressableScale>
               )}
             </View>
-          ))}
+            );
+          })}
           {pending && <LoadingState label="Assistent denkt…" />}
           {error && (
             <View style={{ gap: Spacing.xs, paddingHorizontal: Spacing.sm }}>
@@ -327,6 +417,7 @@ export default function ChatScreen() {
         </View>
       </KeyboardAvoidingView>
       <KeyboardDoneBar />
+      {linkSheet && id && <ChatLinkSheet chatId={id} onClose={() => setLinkSheet(false)} />}
     </View>
   );
 }

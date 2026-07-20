@@ -41,6 +41,7 @@ export function useCreateChat() {
         taskId: input.taskId ?? null,
         noteId: input.noteId ?? null,
         context: input.context ?? null,
+        deletedAt: null,
         createdAt: now,
         updatedAt: now,
       };

@@ -28,9 +28,9 @@ import {
 } from '@/lib/backupFile';
 import { queryKeys } from '@/data/queries';
 import { requestReschedule } from '@/lib/notifications';
-import { runAutoBackup } from '@/lib/autoBackup';
+import { listBackups, readBackup, runAutoBackup } from '@/lib/autoBackup';
 import { deviceRemindersAvailable } from '@/lib/deviceReminders';
-import { hapticSuccess } from '@/lib/haptics';
+import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { setSecureKey } from '@/lib/secureKey';
 import { webNoOutline } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
@@ -116,9 +116,15 @@ export default function EinstellungenScreen() {
     else await shareBackup(json);
   };
 
-  // Gemeinsame Wiederherstellung — aus Datei oder eingefügtem Text.
+  // Gemeinsame Wiederherstellung — aus Datei, Stand oder eingefügtem Text.
+  // Vorher wird der AKTUELLE Bestand als Schutz-Backup weggeschrieben:
+  // ein Restore ist damit selbst risikofrei rückgängig machbar.
   const runImport = async (json: string) => {
     try {
+      if (fileBackupAvailable) {
+        const name = await runAutoBackup(useSettings.getState().savedFilters);
+        if (name) setLastAutoBackupAt(new Date().toISOString());
+      }
       const { lists, tasks, filters, photos } = await importBackup(json, {
         setSavedFilters,
         writePhotoFromBase64,
@@ -151,6 +157,27 @@ export default function EinstellungenScreen() {
       return;
     }
     await runImport(importText);
+  };
+
+  // Wiederherstellen direkt aus einem Auto-Backup-Stand (zweistufig).
+  const backupEntries = fileBackupAvailable ? listBackups() : [];
+  const [confirmRestore, setConfirmRestore] = useState<string | null>(null);
+  const restoreFromBackup = async (name: string) => {
+    if (confirmRestore !== name) {
+      hapticSelect();
+      setConfirmRestore(name);
+      return;
+    }
+    setConfirmRestore(null);
+    setFeedback(null);
+    // WICHTIG: erst lesen, dann Schutz-Backup (runImport) — sonst überschreibt
+    // das Schutz-Backup den heutigen Stand, bevor er gelesen wurde.
+    const json = await readBackup(name);
+    if (!json) {
+      setFeedback('Backup-Datei konnte nicht gelesen werden.');
+      return;
+    }
+    await runImport(json);
   };
 
   return (
@@ -267,6 +294,24 @@ export default function EinstellungenScreen() {
               <FolderOpen size={15} color={colors.indigo} strokeWidth={2.2} />
               <Type variant="label" style={{ color: colors.indigo }}>Aus Datei wählen</Type>
             </GlassButton>
+          )}
+          {backupEntries.length > 0 && (
+            <View style={{ marginTop: Spacing.md, gap: 2 }}>
+              <Type variant="caption" tone="text3">Oder einen automatischen Stand zurückspielen:</Type>
+              {backupEntries.map((b) => (
+                <PressableScale
+                  key={b.name}
+                  accessibilityLabel={`Backup vom ${b.date} wiederherstellen`}
+                  onPress={() => void restoreFromBackup(b.name)}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.xs + 2 }}
+                >
+                  <Download size={13} color={confirmRestore === b.name ? colors.indigo : colors.text3} strokeWidth={2} />
+                  <Type variant="caption" tone={confirmRestore === b.name ? 'indigo' : 'text2'} tabular>
+                    {confirmRestore === b.name ? `${b.date} — Bestand ersetzen? Tippe erneut.` : b.date}
+                  </Type>
+                </PressableScale>
+              ))}
+            </View>
           )}
           <Type variant="caption" tone="text3" style={{ marginTop: Spacing.md }}>
             Oder Backup-JSON direkt einfügen{fileBackupAvailable ? ' (ohne Fotos)' : ''}.

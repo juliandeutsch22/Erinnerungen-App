@@ -59,6 +59,7 @@ export function getDb(): Promise<SQLiteDatabase> {
           task_id TEXT,
           note_id TEXT,
           context TEXT,
+          deleted_at TEXT,
           created_at TEXT NOT NULL,
           updated_at TEXT NOT NULL
         );
@@ -101,10 +102,12 @@ export function getDb(): Promise<SQLiteDatabase> {
           /* Spalte existiert bereits */
         }
       }
-      try {
-        await db.execAsync('ALTER TABLE chats ADD COLUMN note_id TEXT;');
-      } catch {
-        /* Spalte existiert bereits */
+      for (const col of ['note_id TEXT', 'deleted_at TEXT']) {
+        try {
+          await db.execAsync(`ALTER TABLE chats ADD COLUMN ${col};`);
+        } catch {
+          /* Spalte existiert bereits */
+        }
       }
       // Mediterran-Rebrand (v1.2): gespeicherte Listenfarben der alten
       // Teal/Indigo-Palette einmalig auf die Erdton-Palette umziehen.

@@ -72,7 +72,7 @@ describe('Backup', () => {
       updatedAt: '2026-07-02T09:30:00.000Z',
     });
     await getChatRepository().create({
-      id: 'c1', title: 'Airbnb für Rom', eventId: 'evt-42', taskId: null, noteId: null,
+      id: 'c1', title: 'Airbnb für Rom', eventId: 'evt-42', taskId: null, noteId: null, deletedAt: null,
       context: 'Termin: Rom-Reise', createdAt: '2026-07-02T09:00:00.000Z', updatedAt: '2026-07-02T09:30:00.000Z',
     });
     await getChatRepository().addMessage({

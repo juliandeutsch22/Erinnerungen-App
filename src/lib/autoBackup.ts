@@ -25,6 +25,36 @@ export function isAutoBackupDue(lastAt: string, now: Date = new Date()): boolean
   return now.getTime() - last >= AUTO_BACKUP_INTERVAL_MS;
 }
 
+export type BackupEntry = { name: string; date: string };
+
+/** Vorhandene Auto-Backup-Stände, neueste zuerst (nur nativ). */
+export function listBackups(): BackupEntry[] {
+  if (Platform.OS === 'web') return [];
+  try {
+    const { Directory, File, Paths } = fs();
+    const dir = new Directory(Paths.document, BACKUP_DIR);
+    if (!dir.exists) return [];
+    return dir
+      .list()
+      .filter((e) => e instanceof File && e.name.startsWith('stoa-backup-') && e.name.endsWith('.json'))
+      .map((e) => ({ name: e.name, date: e.name.replace('stoa-backup-', '').replace('.json', '') }))
+      .sort((a, b) => (a.name < b.name ? 1 : -1));
+  } catch {
+    return [];
+  }
+}
+
+/** Inhalt eines Backup-Stands lesen (nur nativ). */
+export async function readBackup(name: string): Promise<string | null> {
+  if (Platform.OS === 'web') return null;
+  try {
+    const { Directory, File, Paths } = fs();
+    return await new File(new Directory(Paths.document, BACKUP_DIR), name).text();
+  } catch {
+    return null;
+  }
+}
+
 /** Führt das Backup aus (nur nativ). Liefert den Dateinamen oder null. */
 export async function runAutoBackup(savedFilters: SavedFilter[], now: Date = new Date()): Promise<string | null> {
   if (Platform.OS === 'web') return null;

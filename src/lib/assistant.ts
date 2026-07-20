@@ -7,7 +7,10 @@ import { noteTitle } from '@/lib/noteLogic';
 import type { DeviceEvent } from '@/lib/deviceCalendar';
 
 const MODEL = 'gemini-2.5-flash';
-const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
+/** Fallback, wenn das Tageskontingent des Hauptmodells erschöpft ist (429). */
+const FALLBACK_MODEL = 'gemini-2.5-flash-lite';
+const endpoint = (model: string) =>
+  `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
 /** Wie viele Verlaufs-Nachrichten mitgeschickt werden (Kosten-/Limit-Schutz). */
 const HISTORY_LIMIT = 24;
@@ -21,7 +24,48 @@ export const SYSTEM_PROMPT =
   'oder https://www.booking.com/searchresults.de.html?ss=ORT&checkin=YYYY-MM-DD&checkout=YYYY-MM-DD). ' +
   'Du hast KEINEN Live-Internetzugriff — sage das ehrlich, wenn aktuelle Preise/' +
   'Verfügbarkeiten gefragt sind, und liefere stattdessen die besten Links und Kriterien. ' +
-  'Nutze schlichtes Markdown (Listen, **fett**), keine Tabellen.';
+  'Nutze schlichtes Markdown (Listen, **fett**), keine Tabellen. ' +
+  'AKTIONEN: Wenn der Nutzer dich bittet, Aufgaben/Erinnerungen oder eine Checkliste ' +
+  'ANZULEGEN (z. B. „mach mir daraus Aufgaben", „erstelle eine Packliste"), hänge ans ' +
+  'ENDE deiner Antwort GENAU EINEN Block in diesem Format an:\n' +
+  '```stoa-aktionen\n{"aufgaben":[{"titel":"…","datum":"YYYY-MM-DD","zeit":"HH:MM"}],"checkliste":["…"]}\n```\n' +
+  'datum/zeit sind optional; „checkliste" nur, wenn der Chat zu einer Notiz gehört. ' +
+  'Nutze den Block NUR bei einer ausdrücklichen Anlege-Bitte, nie ungefragt.';
+
+// ——— Aktions-Block: strukturierte Vorschläge aus der Antwort ziehen. ———
+export type AssistantAction = {
+  aufgaben: { titel: string; datum?: string; zeit?: string }[];
+  checkliste: string[];
+};
+
+const ACTION_RE = /```stoa-aktionen\s*\n([\s\S]*?)```/;
+
+/** Trennt den Aktions-Block vom Anzeigetext (tolerant gegen kaputtes JSON). */
+export function extractActions(text: string): { clean: string; actions: AssistantAction | null } {
+  const m = ACTION_RE.exec(text);
+  if (!m) return { clean: text, actions: null };
+  const clean = text.replace(ACTION_RE, '').trim();
+  try {
+    const raw = JSON.parse(m[1]) as Record<string, unknown>;
+    const aufgaben = Array.isArray(raw.aufgaben)
+      ? raw.aufgaben
+          .filter((a): a is Record<string, unknown> => typeof a === 'object' && a !== null)
+          .filter((a) => typeof a.titel === 'string' && (a.titel as string).trim().length > 0)
+          .map((a) => ({
+            titel: (a.titel as string).trim(),
+            datum: typeof a.datum === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(a.datum) ? a.datum : undefined,
+            zeit: typeof a.zeit === 'string' && /^\d{2}:\d{2}$/.test(a.zeit) ? a.zeit : undefined,
+          }))
+      : [];
+    const checkliste = Array.isArray(raw.checkliste)
+      ? raw.checkliste.filter((c): c is string => typeof c === 'string' && c.trim().length > 0).map((c) => c.trim())
+      : [];
+    if (aufgaben.length === 0 && checkliste.length === 0) return { clean, actions: null };
+    return { clean, actions: { aufgaben, checkliste } };
+  } catch {
+    return { clean, actions: null };
+  }
+}
 
 /** Termin-Kontext beim Anlegen des Chats einfrieren (lesbar ohne Kalenderzugriff). */
 export function buildEventContext(ev: DeviceEvent): string {
@@ -94,24 +138,30 @@ export function describeError(status: number): string {
 /** Harte Obergrenze — ein hängender Request darf den Chat nicht blockieren. */
 const TIMEOUT_MS = 30000;
 
-/** Eine Antwort holen. Wirft Error mit lesbarer deutscher Meldung. */
-export async function askAssistant(apiKey: string, messages: ChatMessage[], context: string | null): Promise<string> {
+async function callModel(model: string, apiKey: string, body: unknown): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-  let res: Response;
   try {
-    res = await fetch(`${ENDPOINT}?key=${encodeURIComponent(apiKey)}`, {
+    return await fetch(`${endpoint(model)}?key=${encodeURIComponent(apiKey)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(buildRequestBody(messages, context)),
+      body: JSON.stringify(body),
       signal: controller.signal,
     });
-  } catch (e) {
+  } catch {
     if (controller.signal.aborted) throw new Error('Zeitüberschreitung — der Dienst antwortet nicht. Erneut versuchen.');
     throw new Error('Keine Verbindung — bist du online?');
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** Eine Antwort holen. Bei erschöpftem Kontingent (429) wird einmal aufs
+ *  kleinere Flash-Lite-Modell ausgewichen. Wirft Error mit deutscher Meldung. */
+export async function askAssistant(apiKey: string, messages: ChatMessage[], context: string | null): Promise<string> {
+  const body = buildRequestBody(messages, context);
+  let res = await callModel(MODEL, apiKey, body);
+  if (res.status === 429) res = await callModel(FALLBACK_MODEL, apiKey, body);
   if (!res.ok) throw new Error(describeError(res.status));
   const text = extractText(await res.json());
   if (!text) throw new Error('Leere Antwort erhalten — versuch es nochmal.');

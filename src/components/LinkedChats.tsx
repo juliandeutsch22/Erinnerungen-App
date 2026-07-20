@@ -42,9 +42,10 @@ export function LinkedChats({
     () =>
       (chats ?? []).filter(
         (c) =>
-          (noteId ? c.noteId === noteId : false) ||
-          (taskId ? c.taskId === taskId : false) ||
-          (eventId ? c.eventId === eventId : false),
+          c.deletedAt === null &&
+          ((noteId ? c.noteId === noteId : false) ||
+            (taskId ? c.taskId === taskId : false) ||
+            (eventId ? c.eventId === eventId : false)),
       ),
     [chats, noteId, taskId, eventId],
   );

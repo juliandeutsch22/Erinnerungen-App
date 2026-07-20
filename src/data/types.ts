@@ -108,6 +108,8 @@ export type Chat = {
   /** An eine Notiz gehängt: der Chat liest ihren Inhalt LIVE (kein Snapshot). */
   noteId: string | null;
   context: string | null;
+  /** Papierkorb (30 Tage, wie Notizen), null = aktiv. */
+  deletedAt: string | null; // ISO
   createdAt: string; // ISO
   updatedAt: string; // ISO
 };
