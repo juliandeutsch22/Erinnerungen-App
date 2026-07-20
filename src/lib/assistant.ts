@@ -168,7 +168,8 @@ export function describeError(status: number): string {
     );
   if (status === 429)
     return 'Das Tages-Kontingent des Gratis-Schlüssels ist erschöpft — später erneut versuchen.';
-  if (status >= 500) return 'Der Dienst ist gerade nicht erreichbar. Versuch es gleich nochmal.';
+  if (status >= 500)
+    return 'Gemini ist gerade überlastet oder nicht erreichbar — die App hat es mehrfach probiert. In ein paar Minuten erneut versuchen.';
   return `Anfrage fehlgeschlagen (HTTP ${status}).`;
 }
 
@@ -238,22 +239,46 @@ async function discoverModels(apiKey: string): Promise<{ model: string | null; l
 let workingModel: string | null = null;
 let workingLite: string | null = null;
 
-/** Kette abklappern: 404 (Modell weg/umbenannt) → nächster Kandidat. */
+/** Kette abklappern. Weitergezogen wird bei 404 (Modell weg/umbenannt), 5xx
+ *  („überlastet" — jedes Modell hat eigene Kapazität) und Timeout/Netzfehler.
+ *  Auth-Fehler (400/401/403) und 429 stoppen sofort — die gelten für den
+ *  ganzen Schlüssel, nicht das einzelne Modell. */
 async function callChain(chain: string[], remembered: string | null, apiKey: string, body: unknown): Promise<{ res: Response; model: string }> {
   const order = remembered ? [remembered, ...chain.filter((m) => m !== remembered)] : chain;
-  let last: { res: Response; model: string } | null = null;
+  let overloaded: { res: Response; model: string } | null = null;
+  let notFound: { res: Response; model: string } | null = null;
+  let lastError: Error | null = null;
   for (const model of order) {
-    const res = await callModel(model, apiKey, body);
-    last = { res, model };
-    if (res.status !== 404) return last;
+    let res: Response;
+    try {
+      res = await callModel(model, apiKey, body);
+    } catch (e) {
+      lastError = e instanceof Error ? e : new Error(String(e));
+      continue;
+    }
+    if (res.status === 404) {
+      notFound = { res, model };
+      continue;
+    }
+    if (res.status >= 500) {
+      overloaded = { res, model };
+      continue;
+    }
+    return { res, model };
   }
-  return last!;
+  // 5xx ist die ehrlichere Diagnose als 404 (Discovery greift bei 404 trotzdem).
+  const fallback = overloaded ?? notFound;
+  if (fallback) return fallback;
+  throw lastError ?? new Error('Keine Verbindung — bist du online?');
 }
 
+/** Kurze Pause, dann derselbe Aufruf nochmal — Überlast (5xx) ist meist flüchtig. */
+const RETRY_DELAY_MS = 1500;
+
 /** Eine Antwort holen. Verschwundene Modelle (404) werden über die Kandidaten-
- *  Kette und notfalls die Modell-Liste des Dienstes überbrückt; bei erschöpftem
- *  Kontingent (429) weicht die App auf die Lite-Kette aus. Wirft Error mit
- *  deutscher Meldung. */
+ *  Kette und notfalls die Modell-Liste des Dienstes überbrückt; Überlast (5xx)
+ *  über die Kette + einen kurzen zweiten Versuch; erschöpftes Kontingent (429)
+ *  über die Lite-Kette. Wirft Error mit deutscher Meldung. */
 export async function askAssistant(apiKey: string, messages: ChatMessage[], context: string | null): Promise<string> {
   const body = buildRequestBody(messages, context);
   let { res, model } = await callChain(MODEL_CHAIN, workingModel, apiKey, body);
@@ -269,11 +294,29 @@ export async function askAssistant(apiKey: string, messages: ChatMessage[], cont
   }
   if (res.ok) workingModel = model;
 
-  if (res.status === 429) {
-    const lite = await callChain(LITE_CHAIN, workingLite, apiKey, body);
-    if (lite.res.status !== 404) {
-      res = lite.res;
-      if (res.ok) workingLite = lite.model;
+  // Kontingent erschöpft ODER alles überlastet → die Lite-Kette hat eigenes
+  // Kontingent und eigene Kapazität.
+  if (res.status === 429 || res.status >= 500) {
+    try {
+      const lite = await callChain(LITE_CHAIN, workingLite, apiKey, body);
+      if (lite.res.ok) {
+        res = lite.res;
+        workingLite = lite.model;
+      } else if (res.status === 429 && lite.res.status !== 404) {
+        res = lite.res;
+      }
+    } catch {
+      /* Hauptfehler ist aussagekräftiger als ein Netzfehler der Lite-Kette */
+    }
+  }
+
+  // Letzte Chance bei Überlast: kurz durchatmen, einmal wiederholen.
+  if (!res.ok && res.status >= 500) {
+    await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+    const again = await callModel(model, apiKey, body);
+    if (again.ok) {
+      res = again;
+      workingModel = model;
     }
   }
 
