@@ -1,7 +1,7 @@
 // suche.tsx — Suche über alles (Fahrplan §3.7): Aufgaben (Titel + Notiz,
 // offen wie erledigt), Listen und Notizen. Live-Filter, Treffer öffnen den Editor.
 import { useRouter } from 'expo-router';
-import { NotebookPen, Search, Sparkles } from 'lucide-react-native';
+import { MoonStar, NotebookPen, Search, Sparkles } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { TextInput, View } from 'react-native';
 
@@ -20,10 +20,11 @@ import { TaskQuickSheet } from '@/components/TaskQuickSheet';
 import { TaskRow } from '@/components/TaskRow';
 import { Type } from '@/components/Type';
 import { useAllChatMessages, useChats } from '@/data/chatQueries';
+import { useJournal } from '@/data/journalQueries';
 import { useNotes } from '@/data/noteQueries';
 import { useCompleteTask, useLists, useReopenTask, useTasks } from '@/data/queries';
 import type { Task } from '@/data/types';
-import { todayStr } from '@/lib/dates';
+import { formatDueDate, todayStr } from '@/lib/dates';
 import { noteMatchLine, noteTitle } from '@/lib/noteLogic';
 import { webNoOutline } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
@@ -64,6 +65,12 @@ export default function SucheScreen() {
     if (!q) return [];
     return (notes ?? []).filter((n) => n.deletedAt === null && n.body.toLowerCase().includes(q)).slice(0, 30);
   }, [notes, q]);
+
+  const { data: journalEntries } = useJournal();
+  const journalHits = useMemo(() => {
+    if (!q) return [];
+    return (journalEntries ?? []).filter((e) => e.text.toLowerCase().includes(q)).slice(0, 20);
+  }, [journalEntries, q]);
 
   const { data: chats } = useChats();
   const { data: allChatMessages } = useAllChatMessages();
@@ -120,7 +127,7 @@ export default function SucheScreen() {
       {q.length > 0 && (
         <Reveal delay={90}>
           <GlassPanel>
-            {taskHits.length === 0 && listHits.length === 0 && noteHits.length === 0 && chatHits.length === 0 ? (
+            {taskHits.length === 0 && listHits.length === 0 && noteHits.length === 0 && chatHits.length === 0 && journalHits.length === 0 ? (
               <EmptyState
                 icon={<Search size={20} color={colors.teal} strokeWidth={2} />}
                 title="Keine Treffer"
@@ -220,6 +227,36 @@ export default function SucheScreen() {
                           </Type>
                         </PressableScale>
                       ))}
+                    </View>
+                  </>
+                )}
+                {journalHits.length > 0 && (
+                  <>
+                    {(taskHits.length > 0 || listHits.length > 0 || noteHits.length > 0 || chatHits.length > 0) && <Seam marginVertical={Spacing.md} />}
+                    <Type variant="eyebrow" tone="text3">Abendbetrachtung</Type>
+                    <View style={{ marginTop: Spacing.xs }}>
+                      {journalHits.map((e) => {
+                        // Journal-Einträge haben keine Titel-Zeile — schlicht die
+                        // Zeile mit dem Treffer zeigen (gekürzt).
+                        const raw = e.text.split('\n').find((l) => l.toLowerCase().includes(q))?.trim() ?? e.text.trim();
+                        const line = raw.length > 120 ? `${raw.slice(0, 119)}…` : raw;
+                        return (
+                          <PressableScale
+                            key={e.id}
+                            accessibilityLabel={`Betrachtung vom ${e.date} öffnen`}
+                            onPress={() => router.push('/journal')}
+                            style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.sm + 2 }}
+                          >
+                            <MoonStar size={18} color={colors.text3} strokeWidth={2} />
+                            <View style={{ flex: 1, gap: 1 }}>
+                              <Type variant="body" numberOfLines={1}>{formatDueDate(e.date, today)}</Type>
+                              <Type variant="caption" tone="text3" numberOfLines={1}>
+                                <Highlighted text={line} query={q} />
+                              </Type>
+                            </View>
+                          </PressableScale>
+                        );
+                      })}
                     </View>
                   </>
                 )}

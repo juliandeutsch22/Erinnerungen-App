@@ -11,6 +11,7 @@ import { DisclosureChevron } from '@/components/DisclosureChevron';
 import { EventEditorSheet } from '@/components/EventEditorSheet';
 import { EventRow } from '@/components/EventRow';
 import { GlassPanel } from '@/components/GlassPanel';
+import { JournalCard } from '@/components/JournalCard';
 import { PressableScale } from '@/components/PressableScale';
 import { ProgressLine } from '@/components/ProgressLine';
 import { PulseDot } from '@/components/PulseDot';
@@ -25,6 +26,7 @@ import { TaskQuickSheet } from '@/components/TaskQuickSheet';
 import { TaskRow } from '@/components/TaskRow';
 import { Type } from '@/components/Type';
 import { useDeviceCalendars, useDeviceEvents } from '@/data/calendarQueries';
+import { useJournal } from '@/data/journalQueries';
 import { usePhotoCounts } from '@/data/photoQueries';
 import { useAdoptOverdue, useCompleteTask, useLists, useReopenTask, useTasks } from '@/data/queries';
 import type { Task } from '@/data/types';
@@ -126,6 +128,13 @@ export default function HeuteScreen() {
       events: eventsByDay.get(date) ?? [],
     }));
   }, [tasks, today, eventsByDay]);
+
+  // Abendbetrachtung: ab 18 Uhr — oder früher, wenn heute schon etwas steht.
+  const { data: journalEntries } = useJournal();
+  const hasTodayJournal = useMemo(
+    () => (journalEntries ?? []).some((e) => e.date === today && e.text.trim().length > 0),
+    [journalEntries, today],
+  );
 
   const now = new Date();
   const hour = now.getHours();
@@ -477,6 +486,13 @@ export default function HeuteScreen() {
               );
             })}
           </GlassPanel>
+        </Reveal>
+      )}
+
+      {/* Abendbetrachtung — das Abend-Ritual am Ende des Tages (und der Seite). */}
+      {(hour >= 18 || hasTodayJournal) && (
+        <Reveal delay={upcoming.length > 0 ? 230 : 160}>
+          <JournalCard today={today} />
         </Reveal>
       )}
 

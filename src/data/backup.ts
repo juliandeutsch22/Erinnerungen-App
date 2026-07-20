@@ -12,7 +12,9 @@ import { Platform, Share } from 'react-native';
 
 import type { FilterRange, SavedFilter } from '@/lib/taskFilters';
 import { remapListColor } from './colorRebrand';
-import { getChatRepository, getListRepository, getNoteRepository, getPhotoRepository, getTaskRepository } from './index';
+import type { EventDocument } from './DocumentRepository';
+import { getChatRepository, getDocumentRepository, getJournalRepository, getListRepository, getNoteRepository, getPhotoRepository, getTaskRepository } from './index';
+import type { JournalEntry } from './JournalRepository';
 import { DEFAULT_LIST_ID } from './ListRepository';
 import type { EventPhoto } from './PhotoRepository';
 import type { Chat, ChatMessage, List, Note, Rrule, Task } from './types';
@@ -28,6 +30,17 @@ export type BackupPhoto = {
   data: string | null;
 };
 
+/** Ein Termin-Dokument im Backup: Verknüpfung + eingebettete Datei (Base64).
+ *  data = null, wenn die Datei zu groß (> 10 MB) oder nicht lesbar war. */
+export type BackupDocument = {
+  id: string;
+  eventId: string;
+  name: string;
+  addedAt: string;
+  ext: string;
+  data: string | null;
+};
+
 export type BackupBundle = {
   app: 'stille';
   schemaVersion: 3;
@@ -39,6 +52,8 @@ export type BackupBundle = {
   photos: BackupPhoto[];
   chats: Chat[];
   chatMessages: ChatMessage[];
+  documents: BackupDocument[];
+  journal: JournalEntry[];
 };
 
 /** Quellen, die nur zur Laufzeit verfügbar sind (Store, Datei-IO). */
@@ -47,16 +62,20 @@ export type BackupSources = {
   /** Liest eine Foto-Datei als Base64 (nativ). Fehlt/liefert null → Foto als reine Verknüpfung. */
   readPhotoBase64?: (uri: string) => Promise<string | null>;
   extFromUri?: (uri: string) => string;
+  /** Liest ein Dokument als Base64 (nativ); null bei Übergröße/Fehler. */
+  readDocumentBase64?: (uri: string) => Promise<string | null>;
 };
 
 export async function buildBackup(sources: BackupSources, now: Date = new Date()): Promise<BackupBundle> {
-  const [lists, tasks, notes, photoLinks, chats, chatMessages] = await Promise.all([
+  const [lists, tasks, notes, photoLinks, chats, chatMessages, docLinks, journal] = await Promise.all([
     getListRepository().getAll(),
     getTaskRepository().getAll(),
     getNoteRepository().getAll(),
     getPhotoRepository().getAll(),
     getChatRepository().getAll(),
     getChatRepository().getAllMessages(),
+    getDocumentRepository().getAll(),
+    getJournalRepository().getAll(),
   ]);
 
   const extOf = sources.extFromUri ?? ((uri: string) => (uri.split('.').pop() || 'jpg').toLowerCase());
@@ -64,6 +83,12 @@ export async function buildBackup(sources: BackupSources, now: Date = new Date()
   for (const p of photoLinks) {
     const data = sources.readPhotoBase64 ? await sources.readPhotoBase64(p.uri) : null;
     photos.push({ id: p.id, eventId: p.eventId, addedAt: p.addedAt, ext: extOf(p.uri), data });
+  }
+
+  const documents: BackupDocument[] = [];
+  for (const d of docLinks) {
+    const data = sources.readDocumentBase64 ? await sources.readDocumentBase64(d.uri) : null;
+    documents.push({ id: d.id, eventId: d.eventId, name: d.name, addedAt: d.addedAt, ext: extOf(d.uri), data });
   }
 
   return {
@@ -77,6 +102,8 @@ export async function buildBackup(sources: BackupSources, now: Date = new Date()
     photos,
     chats,
     chatMessages,
+    documents,
+    journal,
   };
 }
 
@@ -134,9 +161,11 @@ export type ImportSinks = {
   setSavedFilters?: (filters: SavedFilter[]) => void;
   /** Schreibt Base64-Bilddaten als Datei und gibt die neue URI zurück (nativ). */
   writePhotoFromBase64?: (ext: string, base64: string) => Promise<string | null>;
+  /** Schreibt Base64-Dokumentdaten als Datei und gibt die neue URI zurück (nativ). */
+  writeDocumentFromBase64?: (ext: string, base64: string) => Promise<string | null>;
 };
 
-export type ImportResult = { lists: number; tasks: number; notes: number; filters: number; photos: number; chats: number };
+export type ImportResult = { lists: number; tasks: number; notes: number; filters: number; photos: number; chats: number; documents: number; journal: number };
 
 /**
  * Validiert + importiert ein Backup. Ersetzt den kompletten Bestand
@@ -160,6 +189,8 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
   const rawNotes = Array.isArray(parsed.notes) ? parsed.notes : [];
   const rawChats = Array.isArray(parsed.chats) ? parsed.chats : [];
   const rawChatMessages = Array.isArray(parsed.chatMessages) ? parsed.chatMessages : [];
+  const rawDocuments = Array.isArray(parsed.documents) ? parsed.documents : [];
+  const rawJournal = Array.isArray(parsed.journal) ? parsed.journal : [];
 
   const lists: List[] = [];
   for (const l of rawLists) {
@@ -271,23 +302,61 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
     });
   }
 
+  // Dokumente: wie Fotos — Base64 zurück in Container-Dateien, ohne Senke überspringen.
+  const documents: EventDocument[] = [];
+  for (const d of rawDocuments) {
+    if (!isRecord(d) || !str(d.eventId) || !str(d.name) || !str(d.data) || !d.data) continue;
+    if (!sinks.writeDocumentFromBase64) continue;
+    const uri = await sinks.writeDocumentFromBase64(str(d.ext) ? d.ext : 'pdf', d.data);
+    if (!uri) continue;
+    documents.push({
+      id: str(d.id) ? d.id : newId(),
+      eventId: d.eventId,
+      name: d.name,
+      uri,
+      addedAt: str(d.addedAt) ? d.addedAt : new Date().toISOString(),
+    });
+  }
+
+  // Abendbetrachtungen: tolerant übernehmen (ältere Backups haben keine).
+  const journal: JournalEntry[] = [];
+  const journalDates = new Set<string>();
+  for (const j of rawJournal) {
+    if (!isRecord(j) || !str(j.date) || !/^\d{4}-\d{2}-\d{2}$/.test(j.date) || !str(j.text)) continue;
+    if (journalDates.has(j.date)) continue;
+    journalDates.add(j.date);
+    journal.push({
+      id: str(j.id) ? j.id : newId(),
+      date: j.date,
+      text: j.text,
+      createdAt: str(j.createdAt) ? j.createdAt : new Date().toISOString(),
+      updatedAt: str(j.updatedAt) ? j.updatedAt : new Date().toISOString(),
+    });
+  }
+
   const listRepo = getListRepository();
   const taskRepo = getTaskRepository();
   const photoRepo = getPhotoRepository();
   const noteRepo = getNoteRepository();
   const chatRepo = getChatRepository();
+  const docRepo = getDocumentRepository();
+  const journalRepo = getJournalRepository();
   await taskRepo.clearAll();
   await listRepo.clearAll();
   await photoRepo.clearAll();
   await noteRepo.clearAll();
   await chatRepo.clearAll();
+  await docRepo.clearAll();
+  await journalRepo.clearAll();
   for (const l of lists) await listRepo.create(l);
   for (const t of tasks) await taskRepo.create(t);
   for (const n of notes) await noteRepo.create(n);
   for (const c of chats) await chatRepo.create(c);
   for (const m of chatMessages) await chatRepo.addMessage(m);
   await photoRepo.restore(photos);
+  await docRepo.restore(documents);
+  for (const j of journal) await journalRepo.upsert(j);
   sinks.setSavedFilters?.(filters);
 
-  return { lists: lists.length, tasks: tasks.length, notes: notes.length, filters: filters.length, photos: photos.length, chats: chats.length };
+  return { lists: lists.length, tasks: tasks.length, notes: notes.length, filters: filters.length, photos: photos.length, chats: chats.length, documents: documents.length, journal: journal.length };
 }

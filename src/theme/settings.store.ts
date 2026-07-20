@@ -28,6 +28,9 @@ type SettingsState = {
   geminiApiKey: string;
   /** Zeitpunkt des letzten automatischen Backups (ISO, '' = noch nie). */
   lastAutoBackupAt: string;
+  /** Tägliche Erinnerung an die Abendbetrachtung (Uhrzeit: journalReminderTime). */
+  journalReminderEnabled: boolean;
+  journalReminderTime: string;
   /** true, sobald der persistierte Zustand geladen wurde (verhindert Flash). */
   _hasHydrated: boolean;
   setThemePref: (p: ThemePref) => void;
@@ -42,6 +45,8 @@ type SettingsState = {
   addImportedReminderIds: (ids: string[]) => void;
   setGeminiApiKey: (key: string) => void;
   setLastAutoBackupAt: (at: string) => void;
+  setJournalReminderEnabled: (v: boolean) => void;
+  setJournalReminderTime: (t: string) => void;
   setHasHydrated: (v: boolean) => void;
 };
 
@@ -57,6 +62,8 @@ export const useSettings = create<SettingsState>()(
       importedReminderIds: [],
       geminiApiKey: '',
       lastAutoBackupAt: '',
+      journalReminderEnabled: false,
+      journalReminderTime: '21:00',
       _hasHydrated: false,
       setThemePref: (themePref) => set({ themePref }),
       setMotionPref: (motionPref) => set({ motionPref }),
@@ -70,6 +77,8 @@ export const useSettings = create<SettingsState>()(
         set((s) => ({ importedReminderIds: [...new Set([...s.importedReminderIds, ...ids])] })),
       setGeminiApiKey: (geminiApiKey) => set({ geminiApiKey: geminiApiKey.trim() }),
       setLastAutoBackupAt: (lastAutoBackupAt) => set({ lastAutoBackupAt }),
+      setJournalReminderEnabled: (journalReminderEnabled) => set({ journalReminderEnabled }),
+      setJournalReminderTime: (journalReminderTime) => set({ journalReminderTime }),
       setHasHydrated: (_hasHydrated) => set({ _hasHydrated }),
     }),
     {
@@ -85,6 +94,8 @@ export const useSettings = create<SettingsState>()(
         savedFilters: s.savedFilters,
         importedReminderIds: s.importedReminderIds,
         lastAutoBackupAt: s.lastAutoBackupAt,
+        journalReminderEnabled: s.journalReminderEnabled,
+        journalReminderTime: s.journalReminderTime,
         // geminiApiKey bewusst NICHT persistieren — Quelle ist die Keychain.
       }),
       // state ist der rehydrierte Store inkl. Actions → kein Bezug auf useSettings

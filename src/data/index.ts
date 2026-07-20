@@ -3,6 +3,8 @@
 import { Platform } from 'react-native';
 
 import { ChatRepository, InMemoryChatRepository } from './ChatRepository';
+import { DocumentRepository, InMemoryDocumentRepository } from './DocumentRepository';
+import { InMemoryJournalRepository, JournalRepository } from './JournalRepository';
 import { InMemoryListRepository, ListRepository } from './ListRepository';
 import { InMemoryNoteRepository, NoteRepository } from './NoteRepository';
 import { InMemoryPhotoRepository, PhotoRepository } from './PhotoRepository';
@@ -13,6 +15,8 @@ let taskSingleton: TaskRepository | null = null;
 let photoSingleton: PhotoRepository | null = null;
 let noteSingleton: NoteRepository | null = null;
 let chatSingleton: ChatRepository | null = null;
+let documentSingleton: DocumentRepository | null = null;
+let journalSingleton: JournalRepository | null = null;
 
 export function getListRepository(): ListRepository {
   if (listSingleton) return listSingleton;
@@ -70,6 +74,28 @@ export function getChatRepository(): ChatRepository {
   return chatSingleton;
 }
 
+export function getDocumentRepository(): DocumentRepository {
+  if (documentSingleton) return documentSingleton;
+  if (Platform.OS === 'web') {
+    documentSingleton = new InMemoryDocumentRepository();
+  } else {
+    const { SqliteDocumentRepository } = require('./SqliteDocumentRepository') as typeof import('./SqliteDocumentRepository');
+    documentSingleton = new SqliteDocumentRepository();
+  }
+  return documentSingleton;
+}
+
+export function getJournalRepository(): JournalRepository {
+  if (journalSingleton) return journalSingleton;
+  if (Platform.OS === 'web') {
+    journalSingleton = new InMemoryJournalRepository();
+  } else {
+    const { SqliteJournalRepository } = require('./SqliteJournalRepository') as typeof import('./SqliteJournalRepository');
+    journalSingleton = new SqliteJournalRepository();
+  }
+  return journalSingleton;
+}
+
 /** Nur für Tests: erlaubt das Einsetzen eigener Repository-Instanzen. */
 export function __setListRepositoryForTests(repo: ListRepository | null) {
   listSingleton = repo;
@@ -86,9 +112,17 @@ export function __setNoteRepositoryForTests(repo: NoteRepository | null) {
 export function __setChatRepositoryForTests(repo: ChatRepository | null) {
   chatSingleton = repo;
 }
+export function __setDocumentRepositoryForTests(repo: DocumentRepository | null) {
+  documentSingleton = repo;
+}
+export function __setJournalRepositoryForTests(repo: JournalRepository | null) {
+  journalSingleton = repo;
+}
 
 export type { ListRepository } from './ListRepository';
 export type { TaskRepository } from './TaskRepository';
 export type { PhotoRepository } from './PhotoRepository';
 export type { NoteRepository } from './NoteRepository';
 export type { ChatRepository } from './ChatRepository';
+export type { DocumentRepository } from './DocumentRepository';
+export type { JournalRepository } from './JournalRepository';

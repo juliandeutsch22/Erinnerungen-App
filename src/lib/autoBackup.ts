@@ -7,6 +7,7 @@ import { Platform } from 'react-native';
 
 import { exportToJsonString } from '@/data/backup';
 import { extFromUri, readPhotoBase64 } from '@/lib/backupFile';
+import { readDocumentBase64 } from '@/lib/documents';
 import type { SavedFilter } from '@/lib/taskFilters';
 
 const BACKUP_DIR = 'Backups';
@@ -63,7 +64,7 @@ export async function runAutoBackup(savedFilters: SavedFilter[], now: Date = new
     const dir = new Directory(Paths.document, BACKUP_DIR);
     if (!dir.exists) dir.create();
 
-    const json = await exportToJsonString({ savedFilters, readPhotoBase64, extFromUri }, now);
+    const json = await exportToJsonString({ savedFilters, readPhotoBase64, extFromUri, readDocumentBase64 }, now);
     const name = `stoa-backup-${now.toISOString().slice(0, 10)}.json`;
     const file = new File(dir, name);
     file.write(json);

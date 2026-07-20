@@ -27,8 +27,9 @@ import {
   writePhotoFromBase64,
 } from '@/lib/backupFile';
 import { queryKeys } from '@/data/queries';
-import { requestReschedule } from '@/lib/notifications';
+import { requestReschedule, rescheduleJournalReminder } from '@/lib/notifications';
 import { listBackups, readBackup, runAutoBackup } from '@/lib/autoBackup';
+import { readDocumentBase64, writeDocumentFromBase64 } from '@/lib/documents';
 import { deviceRemindersAvailable } from '@/lib/deviceReminders';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { setSecureKey } from '@/lib/secureKey';
@@ -49,6 +50,7 @@ const MOTIONS: { value: MotionPref; label: string }[] = [
 ];
 const DEFAULT_TIMES = ['08:00', '09:00', '12:00', '18:00'];
 const SUMMARY_TIMES = ['07:00', '08:00', '09:00', '10:00'];
+const JOURNAL_TIMES = ['20:00', '21:00', '22:00'];
 
 // Version + Build aus der App-Config — damit man am Gerät sieht, welcher Build läuft.
 const build = Constants.expoConfig?.ios?.buildNumber;
@@ -69,6 +71,10 @@ export default function EinstellungenScreen() {
   const setDefaultDueTime = useSettings((s) => s.setDefaultDueTime);
   const setSummaryEnabled = useSettings((s) => s.setSummaryEnabled);
   const setSummaryTime = useSettings((s) => s.setSummaryTime);
+  const journalReminderEnabled = useSettings((s) => s.journalReminderEnabled);
+  const journalReminderTime = useSettings((s) => s.journalReminderTime);
+  const setJournalReminderEnabled = useSettings((s) => s.setJournalReminderEnabled);
+  const setJournalReminderTime = useSettings((s) => s.setJournalReminderTime);
   const setSavedFilters = useSettings((s) => s.setSavedFilters);
 
   const [importText, setImportText] = useState('');
@@ -111,6 +117,7 @@ export default function EinstellungenScreen() {
       savedFilters: useSettings.getState().savedFilters,
       readPhotoBase64,
       extFromUri,
+      readDocumentBase64,
     });
     if (fileBackupAvailable) await saveAndShareBackup(json);
     else await shareBackup(json);
@@ -125,16 +132,17 @@ export default function EinstellungenScreen() {
         const name = await runAutoBackup(useSettings.getState().savedFilters);
         if (name) setLastAutoBackupAt(new Date().toISOString());
       }
-      const { lists, tasks, filters, photos } = await importBackup(json, {
+      const { lists, tasks, filters, photos, documents } = await importBackup(json, {
         setSavedFilters,
         writePhotoFromBase64,
+        writeDocumentFromBase64,
       });
       await qc.invalidateQueries();
       requestReschedule();
       hapticSuccess();
       setImportText('');
       setConfirmImport(false);
-      const extras = [filters ? `${filters} Filter` : '', photos ? `${photos} Fotos` : ''].filter(Boolean);
+      const extras = [filters ? `${filters} Filter` : '', photos ? `${photos} Fotos` : '', documents ? `${documents} Dokumente` : ''].filter(Boolean);
       setFeedback(`Wiederhergestellt: ${lists} Listen, ${tasks} Aufgaben${extras.length ? ', ' + extras.join(', ') : ''}.`);
     } catch (e) {
       setFeedback(e instanceof Error ? e.message : 'Import fehlgeschlagen.');
@@ -249,6 +257,36 @@ export default function EinstellungenScreen() {
                 />
               ))}
           </View>
+
+          <Seam />
+
+          <Type variant="label" tone="text2">Abendbetrachtung</Type>
+          <Type variant="caption" tone="text3" style={{ marginTop: 2 }}>
+            Eine stille tägliche Erinnerung an die Frage des Abends.
+          </Type>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginTop: Spacing.sm }}>
+            <Chip
+              label={journalReminderEnabled ? 'An' : 'Aus'}
+              active={journalReminderEnabled}
+              onPress={() => {
+                const next = !journalReminderEnabled;
+                setJournalReminderEnabled(next);
+                void rescheduleJournalReminder(next, journalReminderTime);
+              }}
+            />
+            {journalReminderEnabled &&
+              JOURNAL_TIMES.map((t) => (
+                <Chip
+                  key={t}
+                  label={t}
+                  active={journalReminderTime === t}
+                  onPress={() => {
+                    setJournalReminderTime(t);
+                    void rescheduleJournalReminder(true, t);
+                  }}
+                />
+              ))}
+          </View>
         </GlassPanel>
       </Reveal>
 
@@ -256,7 +294,8 @@ export default function EinstellungenScreen() {
         <GlassPanel>
           <Type variant="label" tone="text2">Backup</Type>
           <Type variant="caption" tone="text3" style={{ marginTop: 2 }}>
-            Sichert Listen, Aufgaben, Notizen, Chats, Filter und Termin-Fotos in einer Datei — wichtig
+            Sichert Listen, Aufgaben, Notizen, Chats, Filter, Termin-Fotos, Dokumente und
+            Abendbetrachtungen in einer Datei — wichtig
             vor dem Nachsignieren (7-Tage-Zyklus) oder einer Neuinstallation.
           </Type>
           {autoBackupLabel && (

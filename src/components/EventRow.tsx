@@ -2,7 +2,7 @@
 // des Quell-Kalenders, Titel, Zeit-Label, optionaler Foto-Indikator.
 // Gesten wie die Aufgaben-Zeile (gleiche Sprache): Tap = bearbeiten,
 // Swipe rechts = Fotos anhängen (Rückblick), Swipe links = bearbeiten.
-import { ImageIcon, NotebookPen, Pencil } from 'lucide-react-native';
+import { ImageIcon, NotebookPen, Paperclip, Pencil } from 'lucide-react-native';
 import React, { useMemo, useRef } from 'react';
 import { View } from 'react-native';
 import ReanimatedSwipeable, { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
@@ -10,6 +10,7 @@ import ReanimatedSwipeable, { SwipeableMethods } from 'react-native-gesture-hand
 import { PressableScale } from '@/components/PressableScale';
 import { SwipeActionSlide } from '@/components/SwipeActionSlide';
 import { Type } from '@/components/Type';
+import { useDocumentCounts } from '@/data/documentQueries';
 import { useNotes } from '@/data/noteQueries';
 import { useAddPhotos } from '@/data/photoQueries';
 import { eventTimeLabel } from '@/lib/calendarLogic';
@@ -41,6 +42,7 @@ export function EventRow({
   // Verknüpfte Notizen? Kleiner Indikator neben dem Foto-Zähler.
   const { data: notes } = useNotes();
   const noteCount = useMemo(() => (notes ?? []).filter((n) => n.eventId === event.id && n.deletedAt === null).length, [notes, event.id]);
+  const docCount = useDocumentCounts().get(event.id) ?? 0;
   const swipeRef = useRef<SwipeableMethods>(null);
 
   const onPhotos = async () => {
@@ -70,6 +72,12 @@ export function EventRow({
             </View>
           )}
           {noteCount > 0 && <NotebookPen size={11} color={colors.text3} strokeWidth={2} />}
+          {docCount > 0 && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+              <Paperclip size={11} color={colors.text3} strokeWidth={2} />
+              {docCount > 1 && <Type variant="caption" tone="text3" tabular>{docCount}</Type>}
+            </View>
+          )}
         </View>
       </View>
     </PressableScale>

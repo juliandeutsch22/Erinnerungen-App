@@ -12,6 +12,7 @@ import { Chip } from '@/components/Chip';
 import { GlassButton } from '@/components/GlassButton';
 import { LinkedNotes } from '@/components/LinkedNotes';
 import { MiniCalendar } from '@/components/MiniCalendar';
+import { DocumentStrip } from '@/components/DocumentStrip';
 import { PhotoStrip } from '@/components/PhotoStrip';
 import { PressableScale } from '@/components/PressableScale';
 import { Expanded, Group, RowDivider } from '@/components/SheetParts';
@@ -313,6 +314,16 @@ export function EventEditorSheet({
           <Hairline />
           <View style={{ marginTop: Spacing.md }}>
             <LinkedNotes eventId={event.id} onNavigate={onClose} />
+          </View>
+        </View>
+      )}
+
+      {/* Dokumente: Tickets, Buchungen, PDFs — erst für gespeicherte Termine. */}
+      {isEdit && event && (
+        <View style={{ marginTop: Spacing.md }}>
+          <Hairline />
+          <View style={{ marginTop: Spacing.md }}>
+            <DocumentStrip eventId={event.id} />
           </View>
         </View>
       )}

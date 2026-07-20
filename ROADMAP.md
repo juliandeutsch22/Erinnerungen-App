@@ -39,9 +39,9 @@ Braucht `expo prebuild` + native Targets in der IPA-GitHub-Action:
 - **Antike Listen-Ikonografie** — eigene Icon-Familie (Amphore, Lyra, …).
 - **Wochentafel-Export** — die Woche als gesetztes Bild/PDF (Antiqua, Mäander).
 - **Erledigt-Moment** — Lorbeer-Glanz beim Abhaken der letzten Tagesaufgabe.
-- **Dokumente an Terminen** — Tickets/PDFs anheften (Konzept besprochen).
-- **Journaling / Abendbetrachtung** — Seneca-Frage als Abend-Ritual
-  (Konzept besprochen, verwoben mit Chronik + Wochenrückblick).
+- ~~**Dokumente an Terminen**~~ — umgesetzt in v1.14.0 (Anheften, QuickLook, Backup).
+- ~~**Journaling / Abendbetrachtung**~~ — umgesetzt in v1.14.0 (Heute-Karte ab
+  18 Uhr, Verlauf, stille Kette, optionale Erinnerung, Suche, Backup).
 
 - **Routinen/Gewohnheiten mit Säulen-Streaks** — tägliche Gewohnheiten ohne
   Überfällig-Druck; jede volle Woche baut eine Säule (Trommel für Trommel,

@@ -28,6 +28,7 @@ export const ACTION_DONE = 'done';
 export const ACTION_SNOOZE = 'snooze';
 
 const SUMMARY_ID_KEY = 'stille.notif.summary';
+const JOURNAL_ID_KEY = 'stille.notif.journal';
 
 // Benachrichtigungen im Vordergrund anzeigen (nur nativ konfigurieren).
 if (native) {
@@ -166,6 +167,34 @@ async function rescheduleSummary(tasks: Task[]): Promise<void> {
     trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: next },
   });
   await kvStorage.setItem(SUMMARY_ID_KEY, id);
+}
+
+/** Tägliche Erinnerung an die Abendbetrachtung — eine wiederkehrende
+ *  DAILY-Notification, geplant/gelöscht, wenn die Einstellung sich ändert. */
+export async function rescheduleJournalReminder(enabled: boolean, time: string): Promise<void> {
+  if (!native) return;
+  const oldId = await kvStorage.getItem(JOURNAL_ID_KEY);
+  if (oldId) {
+    try {
+      await Notifications.cancelScheduledNotificationAsync(oldId);
+    } catch {
+      /* bereits weg */
+    }
+    await kvStorage.removeItem(JOURNAL_ID_KEY);
+  }
+  if (!enabled) return;
+  const granted = await ensureNotificationPermission();
+  if (!granted) return;
+  const [h, m] = (time || '21:00').split(':').map(Number);
+  const id = await Notifications.scheduleNotificationAsync({
+    content: {
+      title: 'Abendbetrachtung',
+      body: 'Was lief heute gut? Was hast du gelernt?',
+      data: { url: '/heute' },
+    },
+    trigger: { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour: h, minute: m },
+  });
+  await kvStorage.setItem(JOURNAL_ID_KEY, id);
 }
 
 /** Snooze: Notification-only, +1 Std ab jetzt (Fälligkeit in der DB bleibt). */

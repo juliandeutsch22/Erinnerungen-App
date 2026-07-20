@@ -2,17 +2,21 @@
 import { exportToJsonString, importBackup } from './backup';
 import {
   __setChatRepositoryForTests,
+  __setDocumentRepositoryForTests,
+  __setJournalRepositoryForTests,
   __setListRepositoryForTests,
   __setNoteRepositoryForTests,
   __setPhotoRepositoryForTests,
   __setTaskRepositoryForTests,
 } from './index';
 import { InMemoryChatRepository } from './ChatRepository';
+import { InMemoryDocumentRepository } from './DocumentRepository';
+import { InMemoryJournalRepository } from './JournalRepository';
 import { InMemoryListRepository } from './ListRepository';
 import { InMemoryNoteRepository } from './NoteRepository';
 import { InMemoryPhotoRepository } from './PhotoRepository';
 import { InMemoryTaskRepository } from './TaskRepository';
-import { getChatRepository, getListRepository, getNoteRepository, getPhotoRepository, getTaskRepository } from './index';
+import { getChatRepository, getDocumentRepository, getJournalRepository, getListRepository, getNoteRepository, getPhotoRepository, getTaskRepository } from './index';
 import type { SavedFilter } from '@/lib/taskFilters';
 import type { Task } from './types';
 
@@ -46,6 +50,8 @@ describe('Backup', () => {
     __setPhotoRepositoryForTests(new InMemoryPhotoRepository());
     __setNoteRepositoryForTests(new InMemoryNoteRepository());
     __setChatRepositoryForTests(new InMemoryChatRepository());
+    __setDocumentRepositoryForTests(new InMemoryDocumentRepository());
+    __setJournalRepositoryForTests(new InMemoryJournalRepository());
   });
 
   afterEach(() => {
@@ -54,6 +60,8 @@ describe('Backup', () => {
     __setPhotoRepositoryForTests(null);
     __setNoteRepositoryForTests(null);
     __setChatRepositoryForTests(null);
+    __setDocumentRepositoryForTests(null);
+    __setJournalRepositoryForTests(null);
   });
 
   it('Roundtrip: Export → Import stellt Listen + Aufgaben wieder her', async () => {
@@ -89,7 +97,7 @@ describe('Backup', () => {
     __setChatRepositoryForTests(new InMemoryChatRepository());
 
     const result = await importBackup(json);
-    expect(result).toEqual({ lists: 2, tasks: 3, notes: 1, filters: 0, photos: 0, chats: 1 }); // Standardliste + Einkauf
+    expect(result).toEqual({ lists: 2, tasks: 3, notes: 1, filters: 0, photos: 0, chats: 1, documents: 0, journal: 0 }); // Standardliste + Einkauf
 
     // Chat samt Verlauf und Kontext überlebt den Roundtrip.
     const restoredChats = await getChatRepository().getAll();
@@ -181,6 +189,40 @@ describe('Backup', () => {
     expect(photos.every((p) => p.uri.startsWith('file:///new/'))).toBe(true);
   });
 
+  it('Roundtrip: Dokumente (mit Datei-IO) und Abendbetrachtungen überleben', async () => {
+    await getDocumentRepository().restore([
+      { id: 'd1', eventId: 'ev-9', name: 'Flugticket Rom.pdf', uri: 'file:///old/t.pdf', addedAt: '2026-07-02T10:00:00.000Z' },
+      { id: 'd2', eventId: 'ev-9', name: 'Riesig.zip', uri: 'file:///old/big.zip', addedAt: '2026-07-02T10:00:01.000Z' },
+    ]);
+    await getJournalRepository().upsert({ id: 'j1', date: '2026-07-02', text: 'Ruhiger Tag.', createdAt: '2026-07-02T21:00:00.000Z', updatedAt: '2026-07-02T21:00:00.000Z' });
+
+    // Fake-IO: das große Dokument liefert null (Limit) → nur Verknüpfung im Export.
+    const bytes: Record<string, string | null> = { 'file:///old/t.pdf': 'PDFDATA', 'file:///old/big.zip': null };
+    const json = await exportToJsonString(
+      { savedFilters: [], readDocumentBase64: async (uri) => bytes[uri] ?? null, extFromUri: (uri) => uri.split('.').pop()! },
+      new Date('2026-07-03T12:00:00.000Z'),
+    );
+
+    // Neues Gerät.
+    __setDocumentRepositoryForTests(new InMemoryDocumentRepository());
+    __setJournalRepositoryForTests(new InMemoryJournalRepository());
+
+    const result = await importBackup(json, {
+      writeDocumentFromBase64: async (ext, data) => `file:///new/doc.${ext}#${data.length}`,
+    });
+
+    // Nur das eingebettete Dokument kommt zurück — das übergroße war reine Verknüpfung.
+    expect(result.documents).toBe(1);
+    expect(result.journal).toBe(1);
+    const docs = await getDocumentRepository().getAll();
+    expect(docs).toHaveLength(1);
+    expect(docs[0].name).toBe('Flugticket Rom.pdf');
+    expect(docs[0].uri).toBe('file:///new/doc.pdf#7');
+    const journal = await getJournalRepository().getAll();
+    expect(journal[0].text).toBe('Ruhiger Tag.');
+    expect(journal[0].date).toBe('2026-07-02');
+  });
+
   it('ohne Datei-Senke werden Fotos übersprungen (Web/Einfügen)', async () => {
     await getPhotoRepository().restore([
       { id: 'p1', eventId: 'ev-9', uri: 'file:///old/a.png', addedAt: '2026-07-02T10:00:00.000Z' },
@@ -202,7 +244,7 @@ describe('Backup', () => {
       tasks: [{ id: 'x', listId: 'default', title: 'Alt' }],
     });
     const result = await importBackup(json);
-    expect(result).toEqual({ lists: 0, tasks: 1, notes: 0, filters: 0, photos: 0, chats: 0 });
+    expect(result).toEqual({ lists: 0, tasks: 1, notes: 0, filters: 0, photos: 0, chats: 0, documents: 0, journal: 0 });
   });
 
   it('Aufgaben mit unbekannter Liste fallen in die Standardliste', async () => {
