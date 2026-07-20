@@ -10,9 +10,9 @@ import type { DeviceEvent } from '@/lib/deviceCalendar';
 // einzelne feste ID, sondern Kandidaten-Ketten: die „-latest"-Aliasse zeigen immer
 // auf das aktuelle Modell, die versionierten IDs sind das Netz darunter. Greift
 // keine, fragt discoverModels() beim Dienst nach, was der Schlüssel wirklich kann.
-const MODEL_CHAIN = ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash'];
+const MODEL_CHAIN = ['gemini-3.5-flash', 'gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash'];
 /** Kleinere Lite-Kette, wenn das Tageskontingent des Hauptmodells erschöpft ist (429). */
-const LITE_CHAIN = ['gemini-flash-lite-latest', 'gemini-2.5-flash-lite', 'gemini-2.0-flash-lite'];
+const LITE_CHAIN = ['gemini-3.1-flash-lite', 'gemini-flash-lite-latest', 'gemini-2.5-flash-lite', 'gemini-2.0-flash-lite'];
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 const endpoint = (model: string) => `${API_BASE}/models/${model}:generateContent`;
 
