@@ -28,14 +28,27 @@ export const SYSTEM_PROMPT =
   'AKTIONEN: Wenn der Nutzer dich bittet, Aufgaben/Erinnerungen oder eine Checkliste ' +
   'ANZULEGEN (z. B. „mach mir daraus Aufgaben", „erstelle eine Packliste"), hänge ans ' +
   'ENDE deiner Antwort GENAU EINEN Block in diesem Format an:\n' +
-  '```stoa-aktionen\n{"aufgaben":[{"titel":"…","datum":"YYYY-MM-DD","zeit":"HH:MM"}],"checkliste":["…"]}\n```\n' +
-  'datum/zeit sind optional; „checkliste" nur, wenn der Chat zu einer Notiz gehört. ' +
+  '```stoa-aktionen\n{"aufgaben":[{"titel":"…","datum":"YYYY-MM-DD","zeit":"HH:MM"}],"checkliste":["…"],"notizen":["…"]}\n```\n' +
+  'datum/zeit sind optional; „checkliste" nur, wenn der Chat zu einer Notiz gehört; ' +
+  '„notizen" für Gedanken/Ideen ohne Handlung (erste Zeile wird der Titel). ' +
   'Nutze den Block NUR bei einer ausdrücklichen Anlege-Bitte, nie ungefragt.';
+
+/** Braindump: ein Wurf unsortierter Gedanken → NUR der Aktions-Block. */
+export function buildBraindumpContext(todayLabel: string): string {
+  return (
+    `Heute ist ${todayLabel}. Der Nutzer kippt einen unsortierten Braindump ab. ` +
+    'Zerlege ALLES vollständig in den stoa-aktionen-Block: Handlungen → "aufgaben" ' +
+    '(mit datum/zeit, wenn erkennbar — relative Angaben wie „morgen" auflösen), ' +
+    'Gedanken/Ideen/Fakten → "notizen" (sinnvoll gruppiert, erste Zeile = Titel). ' +
+    'Keine "checkliste". Antworte mit maximal einem kurzen Satz plus dem Block — nichts darf verloren gehen.'
+  );
+}
 
 // ——— Aktions-Block: strukturierte Vorschläge aus der Antwort ziehen. ———
 export type AssistantAction = {
   aufgaben: { titel: string; datum?: string; zeit?: string }[];
   checkliste: string[];
+  notizen: string[];
 };
 
 const ACTION_RE = /```stoa-aktionen\s*\n([\s\S]*?)```/;
@@ -45,8 +58,20 @@ export function extractActions(text: string): { clean: string; actions: Assistan
   const m = ACTION_RE.exec(text);
   if (!m) return { clean: text, actions: null };
   const clean = text.replace(ACTION_RE, '').trim();
+  // Modelle setzen gelegentlich ECHTE Zeilenumbrüche in JSON-Strings —
+  // erster Versuch roh, zweiter mit escapten Newlines.
+  const jsonText = m[1].trim();
+  let raw: Record<string, unknown>;
   try {
-    const raw = JSON.parse(m[1]) as Record<string, unknown>;
+    raw = JSON.parse(jsonText) as Record<string, unknown>;
+  } catch {
+    try {
+      raw = JSON.parse(jsonText.replace(/\r?\n/g, '\\n')) as Record<string, unknown>;
+    } catch {
+      return { clean, actions: null };
+    }
+  }
+  try {
     const aufgaben = Array.isArray(raw.aufgaben)
       ? raw.aufgaben
           .filter((a): a is Record<string, unknown> => typeof a === 'object' && a !== null)
@@ -60,8 +85,11 @@ export function extractActions(text: string): { clean: string; actions: Assistan
     const checkliste = Array.isArray(raw.checkliste)
       ? raw.checkliste.filter((c): c is string => typeof c === 'string' && c.trim().length > 0).map((c) => c.trim())
       : [];
-    if (aufgaben.length === 0 && checkliste.length === 0) return { clean, actions: null };
-    return { clean, actions: { aufgaben, checkliste } };
+    const notizen = Array.isArray(raw.notizen)
+      ? raw.notizen.filter((n): n is string => typeof n === 'string' && n.trim().length > 0).map((n) => n.trim())
+      : [];
+    if (aufgaben.length === 0 && checkliste.length === 0 && notizen.length === 0) return { clean, actions: null };
+    return { clean, actions: { aufgaben, checkliste, notizen } };
   } catch {
     return { clean, actions: null };
   }

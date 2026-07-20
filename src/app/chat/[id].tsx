@@ -129,6 +129,9 @@ export default function ChatScreen() {
       const lines = actions.checkliste.map((c) => `- [ ] ${c}`).join('\n');
       updateNote.mutate({ id: linkedNote.id, patch: { body: `${linkedNote.body}\n${lines}` } });
     }
+    for (const n of actions.notizen) {
+      await createNote.mutateAsync({ body: n, taskId: chat?.taskId ?? null, eventId: chat?.eventId ?? null });
+    }
     setAppliedActionIds((prev) => new Set(prev).add(m.id));
   };
 
@@ -318,6 +321,11 @@ export default function ChatScreen() {
                   {actions.checkliste.map((c, i) => (
                     <Type key={`c${i}`} variant="caption" tone="text2" numberOfLines={1}>
                       ☐ {c} <Type variant="caption" tone="text3">(Notiz-Checkliste)</Type>
+                    </Type>
+                  ))}
+                  {actions.notizen.map((n, i) => (
+                    <Type key={`n${i}`} variant="caption" tone="text2" numberOfLines={1}>
+                      ✎ {n.split('\n')[0]} <Type variant="caption" tone="text3">(Notiz)</Type>
                     </Type>
                   ))}
                   <PressableScale

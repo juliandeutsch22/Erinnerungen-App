@@ -28,6 +28,21 @@ Braucht `expo prebuild` + native Targets in der IPA-GitHub-Action:
 
 ## Erlebnis-Features (Ideen-Backlog)
 
+- **„An diesem Tag" — die stille Chronik** — Tagesseite aus Erledigtem,
+  Terminen, Fotos und Notizen + „Vor einem Jahr"-Moment im Rückblick.
+- **Countdown-Momente** — große Ereignisse als ruhige Kachel auf Heute,
+  optional mit Termin-Foto als Hintergrund.
+- **Tagesmaxime** — kuratierte stoische Zitate (offline) morgens auf Heute.
+- **KI-Wochenreflexion** — sonntags fasst der Assistent die Woche zusammen
+  (als Notiz „Woche N" gespeichert).
+- **Lebendiger Tempel** — Backdrop-Licht wandert mit Tages-/Jahreszeit.
+- **Antike Listen-Ikonografie** — eigene Icon-Familie (Amphore, Lyra, …).
+- **Wochentafel-Export** — die Woche als gesetztes Bild/PDF (Antiqua, Mäander).
+- **Erledigt-Moment** — Lorbeer-Glanz beim Abhaken der letzten Tagesaufgabe.
+- **Dokumente an Terminen** — Tickets/PDFs anheften (Konzept besprochen).
+- **Journaling / Abendbetrachtung** — Seneca-Frage als Abend-Ritual
+  (Konzept besprochen, verwoben mit Chronik + Wochenrückblick).
+
 - **Routinen/Gewohnheiten mit Säulen-Streaks** — tägliche Gewohnheiten ohne
   Überfällig-Druck; jede volle Woche baut eine Säule (Trommel für Trommel,
   Kapitell bei 7/7). Kandidat fürs nächste große Feature.

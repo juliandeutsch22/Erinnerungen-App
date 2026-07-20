@@ -48,6 +48,15 @@ describe('extractActions', () => {
     ]);
     expect(actions?.checkliste).toEqual(['Milch']);
   });
+  it('verkraftet echte Zeilenumbrüche in JSON-Strings (Modell-Marotte)', () => {
+    const { actions } = extractActions('```stoa-aktionen\n{"notizen":["Idee\nZweite Zeile"]}\n```');
+    expect(actions?.notizen).toEqual(['Idee\nZweite Zeile']);
+  });
+  it('liest Notizen (Braindump) aus dem Block', () => {
+    const { actions } = extractActions('```stoa-aktionen\n{"notizen":["Geschenkidee\\nBuch für Anna"]}\n```');
+    expect(actions?.notizen).toEqual(['Geschenkidee\nBuch für Anna']);
+    expect(actions?.aufgaben).toEqual([]);
+  });
   it('ohne Block / bei kaputtem JSON: nur Text, keine Aktionen', () => {
     expect(extractActions('Nur Text').actions).toBeNull();
     const broken = extractActions('X\n```stoa-aktionen\n{kaputt\n```');

@@ -3,7 +3,7 @@
 // Kalender-Glyph. Swipe links = löschen. Ohne API-Schlüssel erklärt die
 // Seite die Einrichtung (Feature ist strikt opt-in).
 import { useRouter } from 'expo-router';
-import { CalendarDays, ChevronLeft, ListTodo, NotebookPen, Plus, Sparkles } from 'lucide-react-native';
+import { BrainCircuit, CalendarDays, ChevronLeft, ListTodo, NotebookPen, Plus, Sparkles } from 'lucide-react-native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import ReanimatedSwipeable, { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
@@ -133,6 +133,20 @@ export default function ChatsScreen() {
                 <Type variant="label" tone="teal">Plane meinen Tag</Type>
                 <Type variant="caption" tone="text3">
                   Der Assistent kennt deine heutigen Termine und Aufgaben und schlägt eine Reihenfolge vor.
+                </Type>
+              </View>
+            </PressableScale>
+            <Seam marginVertical={Spacing.sm} />
+            <PressableScale
+              accessibilityLabel="Braindump öffnen"
+              onPress={() => router.push('/braindump')}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}
+            >
+              <BrainCircuit size={18} color={colors.teal} strokeWidth={2.2} />
+              <View style={{ flex: 1 }}>
+                <Type variant="label" tone="teal">Braindump</Type>
+                <Type variant="caption" tone="text3">
+                  Alles abkippen — der Assistent sortiert es in Aufgaben und Notizen.
                 </Type>
               </View>
             </PressableScale>
