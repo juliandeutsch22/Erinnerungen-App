@@ -133,9 +133,18 @@ export function buildTaskContext(task: Task): string {
   return lines.join('\n');
 }
 
-/** Verlauf → Gemini-Format; Kontext wandert in die System-Instruction. */
-export function buildRequestBody(messages: ChatMessage[], context: string | null): unknown {
-  const system = context ? `${SYSTEM_PROMPT}\n\nKontext des verknüpften Termins:\n${context}` : SYSTEM_PROMPT;
+/** Verlauf → Gemini-Format; Kontext wandert in die System-Instruction.
+ *  Datum + Uhrzeit gehen IMMER mit — sonst rät das Modell bei „heute Abend"
+ *  ein Datum aus seinen Trainingsdaten. */
+export function buildRequestBody(messages: ChatMessage[], context: string | null, now: Date = new Date()): unknown {
+  const dateLine =
+    `Heute ist ${now.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}, ` +
+    `${now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr ` +
+    `(ISO: ${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}). ` +
+    'Relative Angaben wie „heute", „morgen" oder „nächste Woche" beziehen sich hierauf.';
+  const system =
+    `${SYSTEM_PROMPT}\n\n${dateLine}` +
+    (context ? `\n\nKontext des verknüpften Termins:\n${context}` : '');
   return {
     systemInstruction: { parts: [{ text: system }] },
     contents: messages.slice(-HISTORY_LIMIT).map((m) => ({

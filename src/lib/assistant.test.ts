@@ -109,3 +109,15 @@ describe('pickModelsFromList', () => {
     expect(pickModelsFromList({})).toEqual({ model: null, lite: null });
   });
 });
+
+describe('buildRequestBody — Datum', () => {
+  it('gibt dem Modell immer das heutige Datum mit (gegen Trainingsdaten-Raten)', () => {
+    const body = buildRequestBody([], null, new Date(2026, 6, 20, 21, 5)) as {
+      systemInstruction: { parts: { text: string }[] };
+    };
+    const system = body.systemInstruction.parts[0].text;
+    expect(system).toContain('2026-07-20');
+    expect(system).toContain('Juli');
+    expect(system).toContain('„heute"');
+  });
+});
