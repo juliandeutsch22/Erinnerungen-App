@@ -21,9 +21,12 @@ export type ScreenProps = ScrollViewProps & {
   /** Pull-to-Refresh (§D.2): Zustand + Handler. */
   refreshing?: boolean;
   onRefresh?: () => void;
+  /** Zugriff auf die Scroll-Methoden (z. B. scrollToEnd, wenn die Tastatur
+   *  ein Eingabefeld am Seitenende freilegen muss). */
+  scrollHandle?: React.MutableRefObject<{ scrollToEnd: (o?: { animated?: boolean }) => void } | null>;
 };
 
-export function Screen({ children, withTabBar = true, scroll = true, refreshing, onRefresh, style, contentContainerStyle, ...rest }: ScreenProps) {
+export function Screen({ children, withTabBar = true, scroll = true, refreshing, onRefresh, scrollHandle, style, contentContainerStyle, ...rest }: ScreenProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const bottomPad = (withTabBar ? TAB_BAR_SAFE_BOTTOM : insets.bottom) + Spacing.lg;
@@ -57,7 +60,10 @@ export function Screen({ children, withTabBar = true, scroll = true, refreshing,
     <View style={{ flex: 1 }}>
       <Backdrop scrollY={scrollY} />
       <Animated.ScrollView
-        ref={scrollRef}
+        ref={(node: React.ElementRef<typeof Animated.ScrollView> | null) => {
+          (scrollRef as React.MutableRefObject<unknown>).current = node;
+          if (scrollHandle) scrollHandle.current = node as unknown as { scrollToEnd: (o?: { animated?: boolean }) => void } | null;
+        }}
         style={[{ backgroundColor: 'transparent' }, style]}
         contentContainerStyle={[
           { paddingTop: insets.top + Spacing.lg, paddingBottom: bottomPad, paddingHorizontal: Spacing.lg },

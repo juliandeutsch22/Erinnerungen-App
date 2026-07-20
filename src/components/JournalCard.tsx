@@ -18,7 +18,7 @@ import { R, Spacing, T } from '@/theme/theme.tokens';
 
 export const JOURNAL_PROMPT = 'Was lief heute gut? Was habe ich gelernt?';
 
-export function JournalCard({ today }: { today: string }) {
+export function JournalCard({ today, onFocusInput }: { today: string; onFocusInput?: () => void }) {
   const colors = useColors();
   const router = useRouter();
   const { data: entries } = useJournal();
@@ -55,6 +55,10 @@ export function JournalCard({ today }: { today: string }) {
     [],
   );
 
+  // Nur bei aktivem Feld nachscrollen — sonst würde schon der Seitenaufbau
+  // (initiale Größenmessung) die Heute-Seite ans Ende ziehen.
+  const [focused, setFocused] = useState(false);
+
   const streak = useMemo(() => journalStreak(entries ?? [], today), [entries, today]);
   const hasHistory = (entries ?? []).some((e) => e.text.trim().length > 0);
 
@@ -74,6 +78,15 @@ export function JournalCard({ today }: { today: string }) {
         accessibilityLabel="Abendbetrachtung schreiben"
         value={text ?? ''}
         onChangeText={onChange}
+        onFocus={() => {
+          setFocused(true);
+          onFocusInput?.();
+        }}
+        onBlur={() => setFocused(false)}
+        // Neue Zeile → Feld wächst nach unten → Karte über der Tastatur halten.
+        onContentSizeChange={() => {
+          if (focused) onFocusInput?.();
+        }}
         multiline
         scrollEnabled={false}
         placeholder="Ein paar ehrliche Zeilen genügen …"

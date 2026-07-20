@@ -4,7 +4,7 @@
 // einklappbare „Erledigt heute"-Sektion. Abhaken = Teal-Puls + Haptik.
 import { useRouter } from 'expo-router';
 import { CalendarCheck, Plus, Settings, Sparkles, Sun } from 'lucide-react-native';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 
 import { DisclosureChevron } from '@/components/DisclosureChevron';
@@ -130,6 +130,9 @@ export default function HeuteScreen() {
   }, [tasks, today, eventsByDay]);
 
   // Abendbetrachtung: ab 18 Uhr — oder früher, wenn heute schon etwas steht.
+  // Die Karte liegt am Seitenende — beim Fokussieren muss sie über die
+  // Tastatur gescrollt werden (Insets kommen von automaticallyAdjustKeyboardInsets).
+  const scrollHandle = useRef<{ scrollToEnd: (o?: { animated?: boolean }) => void } | null>(null);
   const { data: journalEntries } = useJournal();
   const hasTodayJournal = useMemo(
     () => (journalEntries ?? []).some((e) => e.date === today && e.text.trim().length > 0),
@@ -360,7 +363,11 @@ export default function HeuteScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-    <Screen contentContainerStyle={{ paddingBottom: TAB_BAR_SAFE_BOTTOM + 84 }}>
+    <Screen
+      contentContainerStyle={{ paddingBottom: TAB_BAR_SAFE_BOTTOM + 84 }}
+      automaticallyAdjustKeyboardInsets
+      scrollHandle={scrollHandle}
+    >
       <Reveal>
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
           {/* flex:1 + adjustsFontSize: Begrüßung kann nie abgeschnitten werden. */}
@@ -492,7 +499,13 @@ export default function HeuteScreen() {
       {/* Abendbetrachtung — das Abend-Ritual am Ende des Tages (und der Seite). */}
       {(hour >= 18 || hasTodayJournal) && (
         <Reveal delay={upcoming.length > 0 ? 230 : 160}>
-          <JournalCard today={today} />
+          <JournalCard
+            today={today}
+            onFocusInput={() => {
+              // Erst wenn Tastatur + Insets stehen, ans Ende ziehen.
+              setTimeout(() => scrollHandle.current?.scrollToEnd({ animated: true }), 300);
+            }}
+          />
         </Reveal>
       )}
 
