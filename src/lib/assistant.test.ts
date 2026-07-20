@@ -1,7 +1,7 @@
 // assistant.test.ts — Prompt-Bau, Antwort-Extraktion, Fehlertexte.
 import type { ChatMessage } from '@/data/types';
 
-import { buildRequestBody, describeError, extractActions, extractText } from './assistant';
+import { buildRequestBody, describeError, extractActions, extractText, pickModelsFromList } from './assistant';
 
 const msg = (role: 'user' | 'assistant', content: string, at: string): ChatMessage => ({
   id: `m-${at}`, chatId: 'c1', role, content, createdAt: at,
@@ -74,5 +74,38 @@ describe('describeError', () => {
     expect(describeError(403)).toContain('Schlüssel');
     expect(describeError(429)).toContain('Kontingent');
     expect(describeError(503)).toContain('nicht erreichbar');
+  });
+});
+
+describe('pickModelsFromList', () => {
+  const list = (names: string[], methods: string[] = ['generateContent']) => ({
+    models: names.map((n) => ({ name: `models/${n}`, supportedGenerationMethods: methods })),
+  });
+
+  it('wählt das neueste stabile Flash-Modell plus Lite-Variante', () => {
+    const { model, lite } = pickModelsFromList(
+      list([
+        'gemini-2.0-flash',
+        'gemini-2.5-flash',
+        'gemini-2.5-flash-lite',
+        'gemini-2.5-pro',
+        'gemini-embedding-001',
+        'gemini-2.5-flash-preview-09-2025',
+        'gemini-2.5-flash-image',
+      ]),
+    );
+    expect(model).toBe('gemini-2.5-flash');
+    expect(lite).toBe('gemini-2.5-flash-lite');
+  });
+
+  it('ignoriert Modelle ohne generateContent und fällt notfalls auf Nicht-Flash zurück', () => {
+    expect(pickModelsFromList(list(['gemini-2.5-flash'], ['embedContent'])).model).toBeNull();
+    expect(pickModelsFromList(list(['gemini-2.5-pro'])).model).toBe('gemini-2.5-pro');
+  });
+
+  it('bleibt bei kaputten Antworten ruhig', () => {
+    expect(pickModelsFromList(null)).toEqual({ model: null, lite: null });
+    expect(pickModelsFromList({ models: 'quatsch' })).toEqual({ model: null, lite: null });
+    expect(pickModelsFromList({})).toEqual({ model: null, lite: null });
   });
 });

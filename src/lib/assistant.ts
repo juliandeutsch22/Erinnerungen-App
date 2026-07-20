@@ -6,11 +6,15 @@ import type { ChatMessage, Note, Task } from '@/data/types';
 import { noteTitle } from '@/lib/noteLogic';
 import type { DeviceEvent } from '@/lib/deviceCalendar';
 
-const MODEL = 'gemini-2.5-flash';
-/** Fallback, wenn das Tageskontingent des Hauptmodells erschöpft ist (429). */
-const FALLBACK_MODEL = 'gemini-2.5-flash-lite';
-const endpoint = (model: string) =>
-  `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+// Google zieht Modell-IDs regelmäßig zurück (dann kommt HTTP 404) — darum keine
+// einzelne feste ID, sondern Kandidaten-Ketten: die „-latest"-Aliasse zeigen immer
+// auf das aktuelle Modell, die versionierten IDs sind das Netz darunter. Greift
+// keine, fragt discoverModels() beim Dienst nach, was der Schlüssel wirklich kann.
+const MODEL_CHAIN = ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash'];
+/** Kleinere Lite-Kette, wenn das Tageskontingent des Hauptmodells erschöpft ist (429). */
+const LITE_CHAIN = ['gemini-flash-lite-latest', 'gemini-2.5-flash-lite', 'gemini-2.0-flash-lite'];
+const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
+const endpoint = (model: string) => `${API_BASE}/models/${model}:generateContent`;
 
 /** Wie viele Verlaufs-Nachrichten mitgeschickt werden (Kosten-/Limit-Schutz). */
 const HISTORY_LIMIT = 24;
@@ -157,10 +161,37 @@ export function extractText(response: unknown): string | null {
 export function describeError(status: number): string {
   if (status === 400 || status === 401 || status === 403)
     return 'Der API-Schlüssel wurde abgelehnt. Prüfe ihn in den Einstellungen.';
+  if (status === 404)
+    return (
+      'Kein verfügbares Gemini-Modell gefunden — auch die Alternativen nicht. ' +
+      'Prüfe, ob der Schlüssel unter aistudio.google.com erstellt wurde.'
+    );
   if (status === 429)
     return 'Das Tages-Kontingent des Gratis-Schlüssels ist erschöpft — später erneut versuchen.';
   if (status >= 500) return 'Der Dienst ist gerade nicht erreichbar. Versuch es gleich nochmal.';
   return `Anfrage fehlgeschlagen (HTTP ${status}).`;
+}
+
+/** Modell-Liste des Dienstes → bestes Flash- und Lite-Modell (rein, testbar).
+ *  Bevorzugt stabile Flash-Modelle, neueste zuerst; Spezialmodelle
+ *  (Embedding, Bild, Audio, Preview …) bleiben außen vor. */
+export function pickModelsFromList(response: unknown): { model: string | null; lite: string | null } {
+  if (typeof response !== 'object' || response === null) return { model: null, lite: null };
+  const models = (response as { models?: unknown }).models;
+  if (!Array.isArray(models)) return { model: null, lite: null };
+  const names = models
+    .filter((m): m is { name: string; supportedGenerationMethods?: unknown } =>
+      typeof m === 'object' && m !== null && typeof (m as { name?: unknown }).name === 'string')
+    .filter((m) => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent'))
+    .map((m) => m.name.replace(/^models\//, ''))
+    .filter((n) => n.startsWith('gemini-'))
+    .filter((n) => !/(embedding|image|tts|audio|live|exp|preview)/.test(n));
+  // Lexikografisch absteigend ≈ neueste Version zuerst (2.5 vor 2.0).
+  names.sort((a, b) => (a < b ? 1 : -1));
+  const flash = names.filter((n) => n.includes('flash'));
+  const model = flash.find((n) => !n.includes('lite')) ?? names[0] ?? null;
+  const lite = flash.find((n) => n.includes('lite')) ?? null;
+  return { model, lite };
 }
 
 /** Harte Obergrenze — ein hängender Request darf den Chat nicht blockieren. */
@@ -184,12 +215,68 @@ async function callModel(model: string, apiKey: string, body: unknown): Promise<
   }
 }
 
-/** Eine Antwort holen. Bei erschöpftem Kontingent (429) wird einmal aufs
- *  kleinere Flash-Lite-Modell ausgewichen. Wirft Error mit deutscher Meldung. */
+/** Live beim Dienst nachfragen, welche Modelle der Schlüssel kann —
+ *  das letzte Netz, wenn alle bekannten IDs 404 liefern. */
+async function discoverModels(apiKey: string): Promise<{ model: string | null; lite: string | null }> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const res = await fetch(`${API_BASE}/models?pageSize=1000&key=${encodeURIComponent(apiKey)}`, {
+      signal: controller.signal,
+    });
+    if (!res.ok) return { model: null, lite: null };
+    return pickModelsFromList(await res.json());
+  } catch {
+    return { model: null, lite: null };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Einmal pro App-Lauf ermitteltes, funktionierendes Modell — spätere
+// Nachrichten gehen direkt dorthin statt die Kette neu abzulaufen.
+let workingModel: string | null = null;
+let workingLite: string | null = null;
+
+/** Kette abklappern: 404 (Modell weg/umbenannt) → nächster Kandidat. */
+async function callChain(chain: string[], remembered: string | null, apiKey: string, body: unknown): Promise<{ res: Response; model: string }> {
+  const order = remembered ? [remembered, ...chain.filter((m) => m !== remembered)] : chain;
+  let last: { res: Response; model: string } | null = null;
+  for (const model of order) {
+    const res = await callModel(model, apiKey, body);
+    last = { res, model };
+    if (res.status !== 404) return last;
+  }
+  return last!;
+}
+
+/** Eine Antwort holen. Verschwundene Modelle (404) werden über die Kandidaten-
+ *  Kette und notfalls die Modell-Liste des Dienstes überbrückt; bei erschöpftem
+ *  Kontingent (429) weicht die App auf die Lite-Kette aus. Wirft Error mit
+ *  deutscher Meldung. */
 export async function askAssistant(apiKey: string, messages: ChatMessage[], context: string | null): Promise<string> {
   const body = buildRequestBody(messages, context);
-  let res = await callModel(MODEL, apiKey, body);
-  if (res.status === 429) res = await callModel(FALLBACK_MODEL, apiKey, body);
+  let { res, model } = await callChain(MODEL_CHAIN, workingModel, apiKey, body);
+
+  // Alle bekannten IDs sind 404 → beim Dienst nachfragen, was es wirklich gibt.
+  if (res.status === 404) {
+    const found = await discoverModels(apiKey);
+    if (found.lite) workingLite = found.lite;
+    if (found.model) {
+      model = found.model;
+      res = await callModel(model, apiKey, body);
+    }
+  }
+  if (res.ok) workingModel = model;
+
+  if (res.status === 429) {
+    const lite = await callChain(LITE_CHAIN, workingLite, apiKey, body);
+    if (lite.res.status !== 404) {
+      res = lite.res;
+      if (res.ok) workingLite = lite.model;
+    }
+  }
+
   if (!res.ok) throw new Error(describeError(res.status));
   const text = extractText(await res.json());
   if (!text) throw new Error('Leere Antwort erhalten — versuch es nochmal.');
