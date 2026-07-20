@@ -4,7 +4,7 @@
 // tappbar (z. B. vorbefüllte Airbnb-/Booking-Suchen). Der Termin-Kontext
 // steckt als Snapshot im Chat und wandert in die System-Instruction.
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowUp, CalendarDays, ChevronLeft, Sparkles, Trash2 } from 'lucide-react-native';
+import { ArrowUp, CalendarDays, ChevronLeft, ListTodo, NotebookPen, Sparkles, Trash2 } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Linking, Platform, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,8 +15,11 @@ import { PressableScale } from '@/components/PressableScale';
 import { LoadingState } from '@/components/StateView';
 import { Type } from '@/components/Type';
 import { useAppendMessage, useChatMessages, useChats, useDeleteChat, useUpdateChat } from '@/data/chatQueries';
+import { useNotes } from '@/data/noteQueries';
+import { useTasks } from '@/data/queries';
 import type { ChatMessage } from '@/data/types';
-import { askAssistant } from '@/lib/assistant';
+import { askAssistant, buildNoteContext, buildTaskContext } from '@/lib/assistant';
+import { noteTitle } from '@/lib/noteLogic';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { webNoOutline } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
@@ -73,6 +76,27 @@ export default function ChatScreen() {
   const apiKey = useSettings((s) => s.geminiApiKey);
 
   const chat = (chats ?? []).find((c) => c.id === id);
+
+  // Live-Kontext: Notiz/Aufgabe werden bei JEDEM Senden frisch gelesen —
+  // der Assistent arbeitet immer mit dem aktuellen Inhalt.
+  const { data: notes } = useNotes();
+  const { data: tasks } = useTasks();
+  const linkedNote = chat?.noteId ? (notes ?? []).find((n) => n.id === chat.noteId) : undefined;
+  const linkedTask = chat?.taskId ? (tasks ?? []).find((t) => t.id === chat.taskId) : undefined;
+  const effectiveContext = linkedNote
+    ? buildNoteContext(linkedNote)
+    : linkedTask
+      ? buildTaskContext(linkedTask)
+      : (chat?.context ?? null);
+  const contextLabel = linkedNote
+    ? noteTitle(linkedNote.body)
+    : linkedTask
+      ? linkedTask.title
+      : chat?.context
+        ? chat.context.split('\n')[0].replace('Termin: ', '')
+        : null;
+  const ContextIcon = linkedNote ? NotebookPen : linkedTask ? ListTodo : CalendarDays;
+
   const [draft, setDraft] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -98,7 +122,7 @@ export default function ChatScreen() {
     setPending(true);
     try {
       const history: ChatMessage[] = [...(messages ?? []), userMsg];
-      const answer = await askAssistant(apiKey, history, chat.context);
+      const answer = await askAssistant(apiKey, history, effectiveContext);
       await appendMessage.mutateAsync({ chatId: id, role: 'assistant', content: answer });
       hapticSuccess();
     } catch (e) {
@@ -133,11 +157,11 @@ export default function ChatScreen() {
           </PressableScale>
           <View style={{ flex: 1, alignItems: 'center' }}>
             <Type variant="label" numberOfLines={1}>{chat?.title ?? 'Chat'}</Type>
-            {chat?.context && (
+            {contextLabel && (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <CalendarDays size={11} color={colors.text3} strokeWidth={2} />
+                <ContextIcon size={11} color={colors.text3} strokeWidth={2} />
                 <Type variant="caption" tone="text3" numberOfLines={1}>
-                  {chat.context.split('\n')[0].replace('Termin: ', '')}
+                  {contextLabel}
                 </Type>
               </View>
             )}
@@ -159,9 +183,13 @@ export default function ChatScreen() {
             <View style={{ alignItems: 'center', paddingTop: Spacing.xxl, gap: Spacing.sm }}>
               <Sparkles size={22} color={colors.teal} strokeWidth={2} />
               <Type variant="caption" tone="text3" style={{ textAlign: 'center', paddingHorizontal: Spacing.lg }}>
-                {chat?.context
-                  ? 'Der Assistent kennt den Termin bereits — frag z. B. nach einer Unterkunft, Restaurants oder einer Packliste.'
-                  : 'Frag den Assistenten — ohne Termin-Verknüpfung antwortet er allgemein.'}
+                {linkedNote
+                  ? 'Der Assistent liest die Notiz live mit — bitte ihn z. B. um Zusammenfassung, Struktur oder nächste Schritte.'
+                  : linkedTask
+                    ? 'Der Assistent kennt die Erinnerung samt Details — frag nach einem Plan, Teilschritten oder Formulierungen.'
+                    : effectiveContext
+                      ? 'Der Assistent kennt den Termin bereits — frag z. B. nach einer Unterkunft, Restaurants oder einer Packliste.'
+                      : 'Frag den Assistenten — ohne Verknüpfung antwortet er allgemein.'}
               </Type>
             </View>
           )}

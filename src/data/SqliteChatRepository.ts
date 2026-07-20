@@ -5,7 +5,7 @@ import type { Chat, ChatMessage } from './types';
 
 type ChatRow = {
   id: string; title: string; event_id: string | null; task_id: string | null;
-  context: string | null; created_at: string; updated_at: string;
+  note_id: string | null; context: string | null; created_at: string; updated_at: string;
 };
 type MessageRow = { id: string; chat_id: string; role: string; content: string; created_at: string };
 
@@ -15,6 +15,7 @@ function toChat(r: ChatRow): Chat {
     title: r.title,
     eventId: r.event_id,
     taskId: r.task_id,
+    noteId: r.note_id,
     context: r.context,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -41,9 +42,9 @@ export class SqliteChatRepository implements ChatRepository {
   async create(chat: Chat): Promise<void> {
     const db = await getDb();
     await db.runAsync(
-      `INSERT OR REPLACE INTO chats (id, title, event_id, task_id, context, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [chat.id, chat.title, chat.eventId, chat.taskId, chat.context, chat.createdAt, chat.updatedAt],
+      `INSERT OR REPLACE INTO chats (id, title, event_id, task_id, note_id, context, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [chat.id, chat.title, chat.eventId, chat.taskId, chat.noteId, chat.context, chat.createdAt, chat.updatedAt],
     );
   }
 
@@ -52,7 +53,7 @@ export class SqliteChatRepository implements ChatRepository {
     const sets: string[] = [];
     const args: (string | null)[] = [];
     const map: Record<string, string> = {
-      title: 'title', eventId: 'event_id', taskId: 'task_id', context: 'context',
+      title: 'title', eventId: 'event_id', taskId: 'task_id', noteId: 'note_id', context: 'context',
       createdAt: 'created_at', updatedAt: 'updated_at',
     };
     for (const [key, col] of Object.entries(map)) {

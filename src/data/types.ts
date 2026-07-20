@@ -105,6 +105,8 @@ export type Chat = {
   title: string;
   eventId: string | null;
   taskId: string | null;
+  /** An eine Notiz gehängt: der Chat liest ihren Inhalt LIVE (kein Snapshot). */
+  noteId: string | null;
   context: string | null;
   createdAt: string; // ISO
   updatedAt: string; // ISO

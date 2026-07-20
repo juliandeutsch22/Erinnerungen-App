@@ -3,7 +3,7 @@
 // Kalender-Glyph. Swipe links = löschen. Ohne API-Schlüssel erklärt die
 // Seite die Einrichtung (Feature ist strikt opt-in).
 import { useRouter } from 'expo-router';
-import { CalendarDays, ChevronLeft, Plus, Sparkles } from 'lucide-react-native';
+import { CalendarDays, ChevronLeft, ListTodo, NotebookPen, Plus, Sparkles } from 'lucide-react-native';
 import React, { useRef } from 'react';
 import { View } from 'react-native';
 import ReanimatedSwipeable, { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
@@ -109,6 +109,8 @@ function ChatRow({ chat, today, onPress }: { chat: Chat; today: string; onPress:
       </Type>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
         {chat.eventId && <CalendarDays size={12} color={colors.text3} strokeWidth={2} />}
+        {chat.noteId && <NotebookPen size={12} color={colors.text3} strokeWidth={2} />}
+        {chat.taskId && <ListTodo size={12} color={colors.text3} strokeWidth={2} />}
         <View style={{ flex: 1 }} />
         <Type variant="caption" tone="text3" tabular>{dateLabel}</Type>
       </View>

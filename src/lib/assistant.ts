@@ -2,7 +2,8 @@
 // Bewusst OHNE eigenen Server: das Gerät spricht die API direkt an — keine
 // laufenden Kosten, kein Mittelsmann. Reine Logik testbar (Prompt-Bau,
 // Antwort-Extraktion); der fetch selbst wird im Test nicht ausgeführt.
-import type { ChatMessage } from '@/data/types';
+import type { ChatMessage, Note, Task } from '@/data/types';
+import { noteTitle } from '@/lib/noteLogic';
 import type { DeviceEvent } from '@/lib/deviceCalendar';
 
 const MODEL = 'gemini-2.5-flash';
@@ -35,6 +36,24 @@ export function buildEventContext(ev: DeviceEvent): string {
     `Check-out-Datum (ISO): ${ev.end.toISOString().slice(0, 10)}`,
   ];
   if (ev.notes) lines.push(`Notizen zum Termin: ${ev.notes}`);
+  return lines.join('\n');
+}
+
+/** Notiz-Kontext — wird bei JEDEM Senden frisch gebaut (Live-Zugriff). */
+const NOTE_CONTEXT_LIMIT = 8000;
+export function buildNoteContext(note: Note): string {
+  const body = note.body.length > NOTE_CONTEXT_LIMIT ? `${note.body.slice(0, NOTE_CONTEXT_LIMIT)}\n[gekürzt]` : note.body;
+  return `Der Chat gehört zu dieser Notiz („${noteTitle(note.body)}"). Aktueller Inhalt:\n---\n${body}\n---`;
+}
+
+/** Aufgaben-Kontext — ebenfalls live beim Senden. */
+export function buildTaskContext(task: Task): string {
+  const lines = [`Der Chat gehört zu dieser Erinnerung: „${task.title}"`];
+  if (task.dueDate) lines.push(`Fällig: ${task.dueDate}${task.dueTime ? ` um ${task.dueTime}` : ''}`);
+  if (task.note) lines.push(`Notiz zur Aufgabe: ${task.note}`);
+  if (task.subtasks.length > 0)
+    lines.push(`Unteraufgaben: ${task.subtasks.map((s) => `${s.done ? '[x]' : '[ ]'} ${s.title}`).join('; ')}`);
+  if (task.tags.length > 0) lines.push(`Tags: ${task.tags.map((t) => `#${t}`).join(' ')}`);
   return lines.join('\n');
 }
 

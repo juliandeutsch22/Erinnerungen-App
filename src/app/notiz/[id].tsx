@@ -6,7 +6,7 @@
 // „- [ ]"-Zeilen am Ende — Suche/Backup/Import bleiben Plain Text.
 // Tastatur: Wisch nach unten (interactive) oder „Fertig"-Leiste.
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { CalendarDays, ChevronLeft, Link2, ListChecks, ListTodo, Pin, Plus, Trash2, X } from 'lucide-react-native';
+import { CalendarDays, ChevronLeft, Link2, ListChecks, ListTodo, Pin, Plus, Sparkles, Trash2, X } from 'lucide-react-native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Keyboard, KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,7 +17,9 @@ import { NoteLinkSheet } from '@/components/NoteLinkSheet';
 import { PressableScale } from '@/components/PressableScale';
 import { Type } from '@/components/Type';
 import { useDeviceEvents } from '@/data/calendarQueries';
+import { useCreateChat } from '@/data/chatQueries';
 import { useDeleteNote, useNotes, useUpdateNote } from '@/data/noteQueries';
+import { useSettings } from '@/theme/settings.store';
 import { useTasks } from '@/data/queries';
 import { addDays, todayStr } from '@/lib/dates';
 import { hasCalendarPermission } from '@/lib/deviceCalendar';
@@ -162,6 +164,8 @@ export default function NotizScreen() {
 
   const bodyRef = useRef<TextInput>(null);
   const draftRef = useRef<TextInput>(null);
+  const createChat = useCreateChat();
+  const hasAssistantKey = useSettings((s) => s.geminiApiKey.length > 0);
 
   // Tastatur offen? → prominenter „Fertig"-Knopf oben rechts (Apple-Muster).
   const [kbVisible, setKbVisible] = useState(false);
@@ -253,6 +257,23 @@ export default function NotizScreen() {
             </PressableScale>
           ) : (
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            {/* Assistent mit LIVE-Zugriff auf diese Notiz (nur mit Schlüssel). */}
+            {hasAssistantKey && (
+              <PressableScale
+                accessibilityLabel="Assistent zu dieser Notiz fragen"
+                onPress={() => {
+                  flush();
+                  hapticSelect();
+                  createChat.mutate(
+                    { title: (title ?? '').trim() || 'Notiz', noteId: id ?? null },
+                    { onSuccess: (c) => router.push(`/chat/${c.id}`) },
+                  );
+                }}
+                style={{ padding: Spacing.sm }}
+              >
+                <Sparkles size={20} color={colors.text3} strokeWidth={2} />
+              </PressableScale>
+            )}
             <PressableScale
               accessibilityLabel="Checkliste öffnen"
               onPress={() => {
