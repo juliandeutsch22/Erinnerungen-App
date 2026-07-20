@@ -6,7 +6,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowUp, CalendarDays, ChevronLeft, Link2, ListTodo, NotebookPen, Sparkles, Trash2 } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Linking, Platform, ScrollView, Text, TextInput, View } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, Linking, Platform, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Backdrop } from '@/components/Backdrop';
@@ -110,6 +110,7 @@ export default function ChatScreen() {
   const createTask = useCreateTask();
   const updateNote = useUpdateNote();
   const scrollRef = useRef<ScrollView>(null);
+  const listHeight = useRef(0);
 
   /** Aktions-Block übernehmen: Aufgaben anlegen, Checkliste an die Notiz anhängen. */
   const applyActions = async (m: ChatMessage) => {
@@ -175,6 +176,19 @@ export default function ChatScreen() {
     const t = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
     return () => clearTimeout(t);
   }, [messages?.length, pending]);
+
+  // Tastatur klappt auf → der Verlauf schrumpft, die letzten Nachrichten dürfen
+  // nicht dahinter verschwinden: beim Öffnen mitscrollen, nach der Animation
+  // (didShow) einmal exakt ans Ende korrigieren.
+  useEffect(() => {
+    const subs = [
+      ...(Platform.OS === 'ios'
+        ? [Keyboard.addListener('keyboardWillShow', () => scrollRef.current?.scrollToEnd({ animated: true }))]
+        : []),
+      Keyboard.addListener('keyboardDidShow', () => scrollRef.current?.scrollToEnd({ animated: false })),
+    ];
+    return () => subs.forEach((s) => s.remove());
+  }, []);
 
   const sendText = async (raw: string) => {
     const text = raw.trim();
@@ -264,6 +278,13 @@ export default function ChatScreen() {
           ref={scrollRef}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
+          // Schrumpft die Fläche (Tastatur, wachsende Eingabezeile), ans Ende
+          // nachziehen — nichts darf hinter der Tastatur liegen bleiben.
+          onLayout={(e) => {
+            const h = e.nativeEvent.layout.height;
+            if (h < listHeight.current) scrollRef.current?.scrollToEnd({ animated: false });
+            listHeight.current = h;
+          }}
           style={{ flex: 1 }}
           contentContainerStyle={{ paddingHorizontal: Spacing.md, paddingTop: Spacing.sm, paddingBottom: Spacing.md, gap: Spacing.sm }}
         >
