@@ -1,16 +1,18 @@
 // backup.test.ts — Export/Import-Roundtrip (Fahrplan §3.8) über die InMemory-Repos.
 import { exportToJsonString, importBackup } from './backup';
 import {
+  __setChatRepositoryForTests,
   __setListRepositoryForTests,
   __setNoteRepositoryForTests,
   __setPhotoRepositoryForTests,
   __setTaskRepositoryForTests,
 } from './index';
+import { InMemoryChatRepository } from './ChatRepository';
 import { InMemoryListRepository } from './ListRepository';
 import { InMemoryNoteRepository } from './NoteRepository';
 import { InMemoryPhotoRepository } from './PhotoRepository';
 import { InMemoryTaskRepository } from './TaskRepository';
-import { getListRepository, getNoteRepository, getPhotoRepository, getTaskRepository } from './index';
+import { getChatRepository, getListRepository, getNoteRepository, getPhotoRepository, getTaskRepository } from './index';
 import type { SavedFilter } from '@/lib/taskFilters';
 import type { Task } from './types';
 
@@ -43,6 +45,7 @@ describe('Backup', () => {
     __setTaskRepositoryForTests(new InMemoryTaskRepository());
     __setPhotoRepositoryForTests(new InMemoryPhotoRepository());
     __setNoteRepositoryForTests(new InMemoryNoteRepository());
+    __setChatRepositoryForTests(new InMemoryChatRepository());
   });
 
   afterEach(() => {
@@ -50,6 +53,7 @@ describe('Backup', () => {
     __setTaskRepositoryForTests(null);
     __setPhotoRepositoryForTests(null);
     __setNoteRepositoryForTests(null);
+    __setChatRepositoryForTests(null);
   });
 
   it('Roundtrip: Export → Import stellt Listen + Aufgaben wieder her', async () => {
@@ -67,6 +71,13 @@ describe('Backup', () => {
       createdAt: '2026-07-02T09:00:00.000Z',
       updatedAt: '2026-07-02T09:30:00.000Z',
     });
+    await getChatRepository().create({
+      id: 'c1', title: 'Airbnb für Rom', eventId: 'evt-42', taskId: null,
+      context: 'Termin: Rom-Reise', createdAt: '2026-07-02T09:00:00.000Z', updatedAt: '2026-07-02T09:30:00.000Z',
+    });
+    await getChatRepository().addMessage({
+      id: 'cm1', chatId: 'c1', role: 'user', content: 'Such mir was Zentrales', createdAt: '2026-07-02T09:05:00.000Z',
+    });
 
     const json = await exportToJsonString(noPhotos, new Date('2026-07-03T12:00:00.000Z'));
 
@@ -75,9 +86,17 @@ describe('Backup', () => {
     __setTaskRepositoryForTests(new InMemoryTaskRepository());
     __setPhotoRepositoryForTests(new InMemoryPhotoRepository());
     __setNoteRepositoryForTests(new InMemoryNoteRepository());
+    __setChatRepositoryForTests(new InMemoryChatRepository());
 
     const result = await importBackup(json);
-    expect(result).toEqual({ lists: 2, tasks: 3, notes: 1, filters: 0, photos: 0 }); // Standardliste + Einkauf
+    expect(result).toEqual({ lists: 2, tasks: 3, notes: 1, filters: 0, photos: 0, chats: 1 }); // Standardliste + Einkauf
+
+    // Chat samt Verlauf und Kontext überlebt den Roundtrip.
+    const restoredChats = await getChatRepository().getAll();
+    expect(restoredChats[0].context).toBe('Termin: Rom-Reise');
+    const restoredMsgs = await getChatRepository().getMessages('c1');
+    expect(restoredMsgs).toHaveLength(1);
+    expect(restoredMsgs[0].content).toContain('Zentrales');
 
     const tasks = await getTaskRepository().getAll();
     const milch = tasks.find((t) => t.id === 't1')!;
@@ -183,7 +202,7 @@ describe('Backup', () => {
       tasks: [{ id: 'x', listId: 'default', title: 'Alt' }],
     });
     const result = await importBackup(json);
-    expect(result).toEqual({ lists: 0, tasks: 1, notes: 0, filters: 0, photos: 0 });
+    expect(result).toEqual({ lists: 0, tasks: 1, notes: 0, filters: 0, photos: 0, chats: 0 });
   });
 
   it('Aufgaben mit unbekannter Liste fallen in die Standardliste', async () => {

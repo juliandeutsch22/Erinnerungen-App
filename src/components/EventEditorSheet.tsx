@@ -2,7 +2,8 @@
 // Formsprache des Aufgaben-Editors: Titel + Notiz oben, kompakte Detail-Zeilen
 // (Kalender / Beginnt / Endet), Primär-Button fest im Footer. Termine können
 // sich über mehrere Tage erstrecken; Uhrzeiten über natives iOS-Rad.
-import { CalendarDays, Plus, Trash2, X } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { CalendarDays, Plus, Sparkles, Trash2, X } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
@@ -19,6 +20,9 @@ import { TaskCheck } from '@/components/TaskCheck';
 import { TimeField } from '@/components/TimeField';
 import { Type } from '@/components/Type';
 import { useCreateEvent, useDeleteEvent, useUpdateEvent } from '@/data/calendarQueries';
+import { useCreateChat } from '@/data/chatQueries';
+import { buildEventContext } from '@/lib/assistant';
+import { useSettings } from '@/theme/settings.store';
 import { DEFAULT_LIST_ID } from '@/data/ListRepository';
 import { useCompleteTask, useCreateTask, useReopenTask, useTasks, useUpdateTask } from '@/data/queries';
 import { addDays, formatDueDate, parseDateStr, toDateStr, todayStr } from '@/lib/dates';
@@ -62,6 +66,9 @@ export function EventEditorSheet({
 
   const writable = useMemo(() => calendars.filter((c) => c.allowsModifications), [calendars]);
   const isEdit = event !== null;
+  const router = useRouter();
+  const createChat = useCreateChat();
+  const hasAssistantKey = useSettings((s) => s.geminiApiKey.length > 0);
 
   // Ende ganztägiger Termine wird exklusiv gespeichert (00:00 Folgetag) →
   // für die Anzeige einen Tag zurück, damit „bis" den letzten echten Tag zeigt.
@@ -285,6 +292,35 @@ export function EventEditorSheet({
           <View style={{ marginTop: Spacing.md }}>
             <EventTasks eventId={event.id} eventDay={startDay} />
           </View>
+        </View>
+      )}
+
+      {/* Assistent: Chat mit eingefrorenem Termin-Kontext (Ort, Daten) starten.
+          Nur sichtbar, wenn ein Gemini-Schlüssel hinterlegt ist (opt-in). */}
+      {isEdit && event && hasAssistantKey && (
+        <View style={{ marginTop: Spacing.md }}>
+          <Hairline />
+          <PressableScale
+            accessibilityLabel="Assistent zu diesem Termin fragen"
+            onPress={() => {
+              createChat.mutate(
+                { title: event.title, eventId: event.id, context: buildEventContext(event) },
+                {
+                  onSuccess: (chat) => {
+                    onClose();
+                    router.push(`/chat/${chat.id}`);
+                  },
+                },
+              );
+            }}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingTop: Spacing.md }}
+          >
+            <Sparkles size={16} color={colors.teal} strokeWidth={2} />
+            <Type variant="label" tone="teal">Assistent fragen</Type>
+            <Type variant="caption" tone="text3" style={{ flex: 1 }} numberOfLines={1}>
+              kennt Daten &amp; Kontext des Termins
+            </Type>
+          </PressableScale>
         </View>
       )}
 

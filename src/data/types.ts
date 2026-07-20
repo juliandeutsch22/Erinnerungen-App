@@ -97,6 +97,27 @@ export type Note = {
   updatedAt: string; // ISO
 };
 
+/** Ein Assistenten-Chat: optional an EINEN Termin und/oder EINE Erinnerung
+ *  gehängt. `context` ist der beim Anlegen eingefrorene Termin-Kontext
+ *  (Titel, Daten, Ort) — so bleibt der Chat auch ohne Kalenderzugriff lesbar. */
+export type Chat = {
+  id: string;
+  title: string;
+  eventId: string | null;
+  taskId: string | null;
+  context: string | null;
+  createdAt: string; // ISO
+  updatedAt: string; // ISO
+};
+
+export type ChatMessage = {
+  id: string;
+  chatId: string;
+  role: 'user' | 'assistant';
+  content: string;
+  createdAt: string; // ISO
+};
+
 /** Dependency-freier ID-Generator (ein Nutzer, ein Gerät — kein UUID nötig). */
 export function newId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);

@@ -74,6 +74,8 @@ export default function EinstellungenScreen() {
   const [feedback, setFeedback] = useState<string | null>(null);
   const [showReminderImport, setShowReminderImport] = useState(false);
   const [showPasteNote, setShowPasteNote] = useState(false);
+  const geminiApiKey = useSettings((s) => s.geminiApiKey);
+  const setGeminiApiKey = useSettings((s) => s.setGeminiApiKey);
 
   const doExport = async () => {
     const json = await exportToJsonString({
@@ -318,6 +320,45 @@ export default function EinstellungenScreen() {
             <ClipboardPaste size={15} color={colors.teal} strokeWidth={2.2} />
             <Type variant="label" tone="teal">Notizen einfügen</Type>
           </GlassButton>
+        </GlassPanel>
+      </Reveal>
+
+      <Reveal delay={190}>
+        <GlassPanel>
+          <Type variant="label" tone="text2">Assistent</Type>
+          <Type variant="caption" tone="text3" style={{ marginTop: 2 }}>
+            Nutzt deinen eigenen Google-Gemini-Schlüssel (dauerhaft kostenloses Kontingent) — Anfragen
+            gehen direkt vom Gerät an Google, ohne Mittelsmann. Schlüssel erstellen:
+            aistudio.google.com/apikey. Ohne Schlüssel bleibt die App vollständig offline.
+          </Type>
+          <TextInput
+            value={geminiApiKey}
+            onChangeText={setGeminiApiKey}
+            placeholder="Gemini-API-Schlüssel einfügen…"
+            placeholderTextColor={colors.text3}
+            autoCapitalize="none"
+            autoCorrect={false}
+            secureTextEntry
+            accessibilityLabel="Gemini-API-Schlüssel"
+            style={[
+              {
+                marginTop: Spacing.md,
+                borderRadius: R.md,
+                borderWidth: 1,
+                borderColor: colors.chipBorder,
+                backgroundColor: colors.chip,
+                padding: Spacing.sm,
+                fontSize: T.sm,
+                color: colors.text,
+              },
+              webNoOutline,
+            ]}
+          />
+          {geminiApiKey.length > 0 && (
+            <Type variant="caption" tone="teal" style={{ marginTop: Spacing.sm }}>
+              Assistent aktiv — Einstieg über ✨ auf „Heute" oder aus einem Termin heraus.
+            </Type>
+          )}
         </GlassPanel>
       </Reveal>
 

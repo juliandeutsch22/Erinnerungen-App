@@ -52,6 +52,23 @@ export function getDb(): Promise<SQLiteDatabase> {
         );
         CREATE INDEX IF NOT EXISTS idx_notes_task ON notes (task_id);
         CREATE INDEX IF NOT EXISTS idx_notes_event ON notes (event_id);
+        CREATE TABLE IF NOT EXISTS chats (
+          id TEXT PRIMARY KEY NOT NULL,
+          title TEXT NOT NULL,
+          event_id TEXT,
+          task_id TEXT,
+          context TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS chat_messages (
+          id TEXT PRIMARY KEY NOT NULL,
+          chat_id TEXT NOT NULL,
+          role TEXT NOT NULL,
+          content TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_chat_messages_chat ON chat_messages (chat_id);
         CREATE TABLE IF NOT EXISTS event_photos (
           id TEXT PRIMARY KEY NOT NULL,
           event_id TEXT NOT NULL,

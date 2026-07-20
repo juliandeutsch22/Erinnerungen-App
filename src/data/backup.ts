@@ -12,10 +12,10 @@ import { Platform, Share } from 'react-native';
 
 import type { FilterRange, SavedFilter } from '@/lib/taskFilters';
 import { remapListColor } from './colorRebrand';
-import { getListRepository, getNoteRepository, getPhotoRepository, getTaskRepository } from './index';
+import { getChatRepository, getListRepository, getNoteRepository, getPhotoRepository, getTaskRepository } from './index';
 import { DEFAULT_LIST_ID } from './ListRepository';
 import type { EventPhoto } from './PhotoRepository';
-import type { List, Note, Rrule, Task } from './types';
+import type { Chat, ChatMessage, List, Note, Rrule, Task } from './types';
 import { newId } from './types';
 
 /** Ein Foto im Backup: Verknüpfung + eingebettete Bilddaten (Base64). */
@@ -37,6 +37,8 @@ export type BackupBundle = {
   notes: Note[];
   savedFilters: SavedFilter[];
   photos: BackupPhoto[];
+  chats: Chat[];
+  chatMessages: ChatMessage[];
 };
 
 /** Quellen, die nur zur Laufzeit verfügbar sind (Store, Datei-IO). */
@@ -48,11 +50,13 @@ export type BackupSources = {
 };
 
 export async function buildBackup(sources: BackupSources, now: Date = new Date()): Promise<BackupBundle> {
-  const [lists, tasks, notes, photoLinks] = await Promise.all([
+  const [lists, tasks, notes, photoLinks, chats, chatMessages] = await Promise.all([
     getListRepository().getAll(),
     getTaskRepository().getAll(),
     getNoteRepository().getAll(),
     getPhotoRepository().getAll(),
+    getChatRepository().getAll(),
+    getChatRepository().getAllMessages(),
   ]);
 
   const extOf = sources.extFromUri ?? ((uri: string) => (uri.split('.').pop() || 'jpg').toLowerCase());
@@ -71,6 +75,8 @@ export async function buildBackup(sources: BackupSources, now: Date = new Date()
     notes,
     savedFilters: sources.savedFilters,
     photos,
+    chats,
+    chatMessages,
   };
 }
 
@@ -130,7 +136,7 @@ export type ImportSinks = {
   writePhotoFromBase64?: (ext: string, base64: string) => Promise<string | null>;
 };
 
-export type ImportResult = { lists: number; tasks: number; notes: number; filters: number; photos: number };
+export type ImportResult = { lists: number; tasks: number; notes: number; filters: number; photos: number; chats: number };
 
 /**
  * Validiert + importiert ein Backup. Ersetzt den kompletten Bestand
@@ -152,6 +158,8 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
   const rawTasks = Array.isArray(parsed.tasks) ? parsed.tasks : [];
   const rawPhotos = Array.isArray(parsed.photos) ? parsed.photos : [];
   const rawNotes = Array.isArray(parsed.notes) ? parsed.notes : [];
+  const rawChats = Array.isArray(parsed.chats) ? parsed.chats : [];
+  const rawChatMessages = Array.isArray(parsed.chatMessages) ? parsed.chatMessages : [];
 
   const lists: List[] = [];
   for (const l of rawLists) {
@@ -216,6 +224,33 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
     });
   }
 
+  // Chats: Titel/Verlauf tolerant übernehmen (ältere Backups haben keine).
+  const chats: Chat[] = [];
+  for (const c of rawChats) {
+    if (!isRecord(c) || !str(c.id) || !str(c.title)) continue;
+    chats.push({
+      id: c.id,
+      title: c.title,
+      eventId: str(c.eventId) ? c.eventId : null,
+      taskId: str(c.taskId) ? c.taskId : null,
+      context: str(c.context) ? c.context : null,
+      createdAt: str(c.createdAt) ? c.createdAt : new Date().toISOString(),
+      updatedAt: str(c.updatedAt) ? c.updatedAt : new Date().toISOString(),
+    });
+  }
+  const chatIds = new Set(chats.map((c) => c.id));
+  const chatMessages: ChatMessage[] = [];
+  for (const m of rawChatMessages) {
+    if (!isRecord(m) || !str(m.id) || !str(m.chatId) || !chatIds.has(m.chatId) || !str(m.content)) continue;
+    chatMessages.push({
+      id: m.id,
+      chatId: m.chatId,
+      role: m.role === 'assistant' ? 'assistant' : 'user',
+      content: m.content,
+      createdAt: str(m.createdAt) ? m.createdAt : new Date().toISOString(),
+    });
+  }
+
   const filters = parseSavedFilters(parsed.savedFilters);
 
   // Fotos: Base64 zurück in echte Container-Dateien schreiben, dann neu verknüpfen.
@@ -238,15 +273,19 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
   const taskRepo = getTaskRepository();
   const photoRepo = getPhotoRepository();
   const noteRepo = getNoteRepository();
+  const chatRepo = getChatRepository();
   await taskRepo.clearAll();
   await listRepo.clearAll();
   await photoRepo.clearAll();
   await noteRepo.clearAll();
+  await chatRepo.clearAll();
   for (const l of lists) await listRepo.create(l);
   for (const t of tasks) await taskRepo.create(t);
   for (const n of notes) await noteRepo.create(n);
+  for (const c of chats) await chatRepo.create(c);
+  for (const m of chatMessages) await chatRepo.addMessage(m);
   await photoRepo.restore(photos);
   sinks.setSavedFilters?.(filters);
 
-  return { lists: lists.length, tasks: tasks.length, notes: notes.length, filters: filters.length, photos: photos.length };
+  return { lists: lists.length, tasks: tasks.length, notes: notes.length, filters: filters.length, photos: photos.length, chats: chats.length };
 }

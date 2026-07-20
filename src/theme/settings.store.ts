@@ -22,6 +22,8 @@ type SettingsState = {
   savedFilters: SavedFilter[];
   /** Bereits importierte Apple-Erinnerungs-IDs (Dedupe bei erneutem Import). */
   importedReminderIds: string[];
+  /** Gemini-API-Schlüssel für den Assistenten (leer = Feature aus). Lokal gespeichert. */
+  geminiApiKey: string;
   /** true, sobald der persistierte Zustand geladen wurde (verhindert Flash). */
   _hasHydrated: boolean;
   setThemePref: (p: ThemePref) => void;
@@ -34,6 +36,7 @@ type SettingsState = {
   /** Ersetzt alle Filter (Backup-Wiederherstellung). */
   setSavedFilters: (f: SavedFilter[]) => void;
   addImportedReminderIds: (ids: string[]) => void;
+  setGeminiApiKey: (key: string) => void;
   setHasHydrated: (v: boolean) => void;
 };
 
@@ -47,6 +50,7 @@ export const useSettings = create<SettingsState>()(
       summaryTime: '09:00',
       savedFilters: [],
       importedReminderIds: [],
+      geminiApiKey: '',
       _hasHydrated: false,
       setThemePref: (themePref) => set({ themePref }),
       setMotionPref: (motionPref) => set({ motionPref }),
@@ -58,6 +62,7 @@ export const useSettings = create<SettingsState>()(
       setSavedFilters: (savedFilters) => set({ savedFilters }),
       addImportedReminderIds: (ids) =>
         set((s) => ({ importedReminderIds: [...new Set([...s.importedReminderIds, ...ids])] })),
+      setGeminiApiKey: (geminiApiKey) => set({ geminiApiKey: geminiApiKey.trim() }),
       setHasHydrated: (_hasHydrated) => set({ _hasHydrated }),
     }),
     {
@@ -72,6 +77,7 @@ export const useSettings = create<SettingsState>()(
         summaryTime: s.summaryTime,
         savedFilters: s.savedFilters,
         importedReminderIds: s.importedReminderIds,
+        geminiApiKey: s.geminiApiKey,
       }),
       // state ist der rehydrierte Store inkl. Actions → kein Bezug auf useSettings
       // während der (ggf. synchronen) Erstellung nötig.

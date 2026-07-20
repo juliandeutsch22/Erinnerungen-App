@@ -3,7 +3,7 @@
 // Uhrzeit auf EINER Glass-Fläche mit Seams, plus dünne Fortschrittslinie und
 // einklappbare „Erledigt heute"-Sektion. Abhaken = Teal-Puls + Haptik.
 import { useRouter } from 'expo-router';
-import { CalendarCheck, Plus, Settings, Sun } from 'lucide-react-native';
+import { CalendarCheck, Plus, Settings, Sparkles, Sun } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 
@@ -361,6 +361,13 @@ export default function HeuteScreen() {
             <Type variant="caption" tone={allDone ? 'teal' : 'text3'} tabular>{summary}</Type>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <PressableScale
+              accessibilityLabel="Assistent öffnen"
+              onPress={() => router.push('/chats')}
+              style={{ padding: Spacing.sm }}
+            >
+              <Sparkles size={20} color={colors.text3} strokeWidth={2} />
+            </PressableScale>
             <PressableScale
               accessibilityLabel="Neue Aufgabe"
               onPress={() => setEditorTask(null)}

@@ -2,6 +2,7 @@
 // nativ → expo-sqlite (offline-first), Web → In-Memory (Web = reine Dev-Preview).
 import { Platform } from 'react-native';
 
+import { ChatRepository, InMemoryChatRepository } from './ChatRepository';
 import { InMemoryListRepository, ListRepository } from './ListRepository';
 import { InMemoryNoteRepository, NoteRepository } from './NoteRepository';
 import { InMemoryPhotoRepository, PhotoRepository } from './PhotoRepository';
@@ -11,6 +12,7 @@ let listSingleton: ListRepository | null = null;
 let taskSingleton: TaskRepository | null = null;
 let photoSingleton: PhotoRepository | null = null;
 let noteSingleton: NoteRepository | null = null;
+let chatSingleton: ChatRepository | null = null;
 
 export function getListRepository(): ListRepository {
   if (listSingleton) return listSingleton;
@@ -57,6 +59,17 @@ export function getNoteRepository(): NoteRepository {
   return noteSingleton;
 }
 
+export function getChatRepository(): ChatRepository {
+  if (chatSingleton) return chatSingleton;
+  if (Platform.OS === 'web') {
+    chatSingleton = new InMemoryChatRepository();
+  } else {
+    const { SqliteChatRepository } = require('./SqliteChatRepository') as typeof import('./SqliteChatRepository');
+    chatSingleton = new SqliteChatRepository();
+  }
+  return chatSingleton;
+}
+
 /** Nur für Tests: erlaubt das Einsetzen eigener Repository-Instanzen. */
 export function __setListRepositoryForTests(repo: ListRepository | null) {
   listSingleton = repo;
@@ -70,8 +83,12 @@ export function __setPhotoRepositoryForTests(repo: PhotoRepository | null) {
 export function __setNoteRepositoryForTests(repo: NoteRepository | null) {
   noteSingleton = repo;
 }
+export function __setChatRepositoryForTests(repo: ChatRepository | null) {
+  chatSingleton = repo;
+}
 
 export type { ListRepository } from './ListRepository';
 export type { TaskRepository } from './TaskRepository';
 export type { PhotoRepository } from './PhotoRepository';
 export type { NoteRepository } from './NoteRepository';
+export type { ChatRepository } from './ChatRepository';

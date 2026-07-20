@@ -1,7 +1,7 @@
 // suche.tsx — Suche über alles (Fahrplan §3.7): Aufgaben (Titel + Notiz,
 // offen wie erledigt), Listen und Notizen. Live-Filter, Treffer öffnen den Editor.
 import { useRouter } from 'expo-router';
-import { NotebookPen, Search } from 'lucide-react-native';
+import { NotebookPen, Search, Sparkles } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { TextInput, View } from 'react-native';
 
@@ -19,6 +19,7 @@ import { TaskEditorSheet } from '@/components/TaskEditorSheet';
 import { TaskQuickSheet } from '@/components/TaskQuickSheet';
 import { TaskRow } from '@/components/TaskRow';
 import { Type } from '@/components/Type';
+import { useAllChatMessages, useChats } from '@/data/chatQueries';
 import { useNotes } from '@/data/noteQueries';
 import { useCompleteTask, useLists, useReopenTask, useTasks } from '@/data/queries';
 import type { Task } from '@/data/types';
@@ -64,6 +65,18 @@ export default function SucheScreen() {
     return (notes ?? []).filter((n) => n.deletedAt === null && n.body.toLowerCase().includes(q)).slice(0, 30);
   }, [notes, q]);
 
+  const { data: chats } = useChats();
+  const { data: allChatMessages } = useAllChatMessages();
+  const chatHits = useMemo(() => {
+    if (!q) return [];
+    const matchingChatIds = new Set(
+      (allChatMessages ?? []).filter((m) => m.content.toLowerCase().includes(q)).map((m) => m.chatId),
+    );
+    return (chats ?? [])
+      .filter((c) => c.title.toLowerCase().includes(q) || matchingChatIds.has(c.id))
+      .slice(0, 20);
+  }, [chats, allChatMessages, q]);
+
   const toggle = (task: Task) => (next: boolean) => {
     if (next) complete.mutate(task);
     else reopen.mutate(task.id);
@@ -107,7 +120,7 @@ export default function SucheScreen() {
       {q.length > 0 && (
         <Reveal delay={90}>
           <GlassPanel>
-            {taskHits.length === 0 && listHits.length === 0 && noteHits.length === 0 ? (
+            {taskHits.length === 0 && listHits.length === 0 && noteHits.length === 0 && chatHits.length === 0 ? (
               <EmptyState
                 icon={<Search size={20} color={colors.teal} strokeWidth={2} />}
                 title="Keine Treffer"
@@ -186,6 +199,27 @@ export default function SucheScreen() {
                           </PressableScale>
                         );
                       })}
+                    </View>
+                  </>
+                )}
+                {chatHits.length > 0 && (
+                  <>
+                    {(taskHits.length > 0 || listHits.length > 0 || noteHits.length > 0) && <Seam marginVertical={Spacing.md} />}
+                    <Type variant="eyebrow" tone="text3">Chats</Type>
+                    <View style={{ marginTop: Spacing.xs }}>
+                      {chatHits.map((c) => (
+                        <PressableScale
+                          key={c.id}
+                          accessibilityLabel={`Chat ${c.title} öffnen`}
+                          onPress={() => router.push(`/chat/${c.id}`)}
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.sm + 2 }}
+                        >
+                          <Sparkles size={18} color={colors.text3} strokeWidth={2} />
+                          <Type variant="body" numberOfLines={1} style={{ flex: 1 }}>
+                            <Highlighted text={c.title} query={q} />
+                          </Type>
+                        </PressableScale>
+                      ))}
                     </View>
                   </>
                 )}
