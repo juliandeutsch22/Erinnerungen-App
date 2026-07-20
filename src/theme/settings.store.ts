@@ -31,6 +31,9 @@ type SettingsState = {
   /** Tägliche Erinnerung an die Abendbetrachtung (Uhrzeit: journalReminderTime). */
   journalReminderEnabled: boolean;
   journalReminderTime: string;
+  /** Assistent bekommt bei jedem Senden den App-Überblick mit
+   *  (Termine/Aufgaben/Listen/Notiz-Titel — nie das Journal). */
+  assistantContextEnabled: boolean;
   /** true, sobald der persistierte Zustand geladen wurde (verhindert Flash). */
   _hasHydrated: boolean;
   setThemePref: (p: ThemePref) => void;
@@ -47,6 +50,7 @@ type SettingsState = {
   setLastAutoBackupAt: (at: string) => void;
   setJournalReminderEnabled: (v: boolean) => void;
   setJournalReminderTime: (t: string) => void;
+  setAssistantContextEnabled: (v: boolean) => void;
   setHasHydrated: (v: boolean) => void;
 };
 
@@ -64,6 +68,7 @@ export const useSettings = create<SettingsState>()(
       lastAutoBackupAt: '',
       journalReminderEnabled: false,
       journalReminderTime: '21:00',
+      assistantContextEnabled: true,
       _hasHydrated: false,
       setThemePref: (themePref) => set({ themePref }),
       setMotionPref: (motionPref) => set({ motionPref }),
@@ -79,6 +84,7 @@ export const useSettings = create<SettingsState>()(
       setLastAutoBackupAt: (lastAutoBackupAt) => set({ lastAutoBackupAt }),
       setJournalReminderEnabled: (journalReminderEnabled) => set({ journalReminderEnabled }),
       setJournalReminderTime: (journalReminderTime) => set({ journalReminderTime }),
+      setAssistantContextEnabled: (assistantContextEnabled) => set({ assistantContextEnabled }),
       setHasHydrated: (_hasHydrated) => set({ _hasHydrated }),
     }),
     {
@@ -96,6 +102,7 @@ export const useSettings = create<SettingsState>()(
         lastAutoBackupAt: s.lastAutoBackupAt,
         journalReminderEnabled: s.journalReminderEnabled,
         journalReminderTime: s.journalReminderTime,
+        assistantContextEnabled: s.assistantContextEnabled,
         // geminiApiKey bewusst NICHT persistieren — Quelle ist die Keychain.
       }),
       // state ist der rehydrierte Store inkl. Actions → kein Bezug auf useSettings

@@ -75,6 +75,8 @@ export default function EinstellungenScreen() {
   const journalReminderTime = useSettings((s) => s.journalReminderTime);
   const setJournalReminderEnabled = useSettings((s) => s.setJournalReminderEnabled);
   const setJournalReminderTime = useSettings((s) => s.setJournalReminderTime);
+  const assistantContextEnabled = useSettings((s) => s.assistantContextEnabled);
+  const setAssistantContextEnabled = useSettings((s) => s.setAssistantContextEnabled);
   const setSavedFilters = useSettings((s) => s.setSavedFilters);
 
   const [importText, setImportText] = useState('');
@@ -478,6 +480,25 @@ export default function EinstellungenScreen() {
             <Type variant="caption" tone="teal" style={{ marginTop: Spacing.sm }}>
               Assistent aktiv — Einstieg über ✨ auf „Heute" oder aus einem Termin heraus.
             </Type>
+          )}
+
+          {geminiApiKey.length > 0 && (
+            <>
+              <Seam />
+              <Type variant="label" tone="text2">App-Überblick</Type>
+              <Type variant="caption" tone="text3" style={{ marginTop: 2 }}>
+                Der Assistent sieht bei jeder Frage Termine (~5 Wochen), offene Aufgaben, Listen und
+                Notiz-Titel — so kann er „Was steht diese Woche an?" direkt beantworten. Die
+                Abendbetrachtung bleibt immer außen vor.
+              </Type>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginTop: Spacing.sm }}>
+                <Chip
+                  label={assistantContextEnabled ? 'An' : 'Aus'}
+                  active={assistantContextEnabled}
+                  onPress={() => setAssistantContextEnabled(!assistantContextEnabled)}
+                />
+              </View>
+            </>
           )}
         </GlassPanel>
       </Reveal>

@@ -1,7 +1,7 @@
 // assistant.test.ts — Prompt-Bau, Antwort-Extraktion, Fehlertexte.
 import type { ChatMessage } from '@/data/types';
 
-import { buildRequestBody, describeError, extractActions, extractText, pickModelsFromList } from './assistant';
+import { buildAppContext, buildRequestBody, describeError, extractActions, extractText, pickModelsFromList } from './assistant';
 
 const msg = (role: 'user' | 'assistant', content: string, at: string): ChatMessage => ({
   id: `m-${at}`, chatId: 'c1', role, content, createdAt: at,
@@ -119,5 +119,54 @@ describe('buildRequestBody — Datum', () => {
     expect(system).toContain('2026-07-20');
     expect(system).toContain('Juli');
     expect(system).toContain('„heute"');
+  });
+});
+
+describe('buildAppContext', () => {
+  const task = (title: string, over: Partial<import('@/data/types').Task> = {}): import('@/data/types').Task => ({
+    id: title, listId: 'default', title, note: null, dueDate: null, dueTime: null, rrule: null,
+    flagged: false, eventId: null, completedAt: null, notificationId: null, tags: [], subtasks: [],
+    createdAt: '2026-07-01T08:00:00.000Z', sort: 0, ...over,
+  });
+  const list = (id: string, name: string, goal: string | null = null, deadline: string | null = null): import('@/data/types').List => ({
+    id, name, icon: 'inbox', color: '#2B5FA6', goal, deadline, sort: 0, createdAt: '2026-07-01T08:00:00.000Z',
+  });
+  const note = (body: string, deletedAt: string | null = null): import('@/data/types').Note => ({
+    id: body, body, taskId: null, eventId: null, pinned: false, deletedAt,
+    createdAt: '2026-07-01T08:00:00.000Z', updatedAt: '2026-07-01T08:00:00.000Z',
+  });
+
+  it('fasst Termine, Aufgaben, Projekte und Notiz-Titel kompakt zusammen', () => {
+    const ctx = buildAppContext({
+      events: [{ title: 'Zahnarzt', start: new Date(2026, 6, 21, 14, 30), allDay: false }],
+      tasks: [
+        task('Steuer', { dueDate: '2026-07-22', dueTime: '18:00' }),
+        task('Keller', { dueDate: '2026-07-10' }),
+        task('Erledigt', { completedAt: '2026-07-19T10:00:00.000Z' }),
+      ],
+      lists: [list('default', 'Erinnerungen'), list('p1', 'Umzug', 'Bis Ende Juli', '2026-07-31')],
+      notes: [note('Packliste Rom\n- [ ] Pass'), note('Gelöschte Notiz', '2026-07-01T00:00:00.000Z')],
+      today: '2026-07-20',
+    });
+    expect(ctx).toContain('Di 21.7. 14:30: Zahnarzt');
+    expect(ctx).toContain('Steuer · fällig 2026-07-22 18:00');
+    expect(ctx).toContain('Keller · fällig 2026-07-10 (überfällig)');
+    expect(ctx).not.toContain('Erledigt ·');
+    expect(ctx).toContain('Umzug (Ziel: Bis Ende Juli · Deadline: 2026-07-31)');
+    expect(ctx).toContain('„Packliste Rom"');
+    expect(ctx).not.toContain('Gelöschte Notiz');
+  });
+
+  it('sagt bei leerem Bestand ausdrücklich „keine" (verhindert Halluzinationen)', () => {
+    const ctx = buildAppContext({ events: [], tasks: [], lists: [], notes: [], today: '2026-07-20' });
+    expect(ctx).toContain('Termine der nächsten ~5 Wochen:\n- keine');
+    expect(ctx).toContain('Offene Aufgaben:\n- keine');
+    expect(ctx).toContain('existiert in der App nicht');
+  });
+
+  it('kappt große Bestände (Limits)', () => {
+    const many = Array.from({ length: 60 }, (_, i) => task(`Aufgabe ${i}`, { dueDate: '2026-08-01' }));
+    const ctx = buildAppContext({ events: [], tasks: many, lists: [], notes: [], today: '2026-07-20' });
+    expect((ctx.match(/- Aufgabe /g) ?? []).length).toBe(40);
   });
 });

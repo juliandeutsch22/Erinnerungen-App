@@ -2,7 +2,7 @@
 // Bewusst OHNE eigenen Server: das Gerät spricht die API direkt an — keine
 // laufenden Kosten, kein Mittelsmann. Reine Logik testbar (Prompt-Bau,
 // Antwort-Extraktion); der fetch selbst wird im Test nicht ausgeführt.
-import type { ChatMessage, Note, Task } from '@/data/types';
+import type { ChatMessage, List, Note, Task } from '@/data/types';
 import { noteTitle } from '@/lib/noteLogic';
 import type { DeviceEvent } from '@/lib/deviceCalendar';
 
@@ -133,6 +133,80 @@ export function buildTaskContext(task: Task): string {
   return lines.join('\n');
 }
 
+// ——— App-Schnappschuss: kompakter Live-Überblick für JEDEN Chat. ———
+// Bewusst NICHT enthalten: die Abendbetrachtung (Journal) — der intimste
+// Datenbestand verlässt das Gerät nur, wenn er ausdrücklich verknüpft wird.
+const CTX_EVENT_LIMIT = 40;
+const CTX_TASK_LIMIT = 40;
+const CTX_NOTE_LIMIT = 30;
+
+const WD = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+
+/** Baut den Überblick aus Terminen (~5 Wochen), offenen Aufgaben, Listen und
+ *  Notiz-TITELN. Rein und testbar — die Daten reicht der Aufrufer herein. */
+export function buildAppContext(input: {
+  events: Pick<DeviceEvent, 'title' | 'start' | 'allDay'>[];
+  tasks: Task[];
+  lists: List[];
+  notes: Note[];
+  today: string; // 'YYYY-MM-DD'
+}): string {
+  const { events, tasks, lists, notes, today } = input;
+  const listName = new Map(lists.map((l) => [l.id, l.name]));
+
+  const evLine = (e: Pick<DeviceEvent, 'title' | 'start' | 'allDay'>) => {
+    const d = e.start;
+    const day = `${WD[d.getDay()]} ${d.getDate()}.${d.getMonth() + 1}.`;
+    const time = e.allDay ? 'ganztägig' : `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    return `- ${day} ${time}: ${e.title}`;
+  };
+  const eventLines = events.slice(0, CTX_EVENT_LIMIT).map(evLine);
+
+  const open = tasks.filter((t) => t.completedAt === null);
+  const sortKey = (t: Task) => `${t.dueDate ?? '9999-12-31'} ${t.dueTime ?? '99:99'}`;
+  const taskLine = (t: Task) => {
+    const parts = [t.title];
+    if (t.dueDate) parts.push(`fällig ${t.dueDate}${t.dueTime ? ` ${t.dueTime}` : ''}${t.dueDate < today ? ' (überfällig)' : ''}`);
+    const ln = listName.get(t.listId);
+    if (ln && t.listId !== 'default') parts.push(`Liste „${ln}"`);
+    return `- ${parts.join(' · ')}`;
+  };
+  const taskLines = [...open]
+    .sort((a, b) => (sortKey(a) < sortKey(b) ? -1 : 1))
+    .slice(0, CTX_TASK_LIMIT)
+    .map(taskLine);
+
+  const projectLines = lists
+    .filter((l) => l.id !== 'default')
+    .map((l) => {
+      const extras = [l.goal ? `Ziel: ${l.goal}` : '', l.deadline ? `Deadline: ${l.deadline}` : ''].filter(Boolean);
+      return `- ${l.name}${extras.length ? ` (${extras.join(' · ')})` : ''}`;
+    });
+
+  const noteTitles = notes
+    .filter((n) => n.deletedAt === null)
+    .slice(0, CTX_NOTE_LIMIT)
+    .map((n) => `„${noteTitle(n.body)}"`);
+
+  return [
+    'ÜBERBLICK über die aktuellen Daten in der App (live):',
+    '',
+    'Termine der nächsten ~5 Wochen:',
+    eventLines.length ? eventLines.join('\n') : '- keine',
+    '',
+    'Offene Aufgaben:',
+    taskLines.length ? taskLines.join('\n') : '- keine',
+    '',
+    'Listen/Projekte:',
+    projectLines.length ? projectLines.join('\n') : '- keine',
+    '',
+    `Notizen (nur Titel): ${noteTitles.length ? noteTitles.join(', ') : 'keine'}`,
+    '',
+    'Beantworte Fragen zu Terminen, Aufgaben und Planung direkt aus diesem Überblick. ' +
+      'Erfinde keine Einträge dazu; was hier nicht steht, existiert in der App nicht.',
+  ].join('\n');
+}
+
 /** Verlauf → Gemini-Format; Kontext wandert in die System-Instruction.
  *  Datum + Uhrzeit gehen IMMER mit — sonst rät das Modell bei „heute Abend"
  *  ein Datum aus seinen Trainingsdaten. */
@@ -144,7 +218,7 @@ export function buildRequestBody(messages: ChatMessage[], context: string | null
     'Relative Angaben wie „heute", „morgen" oder „nächste Woche" beziehen sich hierauf.';
   const system =
     `${SYSTEM_PROMPT}\n\n${dateLine}` +
-    (context ? `\n\nKontext des verknüpften Termins:\n${context}` : '');
+    (context ? `\n\nKontext aus der App:\n${context}` : '');
   return {
     systemInstruction: { parts: [{ text: system }] },
     contents: messages.slice(-HISTORY_LIMIT).map((m) => ({

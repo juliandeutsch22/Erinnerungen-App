@@ -17,11 +17,14 @@ import { LoadingState } from '@/components/StateView';
 import { Type } from '@/components/Type';
 import * as Clipboard from 'expo-clipboard';
 
+import { useDeviceEvents } from '@/data/calendarQueries';
 import { useAppendMessage, useChatMessages, useChats, useDeleteChat, useUpdateChat } from '@/data/chatQueries';
 import { useCreateNote, useNotes, useUpdateNote } from '@/data/noteQueries';
-import { useCreateTask, useTasks } from '@/data/queries';
+import { useCreateTask, useLists, useTasks } from '@/data/queries';
 import type { ChatMessage } from '@/data/types';
-import { askAssistant, buildNoteContext, buildTaskContext, extractActions } from '@/lib/assistant';
+import { askAssistant, buildAppContext, buildNoteContext, buildTaskContext, extractActions } from '@/lib/assistant';
+import { addDays, todayStr } from '@/lib/dates';
+import { hasCalendarPermission } from '@/lib/deviceCalendar';
 import { noteTitle } from '@/lib/noteLogic';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { webNoOutline } from '@/theme/layout';
@@ -84,6 +87,18 @@ export default function ChatScreen() {
   // der Assistent arbeitet immer mit dem aktuellen Inhalt.
   const { data: notes } = useNotes();
   const { data: tasks } = useTasks();
+  const { data: lists } = useLists();
+
+  // App-Schnappschuss (abschaltbar in den Einstellungen): Termine der
+  // nächsten ~5 Wochen + offene Aufgaben + Listen + Notiz-Titel. Das Journal
+  // bleibt bewusst außen vor.
+  const assistantContextEnabled = useSettings((s) => s.assistantContextEnabled);
+  const [calGranted, setCalGranted] = useState(false);
+  useEffect(() => {
+    void hasCalendarPermission().then(setCalGranted);
+  }, []);
+  const today = todayStr();
+  const { data: events } = useDeviceEvents(today, addDays(today, 35), calGranted && assistantContextEnabled);
   const linkedNote = chat?.noteId ? (notes ?? []).find((n) => n.id === chat.noteId) : undefined;
   const linkedTask = chat?.taskId ? (tasks ?? []).find((t) => t.id === chat.taskId) : undefined;
   const effectiveContext = linkedNote
@@ -142,7 +157,11 @@ export default function ChatScreen() {
     setPending(true);
     setError(null);
     try {
-      const answer = await askAssistant(apiKey, history, effectiveContext);
+      const appContext = assistantContextEnabled
+        ? buildAppContext({ events: events ?? [], tasks: tasks ?? [], lists: lists ?? [], notes: notes ?? [], today })
+        : null;
+      const combined = [effectiveContext, appContext].filter(Boolean).join('\n\n') || null;
+      const answer = await askAssistant(apiKey, history, combined);
       await appendMessage.mutateAsync({ chatId: id, role: 'assistant', content: answer });
       hapticSuccess();
     } catch (e) {
