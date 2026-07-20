@@ -91,13 +91,27 @@ export function describeError(status: number): string {
   return `Anfrage fehlgeschlagen (HTTP ${status}).`;
 }
 
+/** Harte Obergrenze — ein hängender Request darf den Chat nicht blockieren. */
+const TIMEOUT_MS = 30000;
+
 /** Eine Antwort holen. Wirft Error mit lesbarer deutscher Meldung. */
 export async function askAssistant(apiKey: string, messages: ChatMessage[], context: string | null): Promise<string> {
-  const res = await fetch(`${ENDPOINT}?key=${encodeURIComponent(apiKey)}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(buildRequestBody(messages, context)),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(`${ENDPOINT}?key=${encodeURIComponent(apiKey)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(buildRequestBody(messages, context)),
+      signal: controller.signal,
+    });
+  } catch (e) {
+    if (controller.signal.aborted) throw new Error('Zeitüberschreitung — der Dienst antwortet nicht. Erneut versuchen.');
+    throw new Error('Keine Verbindung — bist du online?');
+  } finally {
+    clearTimeout(timer);
+  }
   if (!res.ok) throw new Error(describeError(res.status));
   const text = extractText(await res.json());
   if (!text) throw new Error('Leere Antwort erhalten — versuch es nochmal.');

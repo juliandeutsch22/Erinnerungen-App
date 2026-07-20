@@ -3,8 +3,7 @@
 // Detail-Zeilen (Liste / Fällig / Wiederholung / Flagge) mit aktuellem Wert,
 // die erst beim Antippen ihre Chips aufklappen — keine Chip-Wand. Der
 // Primär-Button sitzt fest im Sheet-Footer. Löschen zweistufig.
-import { useRouter } from 'expo-router';
-import { CalendarDays, CalendarX2, Clock, Flag, ListChecks, type LucideIcon, Plus, Repeat, Sparkles, Tag as TagIcon, Trash2, X } from 'lucide-react-native';
+import { CalendarDays, CalendarX2, Clock, Flag, ListChecks, type LucideIcon, Plus, Repeat, Tag as TagIcon, Trash2, X } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
@@ -13,6 +12,7 @@ import { DisclosureChevron } from '@/components/DisclosureChevron';
 import { Chip } from '@/components/Chip';
 import { GlassButton } from '@/components/GlassButton';
 import { KeyboardDoneBar, keyboardDoneProps } from '@/components/KeyboardDone';
+import { LinkedChats } from '@/components/LinkedChats';
 import { LinkedNotes } from '@/components/LinkedNotes';
 import { listIcon } from '@/components/listMeta';
 import { MiniCalendar } from '@/components/MiniCalendar';
@@ -21,7 +21,6 @@ import { Expanded, Group, RowDivider } from '@/components/SheetParts';
 import { TaskCheck } from '@/components/TaskCheck';
 import { TimeField } from '@/components/TimeField';
 import { Type } from '@/components/Type';
-import { useCreateChat } from '@/data/chatQueries';
 import { useCreateTask, useDeleteTask, useLists, useTasks, useUpdateTask } from '@/data/queries';
 import type { Rrule, Subtask, Task } from '@/data/types';
 import { newId, normalizeTag } from '@/data/types';
@@ -87,8 +86,6 @@ export function TaskEditorSheet({
 
   const canSave = title.trim().length > 0;
   const isEdit = task !== null;
-  const router = useRouter();
-  const createChat = useCreateChat();
   const hasAssistantKey = useSettings((s) => s.geminiApiKey.length > 0);
 
   const toggleSection = (s: Section) => {
@@ -432,24 +429,9 @@ export function TaskEditorSheet({
 
       {/* Assistent mit Live-Zugriff auf die Aufgabe (Titel, Fälligkeit, Schritte). */}
       {isEdit && task && hasAssistantKey && (
-        <PressableScale
-          accessibilityLabel="Assistent zu dieser Erinnerung fragen"
-          onPress={() => {
-            createChat.mutate(
-              { title: task.title, taskId: task.id },
-              {
-                onSuccess: (c) => {
-                  onClose();
-                  router.push(`/chat/${c.id}`);
-                },
-              },
-            );
-          }}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingTop: Spacing.lg }}
-        >
-          <Sparkles size={16} color={colors.teal} strokeWidth={2} />
-          <Type variant="label" tone="teal">Assistent fragen</Type>
-        </PressableScale>
+        <View style={{ paddingTop: Spacing.lg }}>
+          <LinkedChats taskId={task.id} title={task.title} onNavigate={onClose} />
+        </View>
       )}
       <KeyboardDoneBar />
     </BottomSheet>

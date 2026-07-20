@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Backdrop } from '@/components/Backdrop';
 import { KeyboardDoneBar, keyboardDoneProps } from '@/components/KeyboardDone';
+import { LinkedChats } from '@/components/LinkedChats';
 import { NoteLinkSheet } from '@/components/NoteLinkSheet';
 import { PressableScale } from '@/components/PressableScale';
 import { Type } from '@/components/Type';
@@ -498,6 +499,13 @@ export default function NotizScreen() {
                   style={[{ flex: 1, fontSize: T.md, color: colors.text, paddingVertical: 2 }, webNoOutline]}
                 />
               </View>
+            </View>
+          )}
+
+          {/* Assistenten-Chats zu dieser Notiz (nur mit Schlüssel sichtbar). */}
+          {id && hasAssistantKey && (
+            <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm }}>
+              <LinkedChats noteId={id} title={(title ?? '').trim() || 'Notiz'} onNavigate={flush} />
             </View>
           )}
           </ScrollView>

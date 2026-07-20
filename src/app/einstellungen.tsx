@@ -28,8 +28,10 @@ import {
 } from '@/lib/backupFile';
 import { queryKeys } from '@/data/queries';
 import { requestReschedule } from '@/lib/notifications';
+import { runAutoBackup } from '@/lib/autoBackup';
 import { deviceRemindersAvailable } from '@/lib/deviceReminders';
 import { hapticSuccess } from '@/lib/haptics';
+import { setSecureKey } from '@/lib/secureKey';
 import { webNoOutline } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
 import { MotionPref, ThemePref, useSettings } from '@/theme/settings.store';
@@ -76,6 +78,33 @@ export default function EinstellungenScreen() {
   const [showPasteNote, setShowPasteNote] = useState(false);
   const geminiApiKey = useSettings((s) => s.geminiApiKey);
   const setGeminiApiKey = useSettings((s) => s.setGeminiApiKey);
+  const lastAutoBackupAt = useSettings((s) => s.lastAutoBackupAt);
+  const setLastAutoBackupAt = useSettings((s) => s.setLastAutoBackupAt);
+
+  // Schlüssel: In-Memory-Kopie + Keychain als Quelle.
+  const onChangeApiKey = (v: string) => {
+    setGeminiApiKey(v);
+    void setSecureKey(v.trim());
+  };
+
+  const autoBackupLabel = (() => {
+    if (!fileBackupAvailable) return null;
+    if (!lastAutoBackupAt) return 'Automatisches Backup: noch keins — läuft beim nächsten Start.';
+    const days = Math.floor((Date.now() - Date.parse(lastAutoBackupAt)) / 86400000);
+    const when = days <= 0 ? 'heute' : days === 1 ? 'gestern' : `vor ${days} Tagen`;
+    return `Automatisches Backup: ${when} · wöchentlich in Dateien → Stoa → Backups.`;
+  })();
+
+  const doAutoBackupNow = async () => {
+    const name = await runAutoBackup(useSettings.getState().savedFilters);
+    if (name) {
+      setLastAutoBackupAt(new Date().toISOString());
+      hapticSuccess();
+      setFeedback(`Backup „${name}" gespeichert (Dateien → Stoa → Backups).`);
+    } else {
+      setFeedback('Backup fehlgeschlagen — bitte manuell sichern.');
+    }
+  };
 
   const doExport = async () => {
     const json = await exportToJsonString({
@@ -200,9 +229,16 @@ export default function EinstellungenScreen() {
         <GlassPanel>
           <Type variant="label" tone="text2">Backup</Type>
           <Type variant="caption" tone="text3" style={{ marginTop: 2 }}>
-            Sichert Listen, Aufgaben, Filter und Termin-Fotos in einer Datei — wichtig vor dem
-            Nachsignieren (7-Tage-Zyklus) oder einer Neuinstallation.
+            Sichert Listen, Aufgaben, Notizen, Chats, Filter und Termin-Fotos in einer Datei — wichtig
+            vor dem Nachsignieren (7-Tage-Zyklus) oder einer Neuinstallation.
           </Type>
+          {autoBackupLabel && (
+            <PressableScale accessibilityLabel="Backup jetzt ausführen" onPress={() => void doAutoBackupNow()}>
+              <Type variant="caption" tone="teal" style={{ marginTop: Spacing.sm }}>
+                {autoBackupLabel} Tippen sichert sofort.
+              </Type>
+            </PressableScale>
+          )}
           <GlassButton
             size="sm"
             accessibilityLabel="Backup exportieren"
@@ -333,7 +369,7 @@ export default function EinstellungenScreen() {
           </Type>
           <TextInput
             value={geminiApiKey}
-            onChangeText={setGeminiApiKey}
+            onChangeText={onChangeApiKey}
             placeholder="Gemini-API-Schlüssel einfügen…"
             placeholderTextColor={colors.text3}
             autoCapitalize="none"

@@ -14,8 +14,10 @@ import { keyboardDoneProps, KeyboardDoneBar } from '@/components/KeyboardDone';
 import { PressableScale } from '@/components/PressableScale';
 import { LoadingState } from '@/components/StateView';
 import { Type } from '@/components/Type';
+import * as Clipboard from 'expo-clipboard';
+
 import { useAppendMessage, useChatMessages, useChats, useDeleteChat, useUpdateChat } from '@/data/chatQueries';
-import { useNotes } from '@/data/noteQueries';
+import { useCreateNote, useNotes } from '@/data/noteQueries';
 import { useTasks } from '@/data/queries';
 import type { ChatMessage } from '@/data/types';
 import { askAssistant, buildNoteContext, buildTaskContext } from '@/lib/assistant';
@@ -100,7 +102,44 @@ export default function ChatScreen() {
   const [draft, setDraft] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [savedNoteIds, setSavedNoteIds] = useState<Set<string>>(new Set());
+  const createNote = useCreateNote();
   const scrollRef = useRef<ScrollView>(null);
+
+  /** Antwort holen für einen gegebenen Verlauf (send + retry teilen sich das). */
+  const requestAnswer = async (history: ChatMessage[]) => {
+    if (!id) return;
+    setPending(true);
+    setError(null);
+    try {
+      const answer = await askAssistant(apiKey, history, effectiveContext);
+      await appendMessage.mutateAsync({ chatId: id, role: 'assistant', content: answer });
+      hapticSuccess();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unbekannter Fehler.');
+    } finally {
+      setPending(false);
+    }
+  };
+
+  /** Erneut versuchen: der Verlauf endet bereits mit der Nutzer-Nachricht. */
+  const retry = () => {
+    if ((messages ?? []).length === 0 || pending) return;
+    void requestAnswer(messages ?? []);
+  };
+
+  const copyMessage = async (content: string) => {
+    await Clipboard.setStringAsync(content);
+    hapticSelect();
+  };
+
+  const saveAsNote = (m: ChatMessage) => {
+    hapticSuccess();
+    createNote.mutate(
+      { body: m.content, taskId: chat?.taskId ?? null, eventId: chat?.eventId ?? null },
+      { onSuccess: () => setSavedNoteIds((prev) => new Set(prev).add(m.id)) },
+    );
+  };
 
   // Bei neuen Nachrichten ans Ende scrollen.
   useEffect(() => {
@@ -119,17 +158,7 @@ export default function ChatScreen() {
     if ((messages ?? []).length === 0 && chat.title === 'Neuer Chat') {
       updateChat.mutate({ id, patch: { title: text.length > 60 ? `${text.slice(0, 59)}…` : text } });
     }
-    setPending(true);
-    try {
-      const history: ChatMessage[] = [...(messages ?? []), userMsg];
-      const answer = await askAssistant(apiKey, history, effectiveContext);
-      await appendMessage.mutateAsync({ chatId: id, role: 'assistant', content: answer });
-      hapticSuccess();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unbekannter Fehler.');
-    } finally {
-      setPending(false);
-    }
+    await requestAnswer([...(messages ?? []), userMsg]);
   };
 
   const remove = () => {
@@ -158,12 +187,20 @@ export default function ChatScreen() {
           <View style={{ flex: 1, alignItems: 'center' }}>
             <Type variant="label" numberOfLines={1}>{chat?.title ?? 'Chat'}</Type>
             {contextLabel && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <PressableScale
+                accessibilityLabel={`Verknüpfte Quelle ${contextLabel} öffnen`}
+                disabled={!linkedNote && !linkedTask}
+                onPress={() => {
+                  if (linkedNote) router.push(`/notiz/${linkedNote.id}`);
+                  else if (linkedTask) router.push(`/aufgabe/${linkedTask.id}`);
+                }}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+              >
                 <ContextIcon size={11} color={colors.text3} strokeWidth={2} />
-                <Type variant="caption" tone="text3" numberOfLines={1}>
+                <Type variant="caption" tone={linkedNote || linkedTask ? 'teal' : 'text3'} numberOfLines={1}>
                   {contextLabel}
                 </Type>
-              </View>
+              </PressableScale>
             )}
           </View>
           <PressableScale accessibilityLabel="Chat löschen" onPress={remove} style={{ padding: Spacing.sm }}>
@@ -194,27 +231,47 @@ export default function ChatScreen() {
             </View>
           )}
           {(messages ?? []).map((m) => (
-            <View
-              key={m.id}
-              style={{
-                alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
-                maxWidth: '88%',
-                backgroundColor: m.role === 'user' ? `${colors.teal}1A` : colors.bg2,
-                borderWidth: 1,
-                borderColor: m.role === 'user' ? `${colors.teal}33` : colors.border,
-                borderRadius: R.lg,
-                paddingVertical: Spacing.sm,
-                paddingHorizontal: Spacing.md,
-              }}
-            >
-              <LinkedText content={m.content} color={colors.teal} />
+            <View key={m.id} style={{ alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '88%' }}>
+              <PressableScale
+                accessibilityLabel={`Nachricht kopieren`}
+                onLongPress={() => void copyMessage(m.content)}
+                pressedScale={0.99}
+                style={{
+                  backgroundColor: m.role === 'user' ? `${colors.teal}1A` : colors.bg2,
+                  borderWidth: 1,
+                  borderColor: m.role === 'user' ? `${colors.teal}33` : colors.border,
+                  borderRadius: R.lg,
+                  paddingVertical: Spacing.sm,
+                  paddingHorizontal: Spacing.md,
+                }}
+              >
+                <LinkedText content={m.content} color={colors.teal} />
+              </PressableScale>
+              {/* Antworten lassen sich mit einem Tipp als Notiz ablegen —
+                  inklusive der Verknüpfung des Chats (Aufgabe/Termin). */}
+              {m.role === 'assistant' && (
+                <PressableScale
+                  accessibilityLabel="Antwort als Notiz speichern"
+                  onPress={() => saveAsNote(m)}
+                  disabled={savedNoteIds.has(m.id)}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingTop: 4, paddingLeft: Spacing.xs }}
+                >
+                  <NotebookPen size={12} color={savedNoteIds.has(m.id) ? colors.text3 : colors.teal} strokeWidth={2} />
+                  <Type variant="caption" tone={savedNoteIds.has(m.id) ? 'text3' : 'teal'}>
+                    {savedNoteIds.has(m.id) ? 'Als Notiz gespeichert ✓' : 'Als Notiz speichern'}
+                  </Type>
+                </PressableScale>
+              )}
             </View>
           ))}
           {pending && <LoadingState label="Assistent denkt…" />}
           {error && (
-            <Type variant="caption" tone="indigo" style={{ paddingHorizontal: Spacing.sm }}>
-              {error}
-            </Type>
+            <View style={{ gap: Spacing.xs, paddingHorizontal: Spacing.sm }}>
+              <Type variant="caption" tone="indigo">{error}</Type>
+              <PressableScale accessibilityLabel="Erneut versuchen" onPress={retry} style={{ alignSelf: 'flex-start' }}>
+                <Type variant="label" tone="teal">Erneut versuchen</Type>
+              </PressableScale>
+            </View>
           )}
         </ScrollView>
 

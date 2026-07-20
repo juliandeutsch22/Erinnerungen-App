@@ -22,8 +22,12 @@ type SettingsState = {
   savedFilters: SavedFilter[];
   /** Bereits importierte Apple-Erinnerungs-IDs (Dedupe bei erneutem Import). */
   importedReminderIds: string[];
-  /** Gemini-API-Schlüssel für den Assistenten (leer = Feature aus). Lokal gespeichert. */
+  /** Gemini-API-Schlüssel für den Assistenten (leer = Feature aus).
+   *  Liegt NICHT im normalen Persist — Quelle ist die Keychain (secureKey.ts),
+   *  hier nur die In-Memory-Kopie für die UI. */
   geminiApiKey: string;
+  /** Zeitpunkt des letzten automatischen Backups (ISO, '' = noch nie). */
+  lastAutoBackupAt: string;
   /** true, sobald der persistierte Zustand geladen wurde (verhindert Flash). */
   _hasHydrated: boolean;
   setThemePref: (p: ThemePref) => void;
@@ -37,6 +41,7 @@ type SettingsState = {
   setSavedFilters: (f: SavedFilter[]) => void;
   addImportedReminderIds: (ids: string[]) => void;
   setGeminiApiKey: (key: string) => void;
+  setLastAutoBackupAt: (at: string) => void;
   setHasHydrated: (v: boolean) => void;
 };
 
@@ -51,6 +56,7 @@ export const useSettings = create<SettingsState>()(
       savedFilters: [],
       importedReminderIds: [],
       geminiApiKey: '',
+      lastAutoBackupAt: '',
       _hasHydrated: false,
       setThemePref: (themePref) => set({ themePref }),
       setMotionPref: (motionPref) => set({ motionPref }),
@@ -63,6 +69,7 @@ export const useSettings = create<SettingsState>()(
       addImportedReminderIds: (ids) =>
         set((s) => ({ importedReminderIds: [...new Set([...s.importedReminderIds, ...ids])] })),
       setGeminiApiKey: (geminiApiKey) => set({ geminiApiKey: geminiApiKey.trim() }),
+      setLastAutoBackupAt: (lastAutoBackupAt) => set({ lastAutoBackupAt }),
       setHasHydrated: (_hasHydrated) => set({ _hasHydrated }),
     }),
     {
@@ -77,7 +84,8 @@ export const useSettings = create<SettingsState>()(
         summaryTime: s.summaryTime,
         savedFilters: s.savedFilters,
         importedReminderIds: s.importedReminderIds,
-        geminiApiKey: s.geminiApiKey,
+        lastAutoBackupAt: s.lastAutoBackupAt,
+        // geminiApiKey bewusst NICHT persistieren — Quelle ist die Keychain.
       }),
       // state ist der rehydrierte Store inkl. Actions → kein Bezug auf useSettings
       // während der (ggf. synchronen) Erstellung nötig.

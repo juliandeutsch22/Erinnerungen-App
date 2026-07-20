@@ -11,6 +11,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { setOnTasksChanged } from '@/data/queries';
+import { isAutoBackupDue, runAutoBackup } from '@/lib/autoBackup';
+import { getSecureKey, setSecureKey } from '@/lib/secureKey';
 import {
   ensureNotificationPermission,
   registerNotificationCategories,
@@ -34,6 +36,20 @@ function RootStack() {
       await registerNotificationCategories();
       await ensureNotificationPermission();
       requestReschedule();
+
+      // Gemini-Schlüssel aus der Keychain in den Speicher holen. Migration:
+      // lag er noch im alten Persist (Store hat einen, Keychain nicht),
+      // wandert er einmalig in die Keychain.
+      const state = useSettings.getState();
+      const secure = await getSecureKey();
+      if (secure && !state.geminiApiKey) state.setGeminiApiKey(secure);
+      else if (!secure && state.geminiApiKey) await setSecureKey(state.geminiApiKey);
+
+      // Stilles Wochen-Backup in den Dateien-Ordner (nur nativ).
+      if (isAutoBackupDue(state.lastAutoBackupAt)) {
+        const name = await runAutoBackup(state.savedFilters);
+        if (name) useSettings.getState().setLastAutoBackupAt(new Date().toISOString());
+      }
     })();
     setOnTasksChanged(requestReschedule);
     return () => setOnTasksChanged(null);
