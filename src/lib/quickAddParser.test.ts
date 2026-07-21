@@ -94,6 +94,26 @@ describe('parseQuickAdd', () => {
     });
   });
 
+  it('deutsche Punkt-Uhrzeit „9.30 uhr" → 09:30 (nicht im Titel)', () => {
+    expect(parseQuickAdd('Anruf 9.30 uhr', TODAY)).toEqual({
+      title: 'Anruf', dueDate: TODAY, dueTime: '09:30', rrule: null, tags: [],
+    });
+    expect(parseQuickAdd('Sport 18.00 uhr', TODAY).dueTime).toBe('18:00');
+  });
+
+  it('Datum und Punkt-Uhrzeit kollidieren nicht („15.8. um 9 uhr")', () => {
+    const r = parseQuickAdd('Zahnarzt am 15.8. um 9 uhr', TODAY);
+    expect(r.dueDate).toBe('2026-08-15');
+    expect(r.dueTime).toBe('09:00');
+  });
+
+  it('ungültige Uhrzeit bleibt im Titel stehen statt zu verschwinden', () => {
+    expect(parseQuickAdd('X 25 uhr', TODAY)).toEqual({
+      title: 'X 25 uhr', dueDate: null, dueTime: null, rrule: null, tags: [],
+    });
+    expect(parseQuickAdd('Y 9:70', TODAY).title).toBe('Y 9:70');
+  });
+
   it('„übermorgen Paket abholen"', () => {
     expect(parseQuickAdd('übermorgen Paket abholen', TODAY)).toEqual({
       title: 'Paket abholen',

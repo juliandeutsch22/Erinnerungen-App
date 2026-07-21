@@ -63,11 +63,13 @@ export function parseQuickAdd(input: string, today: string): QuickAddResult {
   let rrule: Rrule | null = null;
   const tags: string[] = [];
 
-  const strip = (re: RegExp, onMatch: (m: RegExpMatchArray) => void): void => {
+  // onMatch darf `false` zurückgeben → Treffer NICHT aus dem Titel entfernen
+  // (z. B. ungültige Uhrzeit wie „25 uhr" soll stehen bleiben, nicht verschwinden).
+  const strip = (re: RegExp, onMatch: (m: RegExpMatchArray) => void | boolean): void => {
     const m = text.match(re);
     if (m) {
-      onMatch(m);
-      text = text.replace(re, ' ');
+      const keep = onMatch(m) === false;
+      if (!keep) text = text.replace(re, ' ');
     }
   };
 
@@ -151,14 +153,25 @@ export function parseQuickAdd(input: string, today: string): QuickAddResult {
   });
 
   // 5. Uhrzeit „9:30", „9.30 uhr", „9 uhr", „um 9 uhr".
+  // Ungültige Zeiten geben `false` zurück → bleiben im Titel statt zu verschwinden.
   strip(/(?<=\s)(?:um\s+)?(\d{1,2}):(\d{2})(?:\s*uhr)?(?=[\s,.!]|$)/i, (m) => {
     const h = Number(m[1]);
     const min = Number(m[2]);
-    if (h < 24 && min < 60) dueTime = `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+    if (h >= 24 || min >= 60) return false;
+    dueTime = `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+  });
+  // Punkt-Uhrzeit „9.30 uhr", „18.00 uhr" — nur MIT „uhr" (sonst nicht von einem
+  // Datum wie „15.8." unterscheidbar; Datumsmuster hat davor schon gegriffen).
+  strip(/(?<=\s)(?:um\s+)?(\d{1,2})\.(\d{2})\s*uhr(?=[\s,.!]|$)/i, (m) => {
+    const h = Number(m[1]);
+    const min = Number(m[2]);
+    if (h >= 24 || min >= 60) return false;
+    if (!dueTime) dueTime = `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
   });
   strip(/(?<=\s)(?:um\s+)?(\d{1,2})\s+uhr(?=[\s,.!]|$)/i, (m) => {
     const h = Number(m[1]);
-    if (!dueTime && h < 24) dueTime = `${String(h).padStart(2, '0')}:00`;
+    if (h >= 24) return false;
+    if (!dueTime) dueTime = `${String(h).padStart(2, '0')}:00`;
   });
 
   // Uhrzeit oder Wiederholung ohne Datum → heute.
