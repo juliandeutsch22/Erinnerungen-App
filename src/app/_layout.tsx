@@ -2,11 +2,11 @@ import '@/global.css';
 
 import { CormorantGaramond_700Bold } from '@expo-google-fonts/cormorant-garamond/700Bold';
 import { useFonts } from '@expo-google-fonts/sora';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useMemo } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { AppState, Pressable, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -17,6 +17,7 @@ import {
   ensureNotificationPermission,
   registerNotificationCategories,
   requestReschedule,
+  rescheduleJournalReminder,
   useNotificationResponses,
 } from '@/lib/notifications';
 import { useSettings } from '@/theme/settings.store';
@@ -26,6 +27,17 @@ function RootStack() {
   const colors = useColors();
   const scheme = useScheme();
   useNotificationResponses();
+
+  // App wacht auf (iOS hält sie tagelang im Speicher): Queries invalidieren →
+  // Screens rendern neu und rechnen „heute" frisch — sonst zeigt der
+  // Morgen-Blick noch den gestrigen Tagesplan.
+  const qc = useQueryClient();
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') void qc.invalidateQueries();
+    });
+    return () => sub.remove();
+  }, [qc]);
 
   // Erinnerungs-Engine: bei App-Start + nach jeder Datenänderung wird das
   // Planungsfenster neu aufgebaut (64er-Limit, Fahrplan §5). No-Op im Web.
@@ -41,6 +53,10 @@ function RootStack() {
       // lag er noch im alten Persist (Store hat einen, Keychain nicht),
       // wandert er einmalig in die Keychain.
       const state = useSettings.getState();
+
+      // Journal-Erinnerung neu aufsetzen — überlebt sonst keine Neuinstallation.
+      await rescheduleJournalReminder(state.journalReminderEnabled, state.journalReminderTime, false);
+
       const secure = await getSecureKey();
       if (secure && !state.geminiApiKey) state.setGeminiApiKey(secure);
       else if (!secure && state.geminiApiKey) await setSecureKey(state.geminiApiKey);

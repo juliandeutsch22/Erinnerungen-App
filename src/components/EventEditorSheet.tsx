@@ -13,6 +13,7 @@ import { GlassButton } from '@/components/GlassButton';
 import { LinkedNotes } from '@/components/LinkedNotes';
 import { MiniCalendar } from '@/components/MiniCalendar';
 import { DocumentStrip } from '@/components/DocumentStrip';
+import { documentsAvailable } from '@/lib/documents';
 import { PhotoStrip } from '@/components/PhotoStrip';
 import { PressableScale } from '@/components/PressableScale';
 import { Expanded, Group, RowDivider } from '@/components/SheetParts';
@@ -318,8 +319,9 @@ export function EventEditorSheet({
         </View>
       )}
 
-      {/* Dokumente: Tickets, Buchungen, PDFs — erst für gespeicherte Termine. */}
-      {isEdit && event && (
+      {/* Dokumente: Tickets, Buchungen, PDFs — erst für gespeicherte Termine,
+          nur wo der Datei-Picker existiert (sonst bliebe eine leere Hairline). */}
+      {isEdit && event && documentsAvailable && (
         <View style={{ marginTop: Spacing.md }}>
           <Hairline />
           <View style={{ marginTop: Spacing.md }}>

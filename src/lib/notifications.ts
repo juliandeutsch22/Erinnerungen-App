@@ -170,8 +170,11 @@ async function rescheduleSummary(tasks: Task[]): Promise<void> {
 }
 
 /** Tägliche Erinnerung an die Abendbetrachtung — eine wiederkehrende
- *  DAILY-Notification, geplant/gelöscht, wenn die Einstellung sich ändert. */
-export async function rescheduleJournalReminder(enabled: boolean, time: string): Promise<void> {
+ *  DAILY-Notification. Wird bei Einstellungs-Änderung UND bei jedem App-Start
+ *  neu geplant: geplante Notifications überleben eine Neuinstallation
+ *  (7-Tage-Sideload!) nicht, die Einstellung schon. Beim Start fragt sie
+ *  NICHT nach der Berechtigung (requestPermission=false), nur im Settings-Tap. */
+export async function rescheduleJournalReminder(enabled: boolean, time: string, requestPermission = true): Promise<void> {
   if (!native) return;
   const oldId = await kvStorage.getItem(JOURNAL_ID_KEY);
   if (oldId) {
@@ -183,7 +186,9 @@ export async function rescheduleJournalReminder(enabled: boolean, time: string):
     await kvStorage.removeItem(JOURNAL_ID_KEY);
   }
   if (!enabled) return;
-  const granted = await ensureNotificationPermission();
+  const granted = requestPermission
+    ? await ensureNotificationPermission()
+    : await Notifications.getPermissionsAsync().then((p) => p.granted).catch(() => false);
   if (!granted) return;
   const [h, m] = (time || '21:00').split(':').map(Number);
   const id = await Notifications.scheduleNotificationAsync({
