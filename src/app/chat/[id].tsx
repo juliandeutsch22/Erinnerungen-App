@@ -27,7 +27,7 @@ import { useAppendMessage, useChatMessages, useChats, useUpdateChat } from '@/da
 import { useCreateNote, useNotes, useUpdateNote } from '@/data/noteQueries';
 import { useCreateTask, useLists, useTasks } from '@/data/queries';
 import type { Chat, ChatMessage } from '@/data/types';
-import { askAssistant, type AssistantAction, buildAppContext, buildNoteContext, buildTaskContext, extractActions } from '@/lib/assistant';
+import { askAssistant, type AssistantAction, buildAppContext, buildNoteContext, buildTaskContext, type ChatLink, extractActions, generateChatTitle, promptChips } from '@/lib/assistant';
 import { addDays, formatDueDate, toDateStr, todayStr } from '@/lib/dates';
 import { hasCalendarPermission } from '@/lib/deviceCalendar';
 import { noteTitle } from '@/lib/noteLogic';
@@ -210,7 +210,7 @@ function ActionCard({
 }
 
 /** Umbenennen-Sheet: der Titel gehört dem Nutzer, nicht der ersten Nachricht. */
-function RenameSheet({ chat, onClose }: { chat: Chat; onClose: () => void }) {
+function RenameSheet({ chat, onClose, onRenamed }: { chat: Chat; onClose: () => void; onRenamed: () => void }) {
   const colors = useColors();
   const updateChat = useUpdateChat();
   const [title, setTitle] = useState(chat.title);
@@ -218,6 +218,7 @@ function RenameSheet({ chat, onClose }: { chat: Chat; onClose: () => void }) {
     const t = title.trim();
     if (t.length > 0 && t !== chat.title) {
       hapticSuccess();
+      onRenamed();
       updateChat.mutate({ id: chat.id, patch: { title: t } });
     }
     onClose();
@@ -296,6 +297,7 @@ export default function ChatScreen() {
         ? chat.context.split('\n')[0].replace('Termin: ', '')
         : null;
   const ContextIcon = linkedNote ? NotebookPen : linkedTask ? ListTodo : CalendarDays;
+  const chatLink: ChatLink = linkedNote ? 'note' : linkedTask ? 'task' : effectiveContext ? 'event' : 'none';
 
   const [draft, setDraft] = useState('');
   const [linkSheet, setLinkSheet] = useState(false);
@@ -315,6 +317,8 @@ export default function ChatScreen() {
   // persistierte Nachricht im Verlauf angekommen ist — sonst blinkt der Übergang.
   const [streamText, setStreamText] = useState<string | null>(null);
   const streamRef = useRef('');
+  // Sobald der Nutzer selbst umbenennt, hält der Auto-Titel für immer still.
+  const userRenamedRef = useRef(false);
   const clearOnMessageId = useRef<string | null>(null);
   useEffect(() => {
     if (clearOnMessageId.current && (messages ?? []).some((m) => m.id === clearOnMessageId.current)) {
@@ -379,6 +383,15 @@ export default function ChatScreen() {
       const saved = await appendMessage.mutateAsync({ chatId: id, role: 'assistant', content: answer });
       clearOnMessageId.current = saved.id;
       hapticSuccess();
+
+      // Auto-Titel nach dem ERSTEN Austausch — es sei denn, der Nutzer hat schon
+      // selbst umbenannt (seine Wahl gewinnt immer). Still im Hintergrund.
+      const firstUser = history[history.length - 1];
+      if (history.length === 1 && !userRenamedRef.current && firstUser) {
+        void generateChatTitle(apiKey, firstUser.content, answer).then((title) => {
+          if (title && !userRenamedRef.current) updateChat.mutate({ id, patch: { title } });
+        });
+      }
     } catch (e) {
       streamRef.current = '';
       setStreamText(null);
@@ -558,7 +571,7 @@ export default function ChatScreen() {
           contentContainerStyle={{ paddingHorizontal: Spacing.md, paddingTop: Spacing.sm, paddingBottom: Spacing.md, gap: Spacing.md }}
         >
           {(messages ?? []).length === 0 && !pending && (
-            <View style={{ alignItems: 'center', paddingTop: Spacing.xxl, gap: Spacing.sm }}>
+            <View style={{ alignItems: 'center', paddingTop: Spacing.xxl, gap: Spacing.md }}>
               <Sparkles size={22} color={colors.teal} strokeWidth={2} />
               <Type variant="caption" tone="text3" style={{ textAlign: 'center', paddingHorizontal: Spacing.lg }}>
                 {linkedNote
@@ -569,6 +582,26 @@ export default function ChatScreen() {
                       ? 'Der Assistent kennt den Termin bereits — frag z. B. nach einer Unterkunft, Restaurants oder einer Packliste.'
                       : 'Frag den Assistenten — ohne Verknüpfung antwortet er allgemein.'}
               </Type>
+              {/* Prompt-Chips: ein Tipp genügt statt zu tippen. Nur mit Schlüssel. */}
+              {apiKey.length > 0 && (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: Spacing.sm, paddingHorizontal: Spacing.md }}>
+                  {promptChips(chatLink).map((chip) => (
+                    <PressableScale
+                      key={chip}
+                      accessibilityLabel={`Vorschlag senden: ${chip}`}
+                      onPress={() => void sendText(chip)}
+                      style={{
+                        backgroundColor: colors.chip,
+                        borderRadius: R.pill,
+                        paddingVertical: Spacing.sm,
+                        paddingHorizontal: Spacing.md,
+                      }}
+                    >
+                      <Type variant="label" tone="teal">{chip}</Type>
+                    </PressableScale>
+                  ))}
+                </View>
+              )}
             </View>
           )}
           {(messages ?? []).map((m, i, arr) => {
@@ -705,7 +738,9 @@ export default function ChatScreen() {
       </KeyboardAvoidingView>
       <KeyboardDoneBar />
       {linkSheet && id && <ChatLinkSheet chatId={id} onClose={() => setLinkSheet(false)} />}
-      {renameSheet && chat && <RenameSheet chat={chat} onClose={() => setRenameSheet(false)} />}
+      {renameSheet && chat && (
+        <RenameSheet chat={chat} onClose={() => setRenameSheet(false)} onRenamed={() => (userRenamedRef.current = true)} />
+      )}
     </View>
   );
 }

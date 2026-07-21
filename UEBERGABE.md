@@ -1,6 +1,6 @@
 # ÜBERGABE-PROTOKOLL — Stoa
 
-Stand: **v1.19.0 (Build 38)**, Juli 2026 · 158 Jest-Tests grün · Branch-Modell siehe §3.
+Stand: **v1.20.0 (Build 39)**, Juli 2026 · 170 Jest-Tests grün · Branch-Modell siehe §3.
 Dieses Dokument macht eine neue Session sofort arbeitsfähig. Lies zusätzlich
 `AGENTS.md` (bindende Design-Leitplanken) und `ROADMAP.md` (Ideen-Backlog).
 
@@ -128,6 +128,18 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
 
 ## 7. Feature-Inventar (v1.16.0) — Kurzreferenz
 
+- **Sperre (optional):** Face-ID-/Code-Sperre beim Öffnen und beim Aufwachen
+  aus dem Hintergrund (`AppLockGate` in `_layout.tsx`, `lib/appLock.ts`,
+  `appLockEnabled` im Store; Schalter in den Einstellungen nur, wenn das Gerät
+  Biometrie/Code kann). Web/ohne Hardware: greift nie. **Am Gerät gegenprüfen.**
+- **Teilen:** Notiz (Body) und Liste (formatierter Text — Überschrift, Ziel/
+  Deadline, offene/erledigte Aufgaben, Unteraufgaben) via Share-Sheet
+  (`lib/share.ts` + reine `lib/shareText.ts` mit Test); Share-Icon in der
+  Kopfzeile von Notiz-Editor und Listen-Detail.
+- **Assistent-Feinschliff:** Prompt-Chips im leeren Chat (kontextabhängig,
+  `promptChips` in assistant.ts) und stiller Auto-Titel nach dem ersten
+  Austausch (`generateChatTitle` über die Lite-Kette, `sanitizeChatTitle`
+  rein+getestet; manuelles Umbenennen gewinnt immer via `userRenamedRef`).
 - **Erster Start:** einmalige Willkommens-Karte auf Heute (WelcomeCard.tsx:
   Lokal-Versprechen, QuickAdd-Tipp, erklärter Kalender-Zugriff, Assistent-
   Hinweis; `welcomeDismissed` im Settings-Store).

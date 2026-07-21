@@ -10,6 +10,7 @@ import { AppState, Pressable, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { AppLockGate } from '@/components/AppLockGate';
 import { setOnTasksChanged } from '@/data/queries';
 import { isAutoBackupDue, runAutoBackup } from '@/lib/autoBackup';
 import { runOrphanDocumentSweep } from '@/lib/orphanDocuments';
@@ -78,7 +79,9 @@ function RootStack() {
   return (
     <>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
+      <AppLockGate>
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
+      </AppLockGate>
     </>
   );
 }

@@ -2,7 +2,7 @@
 // Smart-Ansicht: 'geplant' (chronologisch gruppiert) / 'alle' (nach Liste).
 // Offene zuerst (fällige oben), Erledigt-Sektion einklappbar (30-Tage-Fenster).
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowUpDown, CalendarClock, ChevronLeft, Pencil, Plus } from 'lucide-react-native';
+import { ArrowUpDown, CalendarClock, ChevronLeft, Pencil, Plus, Share2 } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { View } from 'react-native';
 
@@ -28,6 +28,8 @@ import type { Task } from '@/data/types';
 import { deadlineLabel, todayStr } from '@/lib/dates';
 import { byTimeThenCreation, groupPlanned, isOpen, listProgress, recentlyCompleted } from '@/lib/taskLogic';
 import { hapticSelect } from '@/lib/haptics';
+import { shareText } from '@/lib/share';
+import { listToShareText } from '@/lib/shareText';
 import { useColors } from '@/theme/ThemeProvider';
 import { Spacing } from '@/theme/theme.tokens';
 
@@ -112,6 +114,18 @@ export default function ListeDetailScreen() {
             {list && open.length > 1 && (
               <PressableScale accessibilityLabel="Reihenfolge sortieren" onPress={() => setReordering(true)} style={{ padding: Spacing.sm }}>
                 <ArrowUpDown size={18} color={colors.text3} strokeWidth={2} />
+              </PressableScale>
+            )}
+            {list && (
+              <PressableScale
+                accessibilityLabel="Liste teilen"
+                onPress={() => {
+                  hapticSelect();
+                  void shareText(listToShareText(list, scoped, today), list.name);
+                }}
+                style={{ padding: Spacing.sm }}
+              >
+                <Share2 size={18} color={colors.text3} strokeWidth={2} />
               </PressableScale>
             )}
             {list && (

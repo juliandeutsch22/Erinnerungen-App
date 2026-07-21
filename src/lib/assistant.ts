@@ -103,6 +103,71 @@ export function extractActions(text: string): { clean: string; actions: Assistan
   }
 }
 
+// ——— Prompt-Chips: kontextabhängige Ein-Tipp-Vorschläge im leeren Chat. ———
+export type ChatLink = 'note' | 'task' | 'event' | 'none';
+
+/** Zwei, drei Vorschläge je nach Verknüpfung — Tippen sendet sie als Nachricht. */
+export function promptChips(link: ChatLink): string[] {
+  switch (link) {
+    case 'note':
+      return ['Fasse die Notiz zusammen', 'Was sind die nächsten Schritte?', 'Bring das in eine klare Struktur'];
+    case 'task':
+      return ['Zerlege das in Teilschritte', 'Wie fange ich am besten an?', 'Formuliere das klarer'];
+    case 'event':
+      return ['Erstelle eine Packliste', 'Schlage Restaurants in der Nähe vor', 'Woran sollte ich denken?'];
+    default:
+      return ['Plane meinen Tag', 'Erstelle eine Packliste', 'Fasse einen Text zusammen'];
+  }
+}
+
+// ——— Auto-Titel: kurzer, sprechender Chat-Titel aus dem ersten Austausch. ———
+/** Räumt einen modell-generierten Titel auf: Anführungszeichen/Label/Satzzeichen
+ *  weg, eine Zeile, auf ~6 Wörter bzw. 48 Zeichen gedeckelt. Rein & testbar. */
+export function sanitizeChatTitle(raw: string): string {
+  let t = raw.split('\n')[0].trim();
+  // Häufige Vorreiter der Modelle entfernen („Titel:", „Chat:").
+  t = t.replace(/^(titel|title|chat|betreff)\s*[:\-–]\s*/i, '');
+  // Umschließende Anführungszeichen (auch typografische) abstreifen.
+  t = t.replace(/^["'„“»«‚']+/, '').replace(/["'„“»«‚']+$/, '');
+  // Markdown-Sternchen und abschließende Satzzeichen weg.
+  t = t.replace(/\*+/g, '').replace(/[.!?,;:]+$/, '').trim();
+  // Auf 6 Wörter kürzen, dann hart auf 48 Zeichen.
+  const words = t.split(/\s+/).filter(Boolean);
+  if (words.length > 6) t = words.slice(0, 6).join(' ');
+  if (t.length > 48) t = `${t.slice(0, 47).trimEnd()}…`;
+  return t;
+}
+
+/** Titel beim Dienst anfragen (Lite-Kette, ein knapper Prompt). Liefert null,
+ *  wenn nichts Brauchbares zurückkam — der Aufrufer behält dann den alten Titel. */
+export async function generateChatTitle(
+  apiKey: string,
+  userMessage: string,
+  assistantAnswer: string,
+): Promise<string | null> {
+  if (!apiKey) return null;
+  const prompt =
+    'Gib einen sehr kurzen, sachlichen Titel (2–5 Wörter, Deutsch, ohne Anführungszeichen, ' +
+    'ohne abschließenden Punkt) für dieses Gespräch:\n\n' +
+    `Frage: ${userMessage.slice(0, 400)}\n` +
+    `Antwort: ${assistantAnswer.slice(0, 400)}\n\nTitel:`;
+  const body = {
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    generationConfig: { temperature: 0.3, maxOutputTokens: 20 },
+  };
+  try {
+    // Lite-Kette zuerst (billiger); der gemerkte Lite-Treffer sitzt vorn.
+    const { res } = await callChain(LITE_CHAIN, workingLite, apiKey, body);
+    if (!res.ok) return null;
+    const text = extractText(await res.json());
+    if (!text) return null;
+    const title = sanitizeChatTitle(text);
+    return title.length >= 2 ? title : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Termin-Kontext beim Anlegen des Chats einfrieren (lesbar ohne Kalenderzugriff). */
 export function buildEventContext(ev: DeviceEvent): string {
   const fmt = (d: Date) =>

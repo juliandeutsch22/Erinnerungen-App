@@ -5,13 +5,12 @@ für alles, was besprochen, aber noch nicht gebaut ist.
 
 ## Assistent
 
-- **Prompt-Chips im leeren Chat** — kontextabhängige Ein-Tipp-Vorschläge
-  („Packliste erstellen", „Zusammenfassen", „Nächste Schritte", „Zerlege in
-  Teilschritte") statt Tippen.
+- ~~**Prompt-Chips im leeren Chat**~~ — umgesetzt in v1.20.0 (kontextabhängig
+  je nach Verknüpfung Notiz/Aufgabe/Termin/frei).
 - ~~**Streaming-Antworten**~~ — umgesetzt in v1.17.0 (SSE über expo/fetch,
   Fallback auf Komplett-Antwort).
-- **Auto-Titel durch das Modell** — kurzer generierter Chat-Titel statt der
-  ersten Nutzer-Nachricht (Umbenennen von Hand gibt es seit v1.17.0).
+- ~~**Auto-Titel durch das Modell**~~ — umgesetzt in v1.20.0 (Lite-Kette nach
+  dem ersten Austausch; manuelles Umbenennen gewinnt).
 - **On-Device-Stufe** — Apple Foundation Models (iOS 26) für einfache
   Aufgaben komplett offline; braucht das native Kapitel.
 
@@ -61,6 +60,7 @@ Braucht `expo prebuild` + native Targets in der IPA-GitHub-Action:
 
 - **TestFlight** (99 €/Jahr Developer-Account) — beendet den
   7-Tage-Signatur-Zyklus; danach optional Store-Release als Resonanztest.
-- **Face-ID-Sperre** — optional beim Öffnen (expo-local-authentication).
+- ~~**Face-ID-Sperre**~~ — umgesetzt in v1.20.0 (optional, beim Öffnen und
+  Aufwachen; Gerätecode als Fallback).
 - ~~**Papierkorb-Muster ausweiten**~~ — umgesetzt in v1.19.0 (Aufgaben und
   Listen, Sektion im Listen-Tab).

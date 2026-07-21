@@ -4,11 +4,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, ClipboardPaste, CloudDownload, Download, FolderOpen, Upload } from 'lucide-react-native';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { TextInput, View } from 'react-native';
 
 import { Chip } from '@/components/Chip';
 import { DisclosureChevron } from '@/components/DisclosureChevron';
+import { authenticateAppLock, canUseAppLock } from '@/lib/appLock';
 import { GlassButton } from '@/components/GlassButton';
 import { ImportRemindersSheet } from '@/components/ImportRemindersSheet';
 import { PasteNoteSheet } from '@/components/PasteNoteSheet';
@@ -82,6 +83,14 @@ export default function EinstellungenScreen() {
   const assistantContextEnabled = useSettings((s) => s.assistantContextEnabled);
   const setAssistantContextEnabled = useSettings((s) => s.setAssistantContextEnabled);
   const setSavedFilters = useSettings((s) => s.setSavedFilters);
+  const appLockEnabled = useSettings((s) => s.appLockEnabled);
+  const setAppLockEnabled = useSettings((s) => s.setAppLockEnabled);
+
+  // Sperre nur anbieten, wenn das Gerät Biometrie/Code kann (Web: nie).
+  const [lockOfferable, setLockOfferable] = useState(false);
+  useEffect(() => {
+    void canUseAppLock().then(setLockOfferable);
+  }, []);
 
   const [importText, setImportText] = useState('');
   // Das rohe JSON-Feld bleibt eingeklappt — es ist der Notausgang, nicht der Weg.
@@ -230,6 +239,36 @@ export default function EinstellungenScreen() {
               <Chip key={m.value} label={m.label} active={motionPref === m.value} onPress={() => setMotionPref(m.value)} />
             ))}
           </View>
+
+          {lockOfferable && (
+            <>
+              <Seam />
+              <Type variant="heading" style={sectionStyle}>Sperre</Type>
+              <Type variant="caption" tone="text3" style={{ marginTop: 2 }}>
+                Beim Öffnen mit Face ID (oder Gerätecode) entsperren — dein Journal und deine Notizen bleiben privat.
+              </Type>
+              <View style={{ flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm }}>
+                <Chip
+                  label={appLockEnabled ? 'An' : 'Aus'}
+                  active={appLockEnabled}
+                  onPress={() => {
+                    if (appLockEnabled) {
+                      // Ausschalten erst nach erfolgreicher Prüfung — sonst
+                      // könnte jemand die Sperre einfach abschalten.
+                      void authenticateAppLock().then((ok) => {
+                        if (ok) setAppLockEnabled(false);
+                      });
+                    } else {
+                      // Einschalten gleich einmal testen, damit klar ist, dass es geht.
+                      void authenticateAppLock().then((ok) => {
+                        if (ok) setAppLockEnabled(true);
+                      });
+                    }
+                  }}
+                />
+              </View>
+            </>
+          )}
 
           <Seam />
 

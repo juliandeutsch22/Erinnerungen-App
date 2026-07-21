@@ -6,7 +6,7 @@
 // „- [ ]"-Zeilen am Ende — Suche/Backup/Import bleiben Plain Text.
 // Tastatur: Wisch nach unten (interactive) oder „Fertig"-Leiste.
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { CalendarDays, ChevronLeft, Link2, ListChecks, ListTodo, Pin, Plus, Sparkles, Trash2, X } from 'lucide-react-native';
+import { CalendarDays, ChevronLeft, Link2, ListChecks, ListTodo, Pin, Plus, Share2, Sparkles, Trash2, X } from 'lucide-react-native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Keyboard, KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,6 +25,8 @@ import { useTasks } from '@/data/queries';
 import { addDays, todayStr } from '@/lib/dates';
 import { hasCalendarPermission } from '@/lib/deviceCalendar';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
+import { shareText } from '@/lib/share';
+import { noteShareTitle, noteToShareText } from '@/lib/shareText';
 import { webNoOutline } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
 import { R, Spacing, T } from '@/theme/theme.tokens';
@@ -285,6 +287,20 @@ export default function NotizScreen() {
               style={{ padding: Spacing.sm }}
             >
               <ListChecks size={20} color={showChecklist ? colors.teal : colors.text3} strokeWidth={2} />
+            </PressableScale>
+            <PressableScale
+              accessibilityLabel="Notiz teilen"
+              onPress={() => {
+                flush();
+                hapticSelect();
+                // Der frisch komponierte Body (title+free+items) ist die Quelle,
+                // note?.body als Fallback, falls noch nichts getippt wurde.
+                const body = composeBody(title ?? '', free, items).trim() || (note?.body ?? '').trim();
+                if (body) void shareText(noteToShareText(body), noteShareTitle(body));
+              }}
+              style={{ padding: Spacing.sm }}
+            >
+              <Share2 size={20} color={colors.text3} strokeWidth={2} />
             </PressableScale>
             <PressableScale
               accessibilityLabel="Notiz zuweisen"

@@ -24,6 +24,8 @@ type SettingsState = {
   recentSearches: string[];
   /** Willkommens-Karte auf Heute wurde weggetippt (Erster-Start-Erlebnis). */
   welcomeDismissed: boolean;
+  /** Face-ID-/Code-Sperre beim Öffnen (nur nativ wirksam). */
+  appLockEnabled: boolean;
   /** Bereits importierte Apple-Erinnerungs-IDs (Dedupe bei erneutem Import). */
   importedReminderIds: string[];
   /** Gemini-API-Schlüssel für den Assistenten (leer = Feature aus).
@@ -49,6 +51,7 @@ type SettingsState = {
   addRecentSearch: (q: string) => void;
   clearRecentSearches: () => void;
   setWelcomeDismissed: (v: boolean) => void;
+  setAppLockEnabled: (v: boolean) => void;
   removeSavedFilter: (id: string) => void;
   /** Ersetzt alle Filter (Backup-Wiederherstellung). */
   setSavedFilters: (f: SavedFilter[]) => void;
@@ -72,6 +75,7 @@ export const useSettings = create<SettingsState>()(
       savedFilters: [],
       recentSearches: [],
       welcomeDismissed: false,
+      appLockEnabled: false,
       importedReminderIds: [],
       geminiApiKey: '',
       lastAutoBackupAt: '',
@@ -95,6 +99,7 @@ export const useSettings = create<SettingsState>()(
         }),
       clearRecentSearches: () => set({ recentSearches: [] }),
       setWelcomeDismissed: (welcomeDismissed) => set({ welcomeDismissed }),
+      setAppLockEnabled: (appLockEnabled) => set({ appLockEnabled }),
       removeSavedFilter: (id) => set((s) => ({ savedFilters: s.savedFilters.filter((x) => x.id !== id) })),
       setSavedFilters: (savedFilters) => set({ savedFilters }),
       addImportedReminderIds: (ids) =>
@@ -119,6 +124,7 @@ export const useSettings = create<SettingsState>()(
         savedFilters: s.savedFilters,
         recentSearches: s.recentSearches,
         welcomeDismissed: s.welcomeDismissed,
+        appLockEnabled: s.appLockEnabled,
         importedReminderIds: s.importedReminderIds,
         lastAutoBackupAt: s.lastAutoBackupAt,
         journalReminderEnabled: s.journalReminderEnabled,

@@ -1,7 +1,7 @@
 // assistant.test.ts — Prompt-Bau, Antwort-Extraktion, Fehlertexte.
 import type { ChatMessage } from '@/data/types';
 
-import { buildAppContext, buildRequestBody, createSseParser, describeError, extractActions, extractChunkText, extractText, pickModelsFromList } from './assistant';
+import { buildAppContext, buildRequestBody, createSseParser, describeError, extractActions, extractChunkText, extractText, pickModelsFromList, promptChips, sanitizeChatTitle } from './assistant';
 
 const msg = (role: 'user' | 'assistant', content: string, at: string): ChatMessage => ({
   id: `m-${at}`, chatId: 'c1', role, content, createdAt: at,
@@ -214,5 +214,41 @@ describe('createSseParser / extractChunkText — Streaming', () => {
   it('verkraftet CRLF-Zeilenenden', () => {
     const p = createSseParser();
     expect(p.push(event('a').replace('\n', '\r\n'))).toEqual(['a']);
+  });
+});
+
+describe('sanitizeChatTitle', () => {
+  it('streift Anführungszeichen und Label ab', () => {
+    expect(sanitizeChatTitle('Titel: „Rom-Reise planen"')).toBe('Rom-Reise planen');
+    expect(sanitizeChatTitle('"Packliste erstellen"')).toBe('Packliste erstellen');
+  });
+
+  it('nimmt nur die erste Zeile und entfernt Sternchen/Endpunkt', () => {
+    expect(sanitizeChatTitle('**Wocheneinkauf.**\nnoch was')).toBe('Wocheneinkauf');
+  });
+
+  it('deckelt auf sechs Wörter', () => {
+    expect(sanitizeChatTitle('eins zwei drei vier fünf sechs sieben acht')).toBe('eins zwei drei vier fünf sechs');
+  });
+
+  it('kürzt sehr lange Titel mit Ellipse', () => {
+    const long = sanitizeChatTitle('a'.repeat(80));
+    expect(long.length).toBe(48);
+    expect(long.endsWith('…')).toBe(true);
+  });
+});
+
+describe('promptChips', () => {
+  it('gibt je Verknüpfung passende Vorschläge', () => {
+    expect(promptChips('note')[0]).toContain('zusammen');
+    expect(promptChips('task')[0]).toContain('Teilschritte');
+    expect(promptChips('event').some((c) => c.includes('Packliste'))).toBe(true);
+    expect(promptChips('none')).toContain('Plane meinen Tag');
+  });
+
+  it('liefert immer mindestens zwei Chips', () => {
+    for (const link of ['note', 'task', 'event', 'none'] as const) {
+      expect(promptChips(link).length).toBeGreaterThanOrEqual(2);
+    }
   });
 });
