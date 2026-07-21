@@ -4,7 +4,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo } from 'react';
 import { View } from 'react-native';
 
-import { Backdrop } from '@/components/Backdrop';
 import { TaskEditorSheet } from '@/components/TaskEditorSheet';
 import { useTasks } from '@/data/queries';
 
@@ -28,7 +27,6 @@ export default function AufgabeScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <Backdrop />
       {task && <TaskEditorSheet task={task} onClose={close} />}
     </View>
   );

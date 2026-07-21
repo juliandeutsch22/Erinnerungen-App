@@ -8,6 +8,7 @@ import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, { SharedValue, useAnimatedStyle } from 'react-native-reanimated';
 import Svg, { Defs, Ellipse, LinearGradient as SvgGradient, Path, Rect, Stop } from 'react-native-svg';
 
+import { backdropScrollY } from '@/theme/backdropScroll';
 import { useReducedMotion, useScheme } from '@/theme/ThemeProvider';
 
 // Wie stark der Grund dem Scroll folgt (klein = weit hinten).
@@ -94,6 +95,9 @@ export function Backdrop({ scrollY }: { scrollY?: SharedValue<number> }) {
   const isDark = useScheme() === 'dark';
   const reduced = useReducedMotion();
   const { width } = useWindowDimensions();
+  // Ohne eigenen Scroll-Wert (Wurzel-Backdrop) folgt der Parallax dem globalen
+  // Offset des aktiven Screens; eigene Modals/Screens dürfen ihn überschreiben.
+  const offset = scrollY ?? backdropScrollY;
 
   const base: [string, string, string] = isDark
     ? ['#0B0D10', '#000000', '#0C0E0C']
@@ -107,8 +111,8 @@ export function Backdrop({ scrollY }: { scrollY?: SharedValue<number> }) {
   const colWidth = width * 0.52;
 
   const parallax = useAnimatedStyle(() => {
-    if (!scrollY || reduced) return { transform: [{ translateY: 0 }] };
-    const shift = Math.max(-BLEED, Math.min(BLEED, -scrollY.value * PARALLAX_FACTOR));
+    if (reduced) return { transform: [{ translateY: 0 }] };
+    const shift = Math.max(-BLEED, Math.min(BLEED, -offset.value * PARALLAX_FACTOR));
     return { transform: [{ translateY: shift }] };
   });
 

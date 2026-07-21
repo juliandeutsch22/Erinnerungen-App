@@ -42,13 +42,22 @@ export const SYSTEM_PROMPT =
   'Nutze den Block NUR bei einer ausdrücklichen Anlege-Bitte, nie ungefragt.';
 
 /** Braindump: ein Wurf unsortierter Gedanken → NUR der Aktions-Block. */
-export function buildBraindumpContext(todayLabel: string): string {
+export function buildBraindumpContext(todayLabel: string, strict = false): string {
   return (
     `Heute ist ${todayLabel}. Der Nutzer kippt einen unsortierten Braindump ab. ` +
     'Zerlege ALLES vollständig in den stoa-aktionen-Block: Handlungen → "aufgaben" ' +
     '(mit datum/zeit, wenn erkennbar — relative Angaben wie „morgen" auflösen), ' +
     'Gedanken/Ideen/Fakten → "notizen" (sinnvoll gruppiert, erste Zeile = Titel). ' +
-    'Keine "checkliste". Antworte mit maximal einem kurzen Satz plus dem Block — nichts darf verloren gehen.'
+    'Keine "checkliste". Antworte mit maximal einem kurzen Satz plus dem Block — nichts darf verloren gehen. ' +
+    'Gib den stoa-aktionen-Block IMMER aus — auch bei kurzen, stichpunktartigen oder ' +
+    'listenartigen Eingaben (z. B. „Titel:" gefolgt von Zeilen). Überschriften/Doppelpunkt-' +
+    'Zeilen sind Kontext, die Zeilen darunter werden Aufgaben oder Notizen. Wenn etwas eine ' +
+    'Handlung sein könnte, mach eine Aufgabe daraus; sonst eine Notiz. Antworte NIE mit leeren Händen.' +
+    (strict
+      ? ' WICHTIG: Deine letzte Antwort enthielt keinen gültigen Block. Gib jetzt ZWINGEND ' +
+        'den ```stoa-aktionen```-Block mit mindestens einem Eintrag zurück — jede Zeile der ' +
+        'Eingabe wird zu einer Aufgabe (Handlung) oder Notiz.'
+      : '')
   );
 }
 

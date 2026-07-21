@@ -2,7 +2,7 @@
 // erkannte Text fließt in ein Textfeld. Während des Zuhörens atmet ein weicher
 // Teal-Ring (Reduced-Motion → statisch). Reine Präsentation über useDictation.
 import { Mic } from 'lucide-react-native';
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 
@@ -13,11 +13,14 @@ import { useColors, useReducedMotion } from '@/theme/ThemeProvider';
 
 export function MicButton({
   size = 40,
+  autoStart = false,
   onStart,
   onText,
   onListeningChange,
 }: {
   size?: number;
+  /** Direkt beim Erscheinen zu hören beginnen (Quick-Access „sofort sprechen"). */
+  autoStart?: boolean;
   /** Vor dem Sprechen aufgerufen — merke dir den aktuellen Feldstand. */
   onStart?: () => void;
   /** Kumulatives Transkript der laufenden Äußerung + ob final. */
@@ -28,6 +31,15 @@ export function MicButton({
   const colors = useColors();
   const reduced = useReducedMotion();
   const { available, listening, toggle } = useDictation({ onStart, onText });
+
+  // Quick-Access: genau EINMAL beim Mounten automatisch zu hören beginnen.
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (autoStart && available && !autoStarted.current) {
+      autoStarted.current = true;
+      toggle();
+    }
+  }, [autoStart, available, toggle]);
 
   useEffect(() => {
     onListeningChange?.(listening);

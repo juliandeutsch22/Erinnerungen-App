@@ -11,7 +11,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Keyboard, KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Backdrop } from '@/components/Backdrop';
 import { KeyboardDoneBar, keyboardDoneProps } from '@/components/KeyboardDone';
 import { LinkedChats } from '@/components/LinkedChats';
 import { NoteLinkSheet } from '@/components/NoteLinkSheet';
@@ -222,7 +221,6 @@ export default function NotizScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <Backdrop />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         {/* Kopf: zurück · Zuletzt bearbeitet · Checkliste · zuweisen · anheften · löschen */}
         <View

@@ -1,6 +1,6 @@
 # ÜBERGABE-PROTOKOLL — Stoa
 
-Stand: **v1.23.0 (Build 45)**, Juli 2026 · 177 Jest-Tests grün · Branch-Modell siehe §3.
+Stand: **v1.24.0 (Build 46)**, Juli 2026 · 177 Jest-Tests grün · Branch-Modell siehe §3.
 Dieses Dokument macht eine neue Session sofort arbeitsfähig. Lies zusätzlich
 `AGENTS.md` (bindende Design-Leitplanken) und `ROADMAP.md` (Ideen-Backlog).
 
@@ -246,6 +246,23 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
    `ExpoSpeechRecognitionModule.stop()` beenden, nicht nur die Listener
    entfernen — sonst bleibt das Mikrofon heiß und die Audio-Session offen
    (v1.22.0). Der Unmount-Effekt in `lib/dictation.ts` erledigt das.
+9. **Assistent-Generierung ist vom Chat-Screen ENTKOPPELT** (`lib/assistantRun.ts`,
+   v1.24.0): Der Zustand-Store startet den Gemini-Call, streamt, speichert die
+   Antwort direkt übers Repository und invalidiert über den beim Start
+   mitgegebenen QueryClient — beides überlebt das Unmounten. Verlässt man den
+   Chat mitten in der Antwort, läuft sie weiter und ist beim Zurückkehren da.
+   Der Screen liest nur noch `runs[chatId]` (pending/stream/error/savedId). Also
+   NICHT wieder Generierung an einen `useState` im Screen hängen.
+10. **EIN Wurzel-Backdrop** (`_layout.tsx` + `theme/backdropScroll.ts`, v1.24.0):
+   Der Tempel-Hintergrund liegt EINMAL fest hinter dem Stack; die Stack-Karten
+   sind `contentStyle.backgroundColor: 'transparent'`. Screens rendern KEINEN
+   eigenen `<Backdrop>` mehr (sonst schoben sich beim Zurück-Wischen zwei Säulen
+   übereinander). Ausnahmen mit eigenem Backdrop: `ReorderSheet` (RN-`Modal`,
+   eigenes Fenster) und `AppLockGate` (Sperr-Vorhang). Parallax läuft über den
+   globalen `backdropScrollY` (via `makeMutable`), den der aktive `Screen`
+   speist und beim Betreten auf 0 setzt. Die eigentliche Übergangs-Wirkung ist
+   nur am Gerät prüfbar (Web-Stack ≠ nativer Stack), Rendering ist per Playwright
+   verifiziert.
 
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 

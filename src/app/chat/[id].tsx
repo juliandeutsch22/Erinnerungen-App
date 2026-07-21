@@ -12,7 +12,6 @@ import { Keyboard, KeyboardAvoidingView, Linking, Platform, ScrollView, Text, Te
 import Animated, { Easing, type SharedValue, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Backdrop } from '@/components/Backdrop';
 import { BottomSheet } from '@/components/BottomSheet';
 import { ChatLinkSheet } from '@/components/ChatLinkSheet';
 import { GlassButton } from '@/components/GlassButton';
@@ -25,11 +24,14 @@ import { Type } from '@/components/Type';
 import * as Clipboard from 'expo-clipboard';
 
 import { useDeviceEvents } from '@/data/calendarQueries';
+import { useQueryClient } from '@tanstack/react-query';
+
 import { useAppendMessage, useChatMessages, useChats, useUpdateChat } from '@/data/chatQueries';
 import { useCreateNote, useNotes, useUpdateNote } from '@/data/noteQueries';
 import { useCreateTask, useLists, useTasks } from '@/data/queries';
 import type { Chat, ChatMessage } from '@/data/types';
-import { askAssistant, type AssistantAction, buildAppContext, buildNoteContext, buildTaskContext, type ChatLink, extractActions, generateChatTitle, promptChips } from '@/lib/assistant';
+import { type AssistantAction, buildAppContext, buildNoteContext, buildTaskContext, type ChatLink, extractActions, promptChips } from '@/lib/assistant';
+import { useAssistantRun } from '@/lib/assistantRun';
 import { addDays, formatDueDate, toDateStr, todayStr } from '@/lib/dates';
 import { hasCalendarPermission } from '@/lib/deviceCalendar';
 import { noteTitle } from '@/lib/noteLogic';
@@ -264,7 +266,7 @@ export default function ChatScreen() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { id, ask } = useLocalSearchParams<{ id: string; ask?: string }>();
+  const { id, ask, dictate } = useLocalSearchParams<{ id: string; ask?: string; dictate?: string }>();
   const { data: chats } = useChats();
   const { data: messages } = useChatMessages(id);
   const appendMessage = useAppendMessage();
@@ -312,9 +314,7 @@ export default function ChatScreen() {
   const [dictating, setDictating] = useState(false);
   const [linkSheet, setLinkSheet] = useState(false);
   const [renameSheet, setRenameSheet] = useState(false);
-  const [pending, setPending] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [savedNoteIds, setSavedNoteIds] = useState<Set<string>>(new Set());
   const [appliedActionIds, setAppliedActionIds] = useState<Set<string>>(new Set());
   const createNote = useCreateNote();
@@ -332,20 +332,30 @@ export default function ChatScreen() {
   }
   const isNewMessage = (mid: string) => historyIdsRef.current !== null && !historyIdsRef.current.has(mid);
 
-  // Streaming: der wachsende Antwort-Text. Er bleibt sichtbar, bis die
-  // persistierte Nachricht im Verlauf angekommen ist — sonst blinkt der Übergang.
-  const [streamText, setStreamText] = useState<string | null>(null);
-  const streamRef = useRef('');
+  // Laufende Antwort aus dem entkoppelten Store (überlebt das Verlassen des
+  // Chats): denkt/streamt/Fehler pro Chat. So geht keine Antwort mehr verloren.
+  const qc = useQueryClient();
+  const run = useAssistantRun((s) => (id ? s.runs[id] : undefined));
+  const startRun = useAssistantRun((s) => s.start);
+  const clearStream = useAssistantRun((s) => s.clearStream);
+  const clearError = useAssistantRun((s) => s.clearError);
+  const pending = run?.pending ?? false;
+  const streamText = run && run.stream.length > 0 ? run.stream : null;
+  const error = run?.error ?? null;
   // Sobald der Nutzer selbst umbenennt, hält der Auto-Titel für immer still.
   const userRenamedRef = useRef(false);
-  const clearOnMessageId = useRef<string | null>(null);
+
+  // Stream räumen, sobald die gespeicherte Antwort im Verlauf ist (Anti-Blink).
   useEffect(() => {
-    if (clearOnMessageId.current && (messages ?? []).some((m) => m.id === clearOnMessageId.current)) {
-      clearOnMessageId.current = null;
-      streamRef.current = '';
-      setStreamText(null);
+    if (id && run?.savedId && (messages ?? []).some((m) => m.id === run.savedId)) {
+      clearStream(id);
     }
-  }, [messages]);
+  }, [messages, run?.savedId, id, clearStream]);
+
+  // Während des Streamens ans Ende scrollen (der Delta-Handler lebt im Store).
+  useEffect(() => {
+    if (run?.stream) scrollRef.current?.scrollToEnd({ animated: false });
+  }, [run?.stream]);
 
   // Die „Löschen?"-Rückfrage verfällt still nach ein paar Sekunden.
   useEffect(() => {
@@ -383,54 +393,40 @@ export default function ChatScreen() {
     setAppliedActionIds((prev) => new Set(prev).add(m.id));
   };
 
-  /** Antwort holen für einen gegebenen Verlauf (send + retry teilen sich das). */
-  const requestAnswer = async (history: ChatMessage[]) => {
+  /** Antwort anstoßen (send + retry teilen sich das). Läuft ENTKOPPELT im
+   *  Store weiter, auch wenn man den Chat verlässt — nichts geht verloren. */
+  const requestAnswer = (history: ChatMessage[]) => {
     if (!id) return;
-    setPending(true);
-    setError(null);
-    streamRef.current = '';
-    try {
-      const appContext = assistantContextEnabled
-        ? buildAppContext({
-            events: events ?? [],
-            tasks: tasks ?? [],
-            lists: lists ?? [],
-            notes: notes ?? [],
-            today,
-            calendarDenied: !calGranted,
-          })
-        : null;
-      const combined = [effectiveContext, appContext].filter(Boolean).join('\n\n') || null;
-      const answer = await askAssistant(apiKey, history, combined, (delta) => {
-        streamRef.current += delta;
-        setStreamText(streamRef.current);
-        scrollRef.current?.scrollToEnd({ animated: false });
-      });
-      const saved = await appendMessage.mutateAsync({ chatId: id, role: 'assistant', content: answer });
-      clearOnMessageId.current = saved.id;
-      hapticSuccess();
-
-      // Auto-Titel nach dem ERSTEN Austausch — es sei denn, der Nutzer hat schon
-      // selbst umbenannt (seine Wahl gewinnt immer). Still im Hintergrund.
-      const firstUser = history[history.length - 1];
-      if (history.length === 1 && !userRenamedRef.current && firstUser) {
-        void generateChatTitle(apiKey, firstUser.content, answer).then((title) => {
-          if (title && !userRenamedRef.current) updateChat.mutate({ id, patch: { title } });
-        });
-      }
-    } catch (e) {
-      streamRef.current = '';
-      setStreamText(null);
-      setError(e instanceof Error ? e.message : 'Unbekannter Fehler.');
-    } finally {
-      setPending(false);
-    }
+    clearError(id);
+    const appContext = assistantContextEnabled
+      ? buildAppContext({
+          events: events ?? [],
+          tasks: tasks ?? [],
+          lists: lists ?? [],
+          notes: notes ?? [],
+          today,
+          calendarDenied: !calGranted,
+        })
+      : null;
+    const combined = [effectiveContext, appContext].filter(Boolean).join('\n\n') || null;
+    const firstUser = history[history.length - 1];
+    void startRun({
+      chatId: id,
+      apiKey,
+      history,
+      context: combined,
+      qc,
+      autoTitle:
+        history.length === 1 && firstUser
+          ? { firstUserContent: firstUser.content, allowed: () => !userRenamedRef.current }
+          : undefined,
+    });
   };
 
   /** Erneut versuchen: der Verlauf endet bereits mit der Nutzer-Nachricht. */
   const retry = () => {
     if ((messages ?? []).length === 0 || pending) return;
-    void requestAnswer(messages ?? []);
+    requestAnswer(messages ?? []);
   };
 
   const copyMessage = async (content: string) => {
@@ -469,14 +465,14 @@ export default function ChatScreen() {
     const text = raw.trim();
     if (!text || !id || !chat || pending) return;
     setDraft('');
-    setError(null);
+    clearError(id);
     hapticSelect();
     const userMsg = await appendMessage.mutateAsync({ chatId: id, role: 'user', content: text });
     // Titel = erste Nutzer-Nachricht (gekürzt) — bis der Nutzer selbst umbenennt.
     if ((messages ?? []).length === 0 && chat.title === 'Neuer Chat') {
       updateChat.mutate({ id, patch: { title: text.length > 60 ? `${text.slice(0, 59)}…` : text } });
     }
-    await requestAnswer([...(messages ?? []), userMsg]);
+    requestAnswer([...(messages ?? []), userMsg]);
   };
   const send = () => sendText(draft);
 
@@ -511,7 +507,6 @@ export default function ChatScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <Backdrop />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         {/* Kopf */}
         <View
@@ -757,6 +752,7 @@ export default function ChatScreen() {
           {/* Diktat: füllt das Feld mit gesprochenem Text (On-Device). */}
           {apiKey.length > 0 && (
             <MicButton
+              autoStart={dictate === '1'}
               onStart={() => {
                 dictBaseRef.current = draft;
               }}

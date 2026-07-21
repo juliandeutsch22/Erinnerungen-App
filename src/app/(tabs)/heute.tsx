@@ -3,7 +3,7 @@
 // Uhrzeit auf EINER Glass-Fläche mit Seams, plus dünne Fortschrittslinie und
 // einklappbare „Erledigt heute"-Sektion. Abhaken = Teal-Puls + Haptik.
 import { useRouter } from 'expo-router';
-import { CalendarCheck, Plus, Settings, Sparkles, Sun } from 'lucide-react-native';
+import { CalendarCheck, Mic, Plus, Settings, Sparkles, Sun } from 'lucide-react-native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 
@@ -26,6 +26,7 @@ import { TaskQuickSheet } from '@/components/TaskQuickSheet';
 import { TaskRow } from '@/components/TaskRow';
 import { Type } from '@/components/Type';
 import { WelcomeCard } from '@/components/WelcomeCard';
+import { useCreateChat } from '@/data/chatQueries';
 import { useDeviceCalendars, useDeviceEvents } from '@/data/calendarQueries';
 import { useJournal } from '@/data/journalQueries';
 import { usePhotoCounts } from '@/data/photoQueries';
@@ -36,9 +37,11 @@ import { buildDayTimeline, nowMarkerIndex } from '@/lib/dayTimeline';
 import { addDays, formatDayHeading, toDateStr, todayStr } from '@/lib/dates';
 import { type DeviceEvent, hasCalendarPermission } from '@/lib/deviceCalendar';
 import { groupToday, groupUpcomingDays } from '@/lib/taskLogic';
+import { dictationAvailable } from '@/lib/dictation';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { TAB_BAR_SAFE_BOTTOM } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
+import { useSettings } from '@/theme/settings.store';
 import { Spacing } from '@/theme/theme.tokens';
 
 export default function HeuteScreen() {
@@ -49,6 +52,14 @@ export default function HeuteScreen() {
   const complete = useCompleteTask();
   const reopen = useReopenTask();
   const adoptOverdue = useAdoptOverdue();
+  const createChat = useCreateChat();
+  const apiKey = useSettings((s) => s.geminiApiKey);
+
+  // Quick-Access: sofort einen neuen Chat öffnen, der bereits zuhört.
+  const startVoiceChat = () => {
+    hapticSuccess();
+    createChat.mutate({}, { onSuccess: (chat) => router.push(`/chat/${chat.id}?dictate=1`) });
+  };
 
   // undefined = Editor zu, null = neue Aufgabe, Task = bearbeiten.
   const [editorTask, setEditorTask] = useState<Task | null | undefined>(undefined);
@@ -378,6 +389,15 @@ export default function HeuteScreen() {
             <Type variant="caption" tone={allDone ? 'teal' : 'text3'} tabular>{summary}</Type>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            {apiKey.length > 0 && dictationAvailable && (
+              <PressableScale
+                accessibilityLabel="Dem Assistenten diktieren"
+                onPress={startVoiceChat}
+                style={{ padding: Spacing.sm }}
+              >
+                <Mic size={20} color={colors.text3} strokeWidth={2} />
+              </PressableScale>
+            )}
             <PressableScale
               accessibilityLabel="Assistent öffnen"
               onPress={() => router.push('/chats')}
