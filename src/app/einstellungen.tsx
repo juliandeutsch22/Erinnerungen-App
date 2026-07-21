@@ -8,6 +8,7 @@ import React, { useState } from 'react';
 import { TextInput, View } from 'react-native';
 
 import { Chip } from '@/components/Chip';
+import { DisclosureChevron } from '@/components/DisclosureChevron';
 import { GlassButton } from '@/components/GlassButton';
 import { ImportRemindersSheet } from '@/components/ImportRemindersSheet';
 import { PasteNoteSheet } from '@/components/PasteNoteSheet';
@@ -52,6 +53,9 @@ const DEFAULT_TIMES = ['08:00', '09:00', '12:00', '18:00'];
 const SUMMARY_TIMES = ['07:00', '08:00', '09:00', '10:00'];
 const JOURNAL_TIMES = ['20:00', '21:00', '22:00'];
 
+// Abschnitts-Überschriften in der Antiqua — dieselbe Stimme wie überall in der App.
+const sectionStyle = { fontSize: T.lg + 2, lineHeight: (T.lg + 2) * 1.25 } as const;
+
 // Version + Build aus der App-Config — damit man am Gerät sieht, welcher Build läuft.
 const build = Constants.expoConfig?.ios?.buildNumber;
 const appVersion = `${Constants.expoConfig?.version ?? '?'}${build ? ` (${build})` : ''}`;
@@ -80,6 +84,8 @@ export default function EinstellungenScreen() {
   const setSavedFilters = useSettings((s) => s.setSavedFilters);
 
   const [importText, setImportText] = useState('');
+  // Das rohe JSON-Feld bleibt eingeklappt — es ist der Notausgang, nicht der Weg.
+  const [showJsonImport, setShowJsonImport] = useState(false);
   const [confirmImport, setConfirmImport] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [showReminderImport, setShowReminderImport] = useState(false);
@@ -203,7 +209,7 @@ export default function EinstellungenScreen() {
 
       <Reveal delay={80}>
         <GlassPanel>
-          <Type variant="label" tone="text2">Erscheinungsbild</Type>
+          <Type variant="heading" style={sectionStyle}>Erscheinungsbild</Type>
           <View style={{ flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm }}>
             {THEMES.map((t) => (
               <Chip key={t.value} label={t.label} active={themePref === t.value} onPress={() => setThemePref(t.value)} />
@@ -212,7 +218,7 @@ export default function EinstellungenScreen() {
 
           <Seam />
 
-          <Type variant="label" tone="text2">Bewegung</Type>
+          <Type variant="heading" style={sectionStyle}>Bewegung</Type>
           <View style={{ flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm }}>
             {MOTIONS.map((m) => (
               <Chip key={m.value} label={m.label} active={motionPref === m.value} onPress={() => setMotionPref(m.value)} />
@@ -221,7 +227,7 @@ export default function EinstellungenScreen() {
 
           <Seam />
 
-          <Type variant="label" tone="text2">Standard-Uhrzeit</Type>
+          <Type variant="heading" style={sectionStyle}>Standard-Uhrzeit</Type>
           <Type variant="caption" tone="text3" style={{ marginTop: 2 }}>
             Vorschlag für „Eigene Uhrzeit" im Editor.
           </Type>
@@ -233,7 +239,7 @@ export default function EinstellungenScreen() {
 
           <Seam />
 
-          <Type variant="label" tone="text2">Sammel-Erinnerung</Type>
+          <Type variant="heading" style={sectionStyle}>Sammel-Erinnerung</Type>
           <Type variant="caption" tone="text3" style={{ marginTop: 2 }}>
             Eine Mitteilung „X Dinge für heute" für Aufgaben ohne Uhrzeit.
           </Type>
@@ -262,7 +268,7 @@ export default function EinstellungenScreen() {
 
           <Seam />
 
-          <Type variant="label" tone="text2">Abendbetrachtung</Type>
+          <Type variant="heading" style={sectionStyle}>Abendbetrachtung</Type>
           <Type variant="caption" tone="text3" style={{ marginTop: 2 }}>
             Eine stille tägliche Erinnerung an die Frage des Abends.
           </Type>
@@ -294,7 +300,7 @@ export default function EinstellungenScreen() {
 
       <Reveal delay={140}>
         <GlassPanel>
-          <Type variant="label" tone="text2">Backup</Type>
+          <Type variant="heading" style={sectionStyle}>Backup</Type>
           <Type variant="caption" tone="text3" style={{ marginTop: 2 }}>
             Sichert Listen, Aufgaben, Notizen, Chats, Filter, Termin-Fotos, Dokumente und
             Abendbetrachtungen in einer Datei — wichtig
@@ -319,7 +325,7 @@ export default function EinstellungenScreen() {
 
           <Seam />
 
-          <Type variant="label" tone="text2">Wiederherstellen</Type>
+          <Type variant="heading" style={sectionStyle}>Wiederherstellen</Type>
           <Type variant="caption" tone="text3" style={{ marginTop: 2 }}>
             Ersetzt den kompletten Bestand durch ein Backup.
           </Type>
@@ -354,9 +360,20 @@ export default function EinstellungenScreen() {
               ))}
             </View>
           )}
-          <Type variant="caption" tone="text3" style={{ marginTop: Spacing.md }}>
-            Oder Backup-JSON direkt einfügen{fileBackupAvailable ? ' (ohne Fotos)' : ''}.
-          </Type>
+          <PressableScale
+            accessibilityLabel={showJsonImport ? 'JSON-Einfügen einklappen' : 'Backup-JSON direkt einfügen'}
+            onPress={() => {
+              hapticSelect();
+              setShowJsonImport((v) => !v);
+            }}
+            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: Spacing.md }}
+          >
+            <Type variant="caption" tone="text3">
+              Oder Backup-JSON direkt einfügen{fileBackupAvailable ? ' (ohne Fotos)' : ''}
+            </Type>
+            <DisclosureChevron open={showJsonImport} color={colors.text3} />
+          </PressableScale>
+          {showJsonImport && (<>
           <TextInput
             value={importText}
             onChangeText={(v) => {
@@ -399,6 +416,7 @@ export default function EinstellungenScreen() {
               {confirmImport ? 'Wirklich ersetzen? Tippe erneut.' : 'Importieren'}
             </Type>
           </GlassButton>
+          </>)}
           {feedback && (
             <Type variant="caption" tone="text2" style={{ marginTop: Spacing.sm }}>
               {feedback}
@@ -409,7 +427,7 @@ export default function EinstellungenScreen() {
 
       <Reveal delay={170}>
         <GlassPanel>
-          <Type variant="label" tone="text2">Umzug von Apple-Apps</Type>
+          <Type variant="heading" style={sectionStyle}>Umzug von Apple-Apps</Type>
           {deviceRemindersAvailable && (
             <>
               <Type variant="caption" tone="text3" style={{ marginTop: 2 }}>
@@ -447,7 +465,7 @@ export default function EinstellungenScreen() {
 
       <Reveal delay={190}>
         <GlassPanel>
-          <Type variant="label" tone="text2">Assistent</Type>
+          <Type variant="heading" style={sectionStyle}>Assistent</Type>
           <Type variant="caption" tone="text3" style={{ marginTop: 2 }}>
             Nutzt deinen eigenen Google-Gemini-Schlüssel (dauerhaft kostenloses Kontingent) — Anfragen
             gehen direkt vom Gerät an Google, ohne Mittelsmann. Schlüssel erstellen:
@@ -485,7 +503,7 @@ export default function EinstellungenScreen() {
           {geminiApiKey.length > 0 && (
             <>
               <Seam />
-              <Type variant="label" tone="text2">App-Überblick</Type>
+              <Type variant="heading" style={sectionStyle}>App-Überblick</Type>
               <Type variant="caption" tone="text3" style={{ marginTop: 2 }}>
                 Der Assistent sieht bei jeder Frage Termine (~5 Wochen), offene Aufgaben, Listen und
                 Notiz-Titel — so kann er „Was steht diese Woche an?" direkt beantworten. Die

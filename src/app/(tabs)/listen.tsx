@@ -181,12 +181,11 @@ export default function ListenScreen() {
             onPress={() => setEditorList(null)}
             style={{ width: '47%', flexGrow: 1 }}
           >
+            {/* Tonale Well statt Strichlinie (Design-Leitplanke). */}
             <View
               style={{
                 borderRadius: R.xl,
-                borderWidth: 1.5,
-                borderStyle: 'dashed',
-                borderColor: colors.border2,
+                backgroundColor: colors.chip,
                 padding: Spacing.md,
                 gap: Spacing.sm,
                 minHeight: 106,

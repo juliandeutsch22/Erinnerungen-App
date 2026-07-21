@@ -18,28 +18,33 @@ export function LoadingState({ label = 'Wird geladen…' }: { label?: string }) 
   );
 }
 
+/** Leerzustand als stille Einladung: Glyphe in runder Stein-Well, Titel als
+ *  Tempel-Inschrift, ein ruhiger Satz — überall dieselbe Geste, zentriert. */
 export function EmptyState({ title, body, icon }: { title?: string; body: string; icon?: React.ReactNode }) {
   const colors = useColors();
   return (
-    <View style={{ gap: Spacing.sm, paddingVertical: Spacing.md }}>
+    <View style={{ gap: Spacing.sm, paddingVertical: Spacing.lg, alignItems: 'center' }}>
       {icon ? (
         <View
           style={{
-            width: 44,
-            height: 44,
-            borderRadius: R.md,
+            width: 48,
+            height: 48,
+            borderRadius: R.pill,
             backgroundColor: colors.chip,
             borderWidth: StyleSheet.hairlineWidth,
             borderColor: colors.chipBorder,
             alignItems: 'center',
             justifyContent: 'center',
+            marginBottom: Spacing.xs,
           }}
         >
           {icon}
         </View>
       ) : null}
-      {title ? <Type variant="label" tone="text2">{title}</Type> : null}
-      <Type variant="body" tone="text3">{body}</Type>
+      {title ? <Type variant="eyebrow" tone="text2" style={{ textAlign: 'center' }}>{title}</Type> : null}
+      <Type variant="body" tone="text3" style={{ textAlign: 'center', maxWidth: 280, lineHeight: 15 * 1.5 }}>
+        {body}
+      </Type>
     </View>
   );
 }

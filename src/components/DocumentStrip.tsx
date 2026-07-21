@@ -86,9 +86,8 @@ export function DocumentStrip({ eventId }: { eventId: string }) {
             gap: Spacing.sm,
             paddingVertical: Spacing.sm,
             borderRadius: R.md,
-            borderWidth: 1.5,
-            borderStyle: 'dashed',
-            borderColor: colors.border2,
+            // Tonale Well statt Strichlinie (Design-Leitplanke).
+            backgroundColor: colors.chip,
           }}
         >
           {picking ? (

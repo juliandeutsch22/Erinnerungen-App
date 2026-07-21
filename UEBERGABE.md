@@ -1,6 +1,6 @@
 # ÜBERGABE-PROTOKOLL — Stoa
 
-Stand: **v1.17.0 (Build 36)**, Juli 2026 · 154 Jest-Tests grün · Branch-Modell siehe §3.
+Stand: **v1.18.0 (Build 37)**, Juli 2026 · 154 Jest-Tests grün · Branch-Modell siehe §3.
 Dieses Dokument macht eine neue Session sofort arbeitsfähig. Lies zusätzlich
 `AGENTS.md` (bindende Design-Leitplanken) und `ROADMAP.md` (Ideen-Backlog).
 
@@ -167,7 +167,11 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
   gegenüber alten Ständen (schemaVersion 1–3).
 - **Import:** Apple-Erinnerungen (Dedupe), Notizen-Einfügen.
 - **Suche:** Aufgaben, Listen, Notizen, Chats, Dokumente, Abendbetrachtung —
-  mit Treffer-Highlighting.
+  mit Treffer-Highlighting, Bereichs-Chips als Filter und „Zuletzt gesucht"
+  (max. 6, lokal in den Settings; gemerkt beim Öffnen eines Treffers).
+  Leerzustände app-weit über das zentrierte `EmptyState`-Muster (Glyphe in
+  runder Stein-Well + Inschrift-Titel); Hinzufügen-Kacheln sind tonale Wells
+  statt Strichlinien; Dunkelmodus liegt auf Schiefer-Blau statt reinem Schwarz.
 
 ## 8. Teuer erkaufte Fallstricke — nicht neu lernen!
 

@@ -53,9 +53,8 @@ export function PhotoStrip({ eventId }: { eventId: string }) {
               width: THUMB,
               height: THUMB,
               borderRadius: R.md,
-              borderWidth: 1.5,
-              borderStyle: 'dashed',
-              borderColor: colors.border2,
+              // Tonale Well statt Strichlinie (Design-Leitplanke).
+              backgroundColor: colors.chip,
               alignItems: 'center',
               justifyContent: 'center',
               gap: 2,

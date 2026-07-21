@@ -1,7 +1,7 @@
 // rueckblick.tsx — Foto-Rückblick über alle Termine: Momente chronologisch nach
 // Monat gruppiert, als Raster. Tap öffnet die Vollbild-Ansicht mit Blättern.
 import { useRouter } from 'expo-router';
-import { ChevronLeft } from 'lucide-react-native';
+import { ChevronLeft, GalleryHorizontalEnd } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { Image, View, useWindowDimensions } from 'react-native';
 
@@ -70,6 +70,7 @@ export default function RueckblickScreen() {
         <Reveal delay={80}>
           <GlassPanel>
             <EmptyState
+              icon={<GalleryHorizontalEnd size={20} color={colors.teal} strokeWidth={2} />}
               title="Noch keine Momente"
               body="Öffne einen Termin im Kalender und füge unten Fotos hinzu — sie erscheinen dann hier als Rückblick."
             />

@@ -44,15 +44,16 @@ export const lightColors = {
   warning: ACCENT_B,
 };
 
-// Dark = Nacht über der Ägäis: dunkler Schiefer-Marmor, Akzente eine Stufe
-// heller, damit sie auf Dunkel genauso ruhig leuchten wie Light auf Elfenbein.
+// Dark = Nacht über der Ägäis: dunkler Schiefer-Marmor mit einem Hauch
+// Mitternachtsblau (kein reines Schwarz — der Tempel bleibt auch nachts Stein),
+// Akzente eine Stufe heller, damit sie genauso ruhig leuchten wie Light auf Elfenbein.
 export const darkColors: typeof lightColors = {
   teal: '#7BA7DC',
   indigo: '#9DAF7E',
-  bg: '#000000',
-  bg2: '#101315',
-  bg3: '#171B1E',
-  bg4: '#1F2429',
+  bg: '#0B0E13',
+  bg2: '#131820',
+  bg3: '#1A2029',
+  bg4: '#222A34',
   chip: 'rgba(255,255,255,0.07)',
   chipBorder: 'rgba(255,255,255,0.10)',
   border: 'rgba(255,255,255,0.12)',

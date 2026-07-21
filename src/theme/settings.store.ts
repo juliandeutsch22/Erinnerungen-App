@@ -20,6 +20,8 @@ type SettingsState = {
   summaryTime: string;
   /** Gespeicherte Smart-Filter (Feature: eigene Ansichten). */
   savedFilters: SavedFilter[];
+  /** Zuletzt gesuchte Begriffe (neueste zuerst, max. 6) — rein lokal. */
+  recentSearches: string[];
   /** Bereits importierte Apple-Erinnerungs-IDs (Dedupe bei erneutem Import). */
   importedReminderIds: string[];
   /** Gemini-API-Schlüssel für den Assistenten (leer = Feature aus).
@@ -42,6 +44,8 @@ type SettingsState = {
   setSummaryEnabled: (v: boolean) => void;
   setSummaryTime: (t: string) => void;
   addSavedFilter: (f: SavedFilter) => void;
+  addRecentSearch: (q: string) => void;
+  clearRecentSearches: () => void;
   removeSavedFilter: (id: string) => void;
   /** Ersetzt alle Filter (Backup-Wiederherstellung). */
   setSavedFilters: (f: SavedFilter[]) => void;
@@ -63,6 +67,7 @@ export const useSettings = create<SettingsState>()(
       summaryEnabled: true,
       summaryTime: '09:00',
       savedFilters: [],
+      recentSearches: [],
       importedReminderIds: [],
       geminiApiKey: '',
       lastAutoBackupAt: '',
@@ -76,6 +81,15 @@ export const useSettings = create<SettingsState>()(
       setSummaryEnabled: (summaryEnabled) => set({ summaryEnabled }),
       setSummaryTime: (summaryTime) => set({ summaryTime }),
       addSavedFilter: (f) => set((s) => ({ savedFilters: [...s.savedFilters, f] })),
+      // Dedupe (case-insensitiv), neueste zuerst, still auf 6 gekappt.
+      addRecentSearch: (q) =>
+        set((s) => {
+          const t = q.trim();
+          if (t.length < 2) return {};
+          const rest = s.recentSearches.filter((x) => x.toLowerCase() !== t.toLowerCase());
+          return { recentSearches: [t, ...rest].slice(0, 6) };
+        }),
+      clearRecentSearches: () => set({ recentSearches: [] }),
       removeSavedFilter: (id) => set((s) => ({ savedFilters: s.savedFilters.filter((x) => x.id !== id) })),
       setSavedFilters: (savedFilters) => set({ savedFilters }),
       addImportedReminderIds: (ids) =>
@@ -98,6 +112,7 @@ export const useSettings = create<SettingsState>()(
         summaryEnabled: s.summaryEnabled,
         summaryTime: s.summaryTime,
         savedFilters: s.savedFilters,
+        recentSearches: s.recentSearches,
         importedReminderIds: s.importedReminderIds,
         lastAutoBackupAt: s.lastAutoBackupAt,
         journalReminderEnabled: s.journalReminderEnabled,
