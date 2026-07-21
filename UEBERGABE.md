@@ -1,6 +1,6 @@
 # ÜBERGABE-PROTOKOLL — Stoa
 
-Stand: **v1.22.1 (Build 44)**, Juli 2026 · 177 Jest-Tests grün · Branch-Modell siehe §3.
+Stand: **v1.23.0 (Build 45)**, Juli 2026 · 177 Jest-Tests grün · Branch-Modell siehe §3.
 Dieses Dokument macht eine neue Session sofort arbeitsfähig. Lies zusätzlich
 `AGENTS.md` (bindende Design-Leitplanken) und `ROADMAP.md` (Ideen-Backlog).
 
@@ -115,7 +115,12 @@ Rot. Headings in Cormorant Garamond (`Type`-Varianten, positives Tracking —
 Inschriften sind gesperrt). Flächen über `GlassPanel`/`Glass` (Marmor), tonale
 Flächen statt Ränder, flache Schatten. `Seam` trennt innerhalb eines Panels,
 Mäander (`variant="ornament"`) max. 1×/Panel. Backdrop-Tempel nicht anfassen.
-Bewegung ruhig (`Reveal`, `PressableScale`, `PopIn`). Swipes = vollflächige
+Bewegung ruhig (`Reveal`, `PressableScale`, `PopIn`, `Appear` — kleiner
+Mount-Auftritt: Opacity + optional Versatz/Skalierung über die `Ease`/`Dur`-
+Tokens, Shared-Value-basiert = web+nativ robust, `skip`/Reduced-Motion → sofort
+da). Im Chat: Nutzer-Nachricht tritt von rechts auf, Streaming-Text steigt
+sanft an die Stelle der Denk-Punkte, Aktionskarte blendet aus scale 0.96 ein —
+aber NUR neue Nachrichten (geladener Verlauf via `skip` sofort da). Swipes = vollflächige
 Farb-Blöcke (`SwipeActionSlide`, Teal = positiv, Indigo/Oliv = destruktiv).
 UI-Texte deutsch und gelassen.
 

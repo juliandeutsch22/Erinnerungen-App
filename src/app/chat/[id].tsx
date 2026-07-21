@@ -17,6 +17,7 @@ import { BottomSheet } from '@/components/BottomSheet';
 import { ChatLinkSheet } from '@/components/ChatLinkSheet';
 import { GlassButton } from '@/components/GlassButton';
 import { keyboardDoneProps, KeyboardDoneBar } from '@/components/KeyboardDone';
+import { Appear } from '@/components/Appear';
 import { MarkdownText } from '@/components/MarkdownText';
 import { MicButton } from '@/components/MicButton';
 import { PressableScale } from '@/components/PressableScale';
@@ -35,6 +36,7 @@ import { noteTitle } from '@/lib/noteLogic';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { webNoOutline } from '@/theme/layout';
 import { useColors, useReducedMotion } from '@/theme/ThemeProvider';
+import { Dur } from '@/theme/motion.tokens';
 import { R, Spacing, T } from '@/theme/theme.tokens';
 import { useSettings } from '@/theme/settings.store';
 
@@ -320,6 +322,15 @@ export default function ChatScreen() {
   const updateNote = useUpdateNote();
   const scrollRef = useRef<ScrollView>(null);
   const listHeight = useRef(0);
+
+  // Nachrichten aus dem GELADENEN Verlauf treten NICHT auf — nur neue, die
+  // während der Sitzung dazukommen. Merke die IDs, sobald der Verlauf zum
+  // ersten Mal da ist (bei neuem Chat: leere Menge → alles Weitere ist neu).
+  const historyIdsRef = useRef<Set<string> | null>(null);
+  if (historyIdsRef.current === null && messages !== undefined) {
+    historyIdsRef.current = new Set(messages.map((m) => m.id));
+  }
+  const isNewMessage = (mid: string) => historyIdsRef.current !== null && !historyIdsRef.current.has(mid);
 
   // Streaming: der wachsende Antwort-Text. Er bleibt sichtbar, bis die
   // persistierte Nachricht im Verlauf angekommen ist — sonst blinkt der Übergang.
@@ -634,21 +645,22 @@ export default function ChatScreen() {
                 {m.role === 'user' ? (
                   // Nutzer: editorialer Dialog — rechtsbündiger Text an einem
                   // schmalen Teal-Rand, keine Blase (Manuskript statt Messenger).
-                  <PressableScale
-                    accessibilityLabel="Nachricht kopieren"
-                    onLongPress={() => void copyMessage(clean)}
-                    pressedScale={0.99}
-                    style={{
-                      alignSelf: 'flex-end',
-                      maxWidth: '86%',
-                      borderRightWidth: 2,
-                      borderRightColor: colors.teal,
-                      paddingRight: Spacing.md,
-                      paddingVertical: 2,
-                    }}
-                  >
-                    <UserText content={clean} color={colors.teal} />
-                  </PressableScale>
+                  // Tritt leicht von rechts auf (kommt aus der Eingabezeile).
+                  <Appear tx={12} skip={!isNewMessage(m.id)} style={{ alignSelf: 'flex-end', maxWidth: '86%' }}>
+                    <PressableScale
+                      accessibilityLabel="Nachricht kopieren"
+                      onLongPress={() => void copyMessage(clean)}
+                      pressedScale={0.99}
+                      style={{
+                        borderRightWidth: 2,
+                        borderRightColor: colors.teal,
+                        paddingRight: Spacing.md,
+                        paddingVertical: 2,
+                      }}
+                    >
+                      <UserText content={clean} color={colors.teal} />
+                    </PressableScale>
+                  </Appear>
                 ) : (
                   // Assistent: frei gesetzter Text direkt auf der Tafel — ein Brief, keine SMS.
                   <View style={{ alignSelf: 'stretch', paddingRight: Spacing.sm }}>
@@ -659,15 +671,18 @@ export default function ChatScreen() {
                     >
                       <MarkdownText markdown={clean} />
                     </PressableScale>
-                    {/* Aktionskarte: strukturierte Vorschläge, einzeln abwählbar. */}
+                    {/* Aktionskarte: strukturierte Vorschläge, einzeln abwählbar.
+                        Blendet aus scale 0.96 ein — selten gesehen, darf auftreten. */}
                     {actions && (
-                      <ActionCard
-                        actions={actions}
-                        applied={appliedActionIds.has(m.id)}
-                        today={today}
-                        hasLinkedNote={!!linkedNote}
-                        onApply={(selected) => void applyActions(m, selected)}
-                      />
+                      <Appear from={0.96} ty={4} duration={Dur.card} skip={!isNewMessage(m.id)}>
+                        <ActionCard
+                          actions={actions}
+                          applied={appliedActionIds.has(m.id)}
+                          today={today}
+                          hasLinkedNote={!!linkedNote}
+                          onApply={(selected) => void applyActions(m, selected)}
+                        />
+                      </Appear>
                     )}
                     {/* Antworten lassen sich mit einem Tipp als Notiz ablegen —
                         inklusive der Verknüpfung des Chats (Aufgabe/Termin). */}
@@ -687,11 +702,12 @@ export default function ChatScreen() {
               </View>
             );
           })}
-          {/* Streaming: die Antwort wächst Wort für Wort auf der Tafel. */}
+          {/* Streaming: die Antwort wächst Wort für Wort auf der Tafel — der
+              erste Text tritt sanft auf, wo eben noch die Denk-Punkte waren. */}
           {streamVisible !== null && streamVisible.length > 0 && (
-            <View style={{ alignSelf: 'stretch', paddingRight: Spacing.sm }}>
+            <Appear ty={6} style={{ alignSelf: 'stretch', paddingRight: Spacing.sm }}>
               <MarkdownText markdown={streamVisible} />
-            </View>
+            </Appear>
           )}
           {pending && (streamVisible === null || streamVisible.length === 0) && <ThinkingDots />}
           {error && (
