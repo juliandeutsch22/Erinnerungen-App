@@ -1,6 +1,6 @@
 # ÜBERGABE-PROTOKOLL — Stoa
 
-Stand: **v1.20.1 (Build 40)**, Juli 2026 · 170 Jest-Tests grün · Branch-Modell siehe §3.
+Stand: **v1.21.0 (Build 41)**, Juli 2026 · 174 Jest-Tests grün · Branch-Modell siehe §3.
 Dieses Dokument macht eine neue Session sofort arbeitsfähig. Lies zusätzlich
 `AGENTS.md` (bindende Design-Leitplanken) und `ROADMAP.md` (Ideen-Backlog).
 
@@ -163,14 +163,17 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
 - **Notizen:** Apple-Notes-Parität (Datumsgruppen, Anheften, 30-Tage-Papierkorb),
   Checklisten-Block, Verknüpfung zu Aufgabe/Termin, Editor-Tastatur gelöst.
 - **Listen/Projekte:** Ziel + Deadline + Fortschritt, Vorlagen (duplizieren),
-  Tags, Unteraufgaben, Smart-Filter (gespeichert), Drag&Drop.
+  Tags, Unteraufgaben, Smart-Filter (gespeichert), Drag&Drop. **Tag-Chips auf
+  der Aufgabenzeile sind tippbar** → `/filter?tag=…` (Ad-hoc-Ansicht für genau
+  diesen Tag).
 - **Assistent:** Chats (30-Tage-Papierkorb, umbenennbar über den Titel im
   Chat-Kopf, Löschen zweistufig), Verknüpfung an Termin (Snapshot-
   Kontext) / Notiz / Aufgabe (Live-Kontext), **App-Schnappschuss** in jedem
   Senden (Termine ~5 Wochen, offene Aufgaben, Listen, Notiz-Titel; abschaltbar;
   ohne Journal), `stoa-aktionen`-Block → Aktionskarte (einzeln abwählbar,
-  deutsche Datumsanzeige; Aufgaben/Checklisten/Notizen anlegen), „Plane meinen
-  Tag", Braindump, „Als Notiz speichern", Datum immer im Prompt.
+  deutsche Datumsanzeige; Aufgaben/Checklisten/Notizen anlegen — **Checkliste
+  ohne verknüpfte Notiz wird als NEUE Notiz angelegt statt still verworfen**),
+  „Plane meinen Tag", Braindump, „Als Notiz speichern", Datum immer im Prompt.
   **Antworten streamen** (SSE via `streamGenerateContent` + `expo/fetch`;
   reißt der Stream ab, zählt der schon erhaltene Text; ohne Stream-Support
   wird der SSE-Body am Stück geparst) und werden als **Markdown-Licht gesetzt**
@@ -191,8 +194,10 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
   Liste; Schutz-Backup vor jedem Import. Import-/Export-Import immer tolerant
   gegenüber alten Ständen (schemaVersion 1–3).
 - **Import:** Apple-Erinnerungen (Dedupe), Notizen-Einfügen.
-- **Suche:** Aufgaben, Listen, Notizen, Chats, Dokumente, Abendbetrachtung —
-  mit Treffer-Highlighting, Bereichs-Chips als Filter und „Zuletzt gesucht"
+- **Suche:** Aufgaben (Titel, Notiz, **Tags und Unteraufgaben** — reine
+  `taskMatchesQuery` in taskFilters.ts, getestet), Listen, Notizen, Chats,
+  Dokumente, Abendbetrachtung — mit Treffer-Highlighting, Bereichs-Chips als
+  Filter und „Zuletzt gesucht"
   (max. 6, lokal in den Settings; gemerkt beim Öffnen eines Treffers).
   Leerzustände app-weit über das zentrierte `EmptyState`-Muster (Glyphe in
   runder Stein-Well + Inschrift-Titel); Hinzufügen-Kacheln sind tonale Wells

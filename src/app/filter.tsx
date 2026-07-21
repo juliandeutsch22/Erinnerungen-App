@@ -39,7 +39,9 @@ const RANGES: { value: FilterRange; label: string }[] = [
 ];
 
 export default function FilterScreen() {
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  // `id` öffnet einen gespeicherten Filter; `tag` öffnet eine Ad-hoc-Ansicht
+  // für genau diesen Tag (Sprung aus einer Aufgabenzeile).
+  const { id, tag } = useLocalSearchParams<{ id?: string; tag?: string }>();
   const colors = useColors();
   const router = useRouter();
   const today = todayStr();
@@ -53,7 +55,7 @@ export default function FilterScreen() {
   const removeSavedFilter = useSettings((s) => s.removeSavedFilter);
 
   const saved = savedFilters.find((f) => f.id === id);
-  const [tags, setTags] = useState<string[]>(saved?.tags ?? []);
+  const [tags, setTags] = useState<string[]>(saved?.tags ?? (tag ? [tag] : []));
   const [flagged, setFlagged] = useState(saved?.flagged ?? false);
   const [range, setRange] = useState<FilterRange>(saved?.range ?? 'all');
   const [includeCompleted, setIncludeCompleted] = useState(saved?.includeCompleted ?? false);

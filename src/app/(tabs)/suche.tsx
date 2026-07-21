@@ -32,6 +32,7 @@ import { formatDueDate, toDateStr, todayStr } from '@/lib/dates';
 import { openDocument } from '@/lib/documents';
 import { hapticSelect } from '@/lib/haptics';
 import { noteMatchLine, noteTitle } from '@/lib/noteLogic';
+import { taskMatchesQuery } from '@/lib/taskFilters';
 import { webNoOutline } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
 import { useSettings } from '@/theme/settings.store';
@@ -77,8 +78,9 @@ export default function SucheScreen() {
 
   const taskHits = useMemo(() => {
     if (!q || !inScope('aufgaben')) return [];
+    // Volltext (Titel, Notiz, Tags, Unteraufgaben) — reine Logik in taskFilters.
     return (tasks ?? [])
-      .filter((t) => t.title.toLowerCase().includes(q) || (t.note ?? '').toLowerCase().includes(q))
+      .filter((t) => taskMatchesQuery(t, q))
       .sort((a, b) => Number(a.completedAt !== null) - Number(b.completedAt !== null))
       .slice(0, 50);
     // eslint-disable-next-line react-hooks/exhaustive-deps

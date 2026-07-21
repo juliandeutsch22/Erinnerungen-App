@@ -63,3 +63,17 @@ export function tagCounts(tasks: Task[]): { tag: string; count: number }[] {
 export function subtaskProgress(subtasks: Subtask[]): { done: number; total: number } {
   return { done: subtasks.filter((s) => s.done).length, total: subtasks.length };
 }
+
+/**
+ * Volltext-Treffer für die Suche: Titel, Notiz, Tags und Unteraufgaben-Titel.
+ * `q` wird bereits kleingeschrieben/getrimmt hereingereicht. Rein & testbar.
+ */
+export function taskMatchesQuery(task: Task, q: string): boolean {
+  if (q.length === 0) return false;
+  return (
+    task.title.toLowerCase().includes(q) ||
+    (task.note ?? '').toLowerCase().includes(q) ||
+    task.tags.some((tag) => tag.toLowerCase().includes(q)) ||
+    task.subtasks.some((s) => s.title.toLowerCase().includes(q))
+  );
+}

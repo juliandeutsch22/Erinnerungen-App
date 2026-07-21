@@ -103,11 +103,14 @@ function ActionCard({
   actions,
   applied,
   today,
+  hasLinkedNote,
   onApply,
 }: {
   actions: AssistantAction;
   applied: boolean;
   today: string;
+  /** Ob der Chat an eine Notiz gehängt ist — sonst wird die Checkliste eine neue Notiz. */
+  hasLinkedNote: boolean;
   onApply: (selected: AssistantAction) => void;
 }) {
   const colors = useColors();
@@ -185,7 +188,7 @@ function ActionCard({
           a.datum ? `${formatDueDate(a.datum, today)}${a.zeit ? ` · ${a.zeit} Uhr` : ''}` : a.zeit ? `${a.zeit} Uhr` : null,
         ),
       )}
-      {actions.checkliste.map((c, i) => row(`c${i}`, c, 'Checkliste der Notiz'))}
+      {actions.checkliste.map((c, i) => row(`c${i}`, c, hasLinkedNote ? 'Checkliste der Notiz' : 'Neue Notiz-Checkliste'))}
       {actions.notizen.map((n, i) => row(`n${i}`, n.split('\n')[0], 'Notiz'))}
       {applied ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingTop: Spacing.xs }}>
@@ -335,7 +338,9 @@ export default function ChatScreen() {
     return () => clearTimeout(t);
   }, [confirmDelete]);
 
-  /** Aktions-Auswahl übernehmen: Aufgaben anlegen, Checkliste an die Notiz hängen. */
+  /** Aktions-Auswahl übernehmen: Aufgaben anlegen, Checkliste an die verknüpfte
+   *  Notiz hängen — oder, wenn keine verknüpft ist, als NEUE Notiz-Checkliste
+   *  anlegen (nichts geht verloren). */
   const applyActions = async (m: ChatMessage, selected: AssistantAction) => {
     hapticSuccess();
     for (const a of selected.aufgaben) {
@@ -347,9 +352,14 @@ export default function ChatScreen() {
         eventId: chat?.eventId ?? null,
       });
     }
-    if (selected.checkliste.length > 0 && linkedNote) {
+    if (selected.checkliste.length > 0) {
       const lines = selected.checkliste.map((c) => `- [ ] ${c}`).join('\n');
-      updateNote.mutate({ id: linkedNote.id, patch: { body: `${linkedNote.body}\n${lines}` } });
+      if (linkedNote) {
+        updateNote.mutate({ id: linkedNote.id, patch: { body: `${linkedNote.body}\n${lines}` } });
+      } else {
+        // Keine verknüpfte Notiz → eigene Notiz mit der Checkliste (erste Zeile = Titel).
+        await createNote.mutateAsync({ body: `Checkliste\n${lines}`, taskId: chat?.taskId ?? null, eventId: chat?.eventId ?? null });
+      }
     }
     for (const n of selected.notizen) {
       await createNote.mutateAsync({ body: n, taskId: chat?.taskId ?? null, eventId: chat?.eventId ?? null });
@@ -649,6 +659,7 @@ export default function ChatScreen() {
                         actions={actions}
                         applied={appliedActionIds.has(m.id)}
                         today={today}
+                        hasLinkedNote={!!linkedNote}
                         onApply={(selected) => void applyActions(m, selected)}
                       />
                     )}

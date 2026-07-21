@@ -1,6 +1,6 @@
 // taskFilters.test.ts — Smart-Filter (Tags/Flagge/Zeitraum) + Tag-Zählung.
 import type { Task } from '@/data/types';
-import { applyFilter, emptyFilter, subtaskProgress, tagCounts } from './taskFilters';
+import { applyFilter, emptyFilter, subtaskProgress, tagCounts, taskMatchesQuery } from './taskFilters';
 
 const TODAY = '2026-07-03';
 
@@ -70,5 +70,25 @@ describe('subtaskProgress', () => {
       total: 2,
     });
     expect(subtaskProgress([])).toEqual({ done: 0, total: 0 });
+  });
+});
+
+describe('taskMatchesQuery', () => {
+  it('trifft Titel und Notiz', () => {
+    expect(taskMatchesQuery(task({ title: 'Wocheneinkauf' }), 'einkauf')).toBe(true);
+    expect(taskMatchesQuery(task({ note: 'Milch und Brot' }), 'brot')).toBe(true);
+  });
+
+  it('trifft Tags — auch wenn der Titel den Begriff NICHT enthält', () => {
+    expect(taskMatchesQuery(task({ title: 'Flug buchen', tags: ['urlaub'] }), 'urlaub')).toBe(true);
+  });
+
+  it('trifft Unteraufgaben-Titel', () => {
+    expect(taskMatchesQuery(task({ title: 'Packen', subtasks: [{ id: 's', title: 'Reisepass', done: false }] }), 'reisepass')).toBe(true);
+  });
+
+  it('kein Treffer, wenn nichts passt; leere Query trifft nie', () => {
+    expect(taskMatchesQuery(task({ title: 'Anrufen', tags: ['büro'] }), 'urlaub')).toBe(false);
+    expect(taskMatchesQuery(task({ title: 'Anything' }), '')).toBe(false);
   });
 });

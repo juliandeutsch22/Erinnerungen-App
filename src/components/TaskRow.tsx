@@ -1,6 +1,7 @@
 // TaskRow.tsx — eine Aufgaben-Zeile: Haken (Teal-Puls) + Titel + Meta-Zeile.
 // Swipe rechts = erledigt, Swipe links = „Neu planen" (Fahrplan §3.6).
 // Überfällig trägt Indigo (ruhig), nie Alarm-Rot.
+import { useRouter } from 'expo-router';
 import { Check, Flag, Link2, ListChecks, NotebookPen, Repeat } from 'lucide-react-native';
 import React, { useMemo, useRef } from 'react';
 import { View } from 'react-native';
@@ -57,6 +58,7 @@ export function TaskRow({
   onLongPress?: () => void;
 }) {
   const colors = useColors();
+  const router = useRouter();
   const done = task.completedAt !== null;
   // Verknüpfte Notiz? Kleiner Glyph in der Titelzeile (analog zum Termin-Link).
   const { data: notes } = useNotes();
@@ -134,9 +136,18 @@ export function TaskRow({
           {task.tags.length > 0 && (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs, marginTop: 2 }}>
               {task.tags.map((tag) => (
-                <View key={tag} style={{ paddingVertical: 1, paddingHorizontal: Spacing.xs + 1, borderRadius: R.pill, backgroundColor: colors.chip, borderWidth: 1, borderColor: colors.chipBorder }}>
+                // Tippen öffnet die gefilterte Ansicht für genau diesen Tag.
+                <PressableScale
+                  key={tag}
+                  accessibilityLabel={`Alle Aufgaben mit #${tag} anzeigen`}
+                  onPress={() => {
+                    hapticSelect();
+                    router.push(`/filter?tag=${encodeURIComponent(tag)}`);
+                  }}
+                  style={{ paddingVertical: 1, paddingHorizontal: Spacing.xs + 1, borderRadius: R.pill, backgroundColor: colors.chip, borderWidth: 1, borderColor: colors.chipBorder }}
+                >
                   <Type variant="caption" tone="text3">#{tag}</Type>
-                </View>
+                </PressableScale>
               ))}
             </View>
           )}
