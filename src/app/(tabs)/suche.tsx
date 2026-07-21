@@ -1,7 +1,7 @@
 // suche.tsx — Suche über alles (Fahrplan §3.7): Aufgaben (Titel + Notiz,
 // offen wie erledigt), Listen und Notizen. Live-Filter, Treffer öffnen den Editor.
 import { useRouter } from 'expo-router';
-import { MoonStar, NotebookPen, Search, Sparkles } from 'lucide-react-native';
+import { FileText, MoonStar, NotebookPen, Search, Sparkles } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { TextInput, View } from 'react-native';
 
@@ -20,11 +20,13 @@ import { TaskQuickSheet } from '@/components/TaskQuickSheet';
 import { TaskRow } from '@/components/TaskRow';
 import { Type } from '@/components/Type';
 import { useAllChatMessages, useChats } from '@/data/chatQueries';
+import { useDocuments } from '@/data/documentQueries';
 import { useJournal } from '@/data/journalQueries';
 import { useNotes } from '@/data/noteQueries';
 import { useCompleteTask, useLists, useReopenTask, useTasks } from '@/data/queries';
 import type { Task } from '@/data/types';
 import { formatDueDate, todayStr } from '@/lib/dates';
+import { openDocument } from '@/lib/documents';
 import { noteMatchLine, noteTitle } from '@/lib/noteLogic';
 import { webNoOutline } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
@@ -65,6 +67,13 @@ export default function SucheScreen() {
     if (!q) return [];
     return (notes ?? []).filter((n) => n.deletedAt === null && n.body.toLowerCase().includes(q)).slice(0, 30);
   }, [notes, q]);
+
+  // Dokumente: Dateinamen durchsuchbar, Tippen öffnet die iOS-Vorschau.
+  const { data: docs } = useDocuments();
+  const docHits = useMemo(() => {
+    if (!q) return [];
+    return (docs ?? []).filter((d) => d.name.toLowerCase().includes(q)).slice(0, 20);
+  }, [docs, q]);
 
   const { data: journalEntries } = useJournal();
   const journalHits = useMemo(() => {
@@ -127,7 +136,7 @@ export default function SucheScreen() {
       {q.length > 0 && (
         <Reveal delay={90}>
           <GlassPanel>
-            {taskHits.length === 0 && listHits.length === 0 && noteHits.length === 0 && chatHits.length === 0 && journalHits.length === 0 ? (
+            {taskHits.length === 0 && listHits.length === 0 && noteHits.length === 0 && chatHits.length === 0 && journalHits.length === 0 && docHits.length === 0 ? (
               <EmptyState
                 icon={<Search size={20} color={colors.teal} strokeWidth={2} />}
                 title="Keine Treffer"
@@ -209,9 +218,30 @@ export default function SucheScreen() {
                     </View>
                   </>
                 )}
-                {chatHits.length > 0 && (
+                {docHits.length > 0 && (
                   <>
                     {(taskHits.length > 0 || listHits.length > 0 || noteHits.length > 0) && <Seam marginVertical={Spacing.md} />}
+                    <Type variant="eyebrow" tone="text3">Dokumente</Type>
+                    <View style={{ marginTop: Spacing.xs }}>
+                      {docHits.map((d) => (
+                        <PressableScale
+                          key={d.id}
+                          accessibilityLabel={`Dokument ${d.name} öffnen`}
+                          onPress={() => void openDocument(d.uri)}
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.sm + 2 }}
+                        >
+                          <FileText size={18} color={colors.text3} strokeWidth={2} />
+                          <Type variant="body" numberOfLines={1} style={{ flex: 1 }}>
+                            <Highlighted text={d.name} query={q} />
+                          </Type>
+                        </PressableScale>
+                      ))}
+                    </View>
+                  </>
+                )}
+                {chatHits.length > 0 && (
+                  <>
+                    {(taskHits.length > 0 || listHits.length > 0 || noteHits.length > 0 || docHits.length > 0) && <Seam marginVertical={Spacing.md} />}
                     <Type variant="eyebrow" tone="text3">Chats</Type>
                     <View style={{ marginTop: Spacing.xs }}>
                       {chatHits.map((c) => (
@@ -232,7 +262,7 @@ export default function SucheScreen() {
                 )}
                 {journalHits.length > 0 && (
                   <>
-                    {(taskHits.length > 0 || listHits.length > 0 || noteHits.length > 0 || chatHits.length > 0) && <Seam marginVertical={Spacing.md} />}
+                    {(taskHits.length > 0 || listHits.length > 0 || noteHits.length > 0 || chatHits.length > 0 || docHits.length > 0) && <Seam marginVertical={Spacing.md} />}
                     <Type variant="eyebrow" tone="text3">Abendbetrachtung</Type>
                     <View style={{ marginTop: Spacing.xs }}>
                       {journalHits.map((e) => {

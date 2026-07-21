@@ -170,3 +170,11 @@ describe('buildAppContext', () => {
     expect((ctx.match(/- Aufgabe /g) ?? []).length).toBe(40);
   });
 });
+
+describe('buildAppContext — Kalenderzugriff', () => {
+  it('sagt „unbekannt" statt „keine", wenn der Kalenderzugriff fehlt', () => {
+    const ctx = buildAppContext({ events: [], tasks: [], lists: [], notes: [], today: '2026-07-20', calendarDenied: true });
+    expect(ctx).toContain('keinen Kalenderzugriff');
+    expect(ctx).not.toContain('Termine der nächsten ~5 Wochen:\n- keine');
+  });
+});

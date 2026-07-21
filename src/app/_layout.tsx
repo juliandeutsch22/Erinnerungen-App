@@ -12,6 +12,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { setOnTasksChanged } from '@/data/queries';
 import { isAutoBackupDue, runAutoBackup } from '@/lib/autoBackup';
+import { runOrphanDocumentSweep } from '@/lib/orphanDocuments';
 import { getSecureKey, setSecureKey } from '@/lib/secureKey';
 import {
   ensureNotificationPermission,
@@ -66,6 +67,9 @@ function RootStack() {
         const name = await runAutoBackup(state.savedFilters);
         if (name) useSettings.getState().setLastAutoBackupAt(new Date().toISOString());
       }
+
+      // Dokumente gelöschter Termine entsorgen (60-Tage-Schonfrist, nur nativ).
+      await runOrphanDocumentSweep();
     })();
     setOnTasksChanged(requestReschedule);
     return () => setOnTasksChanged(null);

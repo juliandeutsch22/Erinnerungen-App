@@ -150,8 +150,10 @@ export function buildAppContext(input: {
   lists: List[];
   notes: Note[];
   today: string; // 'YYYY-MM-DD'
+  /** Kein Kalenderzugriff → das Modell soll „unbekannt" sagen, nicht „keine". */
+  calendarDenied?: boolean;
 }): string {
-  const { events, tasks, lists, notes, today } = input;
+  const { events, tasks, lists, notes, today, calendarDenied } = input;
   const listName = new Map(lists.map((l) => [l.id, l.name]));
 
   const evLine = (e: Pick<DeviceEvent, 'title' | 'start' | 'allDay'>) => {
@@ -192,7 +194,11 @@ export function buildAppContext(input: {
     'ÜBERBLICK über die aktuellen Daten in der App (live):',
     '',
     'Termine der nächsten ~5 Wochen:',
-    eventLines.length ? eventLines.join('\n') : '- keine',
+    calendarDenied
+      ? '- unbekannt: Die App hat keinen Kalenderzugriff. Sage das ehrlich, statt „keine Termine" zu behaupten.'
+      : eventLines.length
+        ? eventLines.join('\n')
+        : '- keine',
     '',
     'Offene Aufgaben:',
     taskLines.length ? taskLines.join('\n') : '- keine',

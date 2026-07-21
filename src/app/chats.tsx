@@ -69,10 +69,26 @@ export default function ChatsScreen() {
   }, []);
   const { data: todayEvents } = useDeviceEvents(today, addDays(today, 1), calGranted);
 
+  // Sieht der Assistent ohnehin die App (Schnappschuss), braucht der Tagesplan-
+  // Chat keinen eigenen Kontext — sonst ginge derselbe Inhalt doppelt mit.
+  const assistantContextEnabled = useSettings((s) => s.assistantContextEnabled);
+
   const planMyDay = () => {
     hapticSuccess();
-    const openToday = (tasks ?? []).filter((t) => isOpen(t) && t.dueDate === today);
     const dateLabel = parseDateStr(today).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
+    if (assistantContextEnabled) {
+      createChat.mutate(
+        { title: `Tagesplan · ${dateLabel}` },
+        {
+          onSuccess: (chat) =>
+            router.push(
+              `/chat/${chat.id}?ask=${encodeURIComponent('Erstelle mir einen realistischen Tagesplan mit Uhrzeiten für heute. Termine sind Fixpunkte, plane Pausen ein und schlage vor, welche Aufgabe in welche Lücke passt.')}`,
+            ),
+        },
+      );
+      return;
+    }
+    const openToday = (tasks ?? []).filter((t) => isOpen(t) && t.dueDate === today);
     const lines = [`Heute ist ${dateLabel}.`];
     const events = (todayEvents ?? []).filter((e) => toDateStr(e.start) === today && !e.allDay);
     if (events.length > 0) {

@@ -158,7 +158,14 @@ export default function ChatScreen() {
     setError(null);
     try {
       const appContext = assistantContextEnabled
-        ? buildAppContext({ events: events ?? [], tasks: tasks ?? [], lists: lists ?? [], notes: notes ?? [], today })
+        ? buildAppContext({
+            events: events ?? [],
+            tasks: tasks ?? [],
+            lists: lists ?? [],
+            notes: notes ?? [],
+            today,
+            calendarDenied: !calGranted,
+          })
         : null;
       const combined = [effectiveContext, appContext].filter(Boolean).join('\n\n') || null;
       const answer = await askAssistant(apiKey, history, combined);
