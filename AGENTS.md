@@ -1,5 +1,10 @@
 # Stoa — Leitplanken für Agenten
 
+**Neu in diesem Repo? Lies ZUERST `UEBERGABE.md`** — das Übergabe-Protokoll mit
+Projektüberblick, Arbeitsweise, Verifikations-Pipeline, Architektur-Landkarte,
+Fallstricken und dem Fokus der aktuellen Arbeit. `ROADMAP.md` hält den
+Ideen-Backlog. Dieses Dokument hier enthält die bindenden Design-Leitplanken.
+
 ## Expo
 
 Expo SDK 56 — vor API-Nutzung die versionierten Docs prüfen:
