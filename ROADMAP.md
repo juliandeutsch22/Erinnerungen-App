@@ -62,5 +62,5 @@ Braucht `expo prebuild` + native Targets in der IPA-GitHub-Action:
 - **TestFlight** (99 €/Jahr Developer-Account) — beendet den
   7-Tage-Signatur-Zyklus; danach optional Store-Release als Resonanztest.
 - **Face-ID-Sperre** — optional beim Öffnen (expo-local-authentication).
-- **Papierkorb-Muster ausweiten** — „Zuletzt gelöscht" auch für Aufgaben
-  und Listen (Notizen und Chats haben es bereits).
+- ~~**Papierkorb-Muster ausweiten**~~ — umgesetzt in v1.19.0 (Aufgaben und
+  Listen, Sektion im Listen-Tab).

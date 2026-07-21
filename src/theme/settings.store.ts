@@ -22,6 +22,8 @@ type SettingsState = {
   savedFilters: SavedFilter[];
   /** Zuletzt gesuchte Begriffe (neueste zuerst, max. 6) — rein lokal. */
   recentSearches: string[];
+  /** Willkommens-Karte auf Heute wurde weggetippt (Erster-Start-Erlebnis). */
+  welcomeDismissed: boolean;
   /** Bereits importierte Apple-Erinnerungs-IDs (Dedupe bei erneutem Import). */
   importedReminderIds: string[];
   /** Gemini-API-Schlüssel für den Assistenten (leer = Feature aus).
@@ -46,6 +48,7 @@ type SettingsState = {
   addSavedFilter: (f: SavedFilter) => void;
   addRecentSearch: (q: string) => void;
   clearRecentSearches: () => void;
+  setWelcomeDismissed: (v: boolean) => void;
   removeSavedFilter: (id: string) => void;
   /** Ersetzt alle Filter (Backup-Wiederherstellung). */
   setSavedFilters: (f: SavedFilter[]) => void;
@@ -68,6 +71,7 @@ export const useSettings = create<SettingsState>()(
       summaryTime: '09:00',
       savedFilters: [],
       recentSearches: [],
+      welcomeDismissed: false,
       importedReminderIds: [],
       geminiApiKey: '',
       lastAutoBackupAt: '',
@@ -90,6 +94,7 @@ export const useSettings = create<SettingsState>()(
           return { recentSearches: [t, ...rest].slice(0, 6) };
         }),
       clearRecentSearches: () => set({ recentSearches: [] }),
+      setWelcomeDismissed: (welcomeDismissed) => set({ welcomeDismissed }),
       removeSavedFilter: (id) => set((s) => ({ savedFilters: s.savedFilters.filter((x) => x.id !== id) })),
       setSavedFilters: (savedFilters) => set({ savedFilters }),
       addImportedReminderIds: (ids) =>
@@ -113,6 +118,7 @@ export const useSettings = create<SettingsState>()(
         summaryTime: s.summaryTime,
         savedFilters: s.savedFilters,
         recentSearches: s.recentSearches,
+        welcomeDismissed: s.welcomeDismissed,
         importedReminderIds: s.importedReminderIds,
         lastAutoBackupAt: s.lastAutoBackupAt,
         journalReminderEnabled: s.journalReminderEnabled,

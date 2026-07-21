@@ -25,6 +25,8 @@ export type List = {
   goal: string | null;
   /** Projekt-Deadline ('YYYY-MM-DD', optional) — macht die Liste zum Projekt. */
   deadline: string | null;
+  /** Papierkorb (30 Tage); optional wie bei Task — fehlend = aktiv. */
+  deletedAt?: string | null; // ISO
   sort: number;
   createdAt: string; // ISO
 };
@@ -42,6 +44,9 @@ export type Task = {
   eventId: string | null;
   /** null = offen. Bei Wiederholung: Instanz abgehakt → dueDate rückt weiter, bleibt null. */
   completedAt: string | null; // ISO
+  /** Papierkorb (30 Tage, wie Notizen); optional, damit Alt-Daten/Fixtures ohne
+   *  das Feld gültig bleiben — fehlend = aktiv. */
+  deletedAt?: string | null; // ISO
   /** geplante lokale Notification (zum Ersetzen/Abbrechen), null = keine geplant. */
   notificationId: string | null;
   /** Frei vergebbare Tags (kleingeschrieben, ohne #) — kontextübergreifend filterbar. */

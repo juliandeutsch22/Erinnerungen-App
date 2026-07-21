@@ -3,10 +3,13 @@
 // Darüber die Smart-Ansichten Geplant / Alle (Fahrplan §3.3).
 import { useRouter } from 'expo-router';
 import { CalendarClock, CalendarDays, Filter as FilterIcon, Layers, Plus, SlidersHorizontal } from 'lucide-react-native';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
+import ReanimatedSwipeable, { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 
+import { DisclosureChevron } from '@/components/DisclosureChevron';
 import { Glass } from '@/components/Glass';
+import { GlassPanel } from '@/components/GlassPanel';
 import { ListEditorSheet } from '@/components/ListEditorSheet';
 import { listIcon } from '@/components/listMeta';
 import { PressableScale } from '@/components/PressableScale';
@@ -14,16 +17,26 @@ import { ProgressLine } from '@/components/ProgressLine';
 import { Reveal } from '@/components/Reveal';
 import { Screen } from '@/components/Screen';
 import { Seam } from '@/components/Seam';
+import { SwipeActionSlide } from '@/components/SwipeActionSlide';
 import { Type } from '@/components/Type';
-import { useLists, useTasks } from '@/data/queries';
+import {
+  useDeleteListForever,
+  useDeleteTaskForever,
+  useLists,
+  useRestoreList,
+  useRestoreTask,
+  useTasks,
+  useTrashedLists,
+  useTrashedTasks,
+} from '@/data/queries';
 import type { List, Task } from '@/data/types';
 import { applyFilter } from '@/lib/taskFilters';
-import { deadlineLabel, todayStr } from '@/lib/dates';
+import { addDays, deadlineLabel, formatDueDate, toDateStr, todayStr } from '@/lib/dates';
 import { isOpen, listProgress } from '@/lib/taskLogic';
-import { hapticSelect } from '@/lib/haptics';
+import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { useSettings } from '@/theme/settings.store';
 import { useColors } from '@/theme/ThemeProvider';
-import { R, Shadow, Spacing } from '@/theme/theme.tokens';
+import { R, Shadow, Spacing, T } from '@/theme/theme.tokens';
 
 export default function ListenScreen() {
   const colors = useColors();
@@ -200,6 +213,8 @@ export default function ListenScreen() {
         </View>
       </Reveal>
 
+      <TrashSection />
+
       {editorList !== undefined && <ListEditorSheet list={editorList} onClose={() => setEditorList(undefined)} />}
     </Screen>
   );
@@ -216,5 +231,126 @@ function SmartCard({ title, count, icon, onPress }: { title: string; count: numb
         <Type variant="label">{title}</Type>
       </Glass>
     </PressableScale>
+  );
+}
+
+/** Papierkorb: kürzlich gelöschte Listen & Aufgaben (30 Tage, wie Notizen/Chats).
+ *  Tippen stellt wieder her; Swipe links löscht endgültig. Aufgaben, die MIT
+ *  einer Liste gelöscht wurden, hängen an der Liste und erscheinen hier nicht. */
+function TrashSection() {
+  const colors = useColors();
+  const today = todayStr();
+  const { data: trashedTasks } = useTrashedTasks();
+  const { data: trashedLists } = useTrashedLists();
+  const restoreTask = useRestoreTask();
+  const restoreList = useRestoreList();
+  const deleteTaskForever = useDeleteTaskForever();
+  const deleteListForever = useDeleteListForever();
+  const [show, setShow] = useState(false);
+
+  // Nach 30 Tagen still endgültig entsorgen (Muster aus Notizen/Chats).
+  const cutoff = addDays(today, -30);
+  const purged = useRef(false);
+  useEffect(() => {
+    if (purged.current || !trashedTasks || !trashedLists) return;
+    const expiredTasks = trashedTasks.filter((t) => t.deletedAt && toDateStr(new Date(t.deletedAt)) < cutoff);
+    const expiredLists = trashedLists.filter((l) => l.deletedAt && toDateStr(new Date(l.deletedAt)) < cutoff);
+    if (expiredTasks.length === 0 && expiredLists.length === 0) return;
+    purged.current = true;
+    for (const t of expiredTasks) deleteTaskForever.mutate(t.id);
+    for (const l of expiredLists) deleteListForever.mutate(l.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trashedTasks, trashedLists, cutoff]);
+
+  const count = (trashedLists?.length ?? 0) + (trashedTasks?.length ?? 0);
+  if (count === 0) return null;
+
+  return (
+    <Reveal delay={140}>
+      <GlassPanel>
+        <PressableScale
+          accessibilityLabel={show ? 'Zuletzt gelöschte ausblenden' : 'Zuletzt gelöschte anzeigen'}
+          onPress={() => {
+            hapticSelect();
+            setShow((v) => !v);
+          }}
+          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+        >
+          <Type variant="eyebrow" tone="text3">Zuletzt gelöscht · {count}</Type>
+          <DisclosureChevron open={show} color={colors.text3} />
+        </PressableScale>
+        {show && (
+          <View style={{ marginTop: Spacing.xs }}>
+            <Type variant="caption" tone="text3" style={{ marginBottom: Spacing.xs }}>
+              Tippen stellt wieder her · nach 30 Tagen endgültig gelöscht.
+            </Type>
+            {(trashedLists ?? []).map((l) => (
+              <TrashRow
+                key={l.id}
+                title={l.name}
+                sub={`Liste · Gelöscht: ${l.deletedAt ? formatDueDate(toDateStr(new Date(l.deletedAt)), today) : ''}`}
+                onRestore={() => restoreList.mutate(l)}
+                onDeleteForever={() => deleteListForever.mutate(l.id)}
+              />
+            ))}
+            {(trashedTasks ?? []).map((t) => (
+              <TrashRow
+                key={t.id}
+                title={t.title}
+                sub={`Gelöscht: ${t.deletedAt ? formatDueDate(toDateStr(new Date(t.deletedAt)), today) : ''}`}
+                onRestore={() => restoreTask.mutate(t.id)}
+                onDeleteForever={() => deleteTaskForever.mutate(t.id)}
+              />
+            ))}
+          </View>
+        )}
+      </GlassPanel>
+    </Reveal>
+  );
+}
+
+function TrashRow({
+  title,
+  sub,
+  onRestore,
+  onDeleteForever,
+}: {
+  title: string;
+  sub: string;
+  onRestore: () => void;
+  onDeleteForever: () => void;
+}) {
+  const colors = useColors();
+  const swipeRef = useRef<SwipeableMethods>(null);
+  return (
+    <ReanimatedSwipeable
+      ref={swipeRef}
+      friction={2}
+      rightThreshold={56}
+      overshootRight={false}
+      renderRightActions={(_progress, translation) => (
+        <SwipeActionSlide side="right" width={130} translation={translation} color={colors.indigo}>
+          <Type variant="label" style={{ color: '#FFFFFF', fontSize: T.sm }}>Endgültig löschen</Type>
+        </SwipeActionSlide>
+      )}
+      onSwipeableWillOpen={() => {
+        swipeRef.current?.close();
+        hapticSelect();
+        onDeleteForever();
+      }}
+    >
+      <PressableScale
+        accessibilityLabel={`„${title}" wiederherstellen`}
+        onPress={() => {
+          hapticSuccess();
+          onRestore();
+        }}
+        pressedScale={0.99}
+        style={{ paddingVertical: Spacing.sm, gap: 2, backgroundColor: 'transparent' }}
+      >
+        <Type variant="body" tone="text2" numberOfLines={1}>{title}</Type>
+        <Type variant="caption" tone="text3" tabular>{sub}</Type>
+      </PressableScale>
+    </ReanimatedSwipeable>
   );
 }

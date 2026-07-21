@@ -111,6 +111,53 @@ export async function exportToJsonString(sources: BackupSources, now?: Date): Pr
   return JSON.stringify(await buildBackup(sources, now), null, 2);
 }
 
+// ——— Ehrlicher Backup-Bericht: was ist drin, was fehlt. ———
+export type BackupSummary = {
+  lists: number;
+  tasks: number;
+  notes: number;
+  chats: number;
+  journal: number;
+  photos: number;
+  documents: number;
+  /** Dokumente OHNE eingebettete Datei (zu groß > 10 MB oder nicht lesbar) — nur die Verknüpfung ist gesichert. */
+  skippedDocuments: string[];
+};
+
+/** Zählt den Inhalt eines Bundles — aktive Einträge, Papierkorb zählt nicht mit. */
+export function summarizeBundle(bundle: BackupBundle): BackupSummary {
+  return {
+    lists: bundle.lists.filter((l) => !l.deletedAt && l.id !== DEFAULT_LIST_ID).length,
+    tasks: bundle.tasks.filter((t) => !t.deletedAt).length,
+    notes: bundle.notes.filter((n) => n.deletedAt === null).length,
+    chats: bundle.chats.filter((c) => c.deletedAt === null).length,
+    journal: bundle.journal.length,
+    photos: bundle.photos.length,
+    documents: bundle.documents.length,
+    skippedDocuments: bundle.documents.filter((d) => d.data === null).map((d) => d.name),
+  };
+}
+
+/** Bericht als ruhiger deutscher Satz — inklusive der ehrlichen Lücke. */
+export function describeSummary(s: BackupSummary): string {
+  const parts = [
+    `${s.tasks} Aufgaben`,
+    `${s.lists} Listen`,
+    `${s.notes} Notizen`,
+    `${s.chats} Chats`,
+    `${s.journal} Betrachtungen`,
+    `${s.photos} Fotos`,
+    `${s.documents} Dokumente`,
+  ];
+  let text = `Gesichert: ${parts.join(', ')}.`;
+  if (s.skippedDocuments.length > 0) {
+    const names = s.skippedDocuments.slice(0, 3).join(', ');
+    const more = s.skippedDocuments.length > 3 ? ` und ${s.skippedDocuments.length - 3} weitere` : '';
+    text += ` Ohne Dateiinhalt (größer als 10 MB oder nicht lesbar): ${names}${more}.`;
+  }
+  return text;
+}
+
 /** Web-Fallback: Datei-Download über einen Blob (nativ nutzt saveAndShareBackup). */
 export async function shareBackup(json: string, filename = 'erinnerungen-backup.json'): Promise<void> {
   if (Platform.OS === 'web') {
@@ -203,6 +250,8 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
       color: str(l.color) ? remapListColor(l.color) : '#2B5FA6',
       goal: str(l.goal) ? l.goal : null,
       deadline: str(l.deadline) ? l.deadline : null,
+      // Papierkorb-Zustand kommt mit zurück (ältere Backups: aktiv).
+      deletedAt: str(l.deletedAt) ? l.deletedAt : null,
       sort: typeof l.sort === 'number' ? l.sort : 0,
       createdAt: str(l.createdAt) ? l.createdAt : new Date().toISOString(),
     });
@@ -223,6 +272,7 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
       flagged: t.flagged === true,
       eventId: str(t.eventId) ? t.eventId : null,
       completedAt: str(t.completedAt) ? t.completedAt : null,
+      deletedAt: str(t.deletedAt) ? t.deletedAt : null,
       // Geplante Notifications gehören zum alten Gerät/Install — neu planen.
       notificationId: null,
       tags: Array.isArray(t.tags) ? t.tags.filter(str) : [],

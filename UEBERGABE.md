@@ -1,6 +1,6 @@
 # ÜBERGABE-PROTOKOLL — Stoa
 
-Stand: **v1.18.0 (Build 37)**, Juli 2026 · 154 Jest-Tests grün · Branch-Modell siehe §3.
+Stand: **v1.19.0 (Build 38)**, Juli 2026 · 158 Jest-Tests grün · Branch-Modell siehe §3.
 Dieses Dokument macht eine neue Session sofort arbeitsfähig. Lies zusätzlich
 `AGENTS.md` (bindende Design-Leitplanken) und `ROADMAP.md` (Ideen-Backlog).
 
@@ -128,6 +128,19 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
 
 ## 7. Feature-Inventar (v1.16.0) — Kurzreferenz
 
+- **Erster Start:** einmalige Willkommens-Karte auf Heute (WelcomeCard.tsx:
+  Lokal-Versprechen, QuickAdd-Tipp, erklärter Kalender-Zugriff, Assistent-
+  Hinweis; `welcomeDismissed` im Settings-Store).
+- **Papierkorb überall:** Aufgaben und Listen haben jetzt wie Notizen/Chats
+  „Zuletzt gelöscht" (30 Tage, Sektion im Listen-Tab). `deletedAt` optional
+  auf Task/List; useTasks/useLists liefern nur Aktive, der Papierkorb hat
+  eigene Hooks. Listen-Löschung stempelt ihre aktiven Aufgaben mit DEMSELBEN
+  Zeitstempel — Wiederherstellen bringt genau diese zurück. Endgültig =
+  useDelete*Forever. Notifications/Duplizieren/Backup-Bericht filtern den
+  Papierkorb.
+- **Ehrliches Backup:** Export zeigt einen Bericht (summarizeBundle/
+  describeSummary in backup.ts) inkl. Dokumenten ohne eingebetteten Inhalt
+  (> 10 MB) — der offene Faden von früher ist damit geschlossen.
 - **Heute:** Tages-Bilanz, Überfällig (+ „Auf heute"), chronologischer Tagesplan
   (Termine+Aufgaben verschmolzen, Jetzt-Marker), Ohne Uhrzeit, Erledigt
   (einklappbar), Wochenvorschau, QuickAdd (deutscher Parser: „morgen 18 uhr",

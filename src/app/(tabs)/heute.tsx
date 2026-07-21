@@ -25,6 +25,7 @@ import { TaskEditorSheet } from '@/components/TaskEditorSheet';
 import { TaskQuickSheet } from '@/components/TaskQuickSheet';
 import { TaskRow } from '@/components/TaskRow';
 import { Type } from '@/components/Type';
+import { WelcomeCard } from '@/components/WelcomeCard';
 import { useDeviceCalendars, useDeviceEvents } from '@/data/calendarQueries';
 import { useJournal } from '@/data/journalQueries';
 import { usePhotoCounts } from '@/data/photoQueries';
@@ -401,6 +402,9 @@ export default function HeuteScreen() {
           </View>
         </View>
       </Reveal>
+
+      {/* Erster Start: einmalige Begrüßung — verschwindet nach „Los geht's". */}
+      <WelcomeCard onCalendarGranted={() => setCalGranted(true)} />
 
       <Reveal delay={90}>
         <GlassPanel>

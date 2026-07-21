@@ -20,7 +20,7 @@ export function duplicateListWithTasks(
     createdAt: now.toISOString(),
   };
   const copiedTasks: Task[] = tasks
-    .filter((t) => t.listId === list.id)
+    .filter((t) => t.listId === list.id && !t.deletedAt)
     .map((t, i) => ({
       ...t,
       id: newId(),

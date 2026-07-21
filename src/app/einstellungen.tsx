@@ -18,7 +18,7 @@ import { Reveal } from '@/components/Reveal';
 import { Screen } from '@/components/Screen';
 import { Seam } from '@/components/Seam';
 import { Type } from '@/components/Type';
-import { exportToJsonString, importBackup, shareBackup } from '@/data/backup';
+import { type BackupBundle, describeSummary, exportToJsonString, importBackup, shareBackup, summarizeBundle } from '@/data/backup';
 import {
   extFromUri,
   fileBackupAvailable,
@@ -129,6 +129,12 @@ export default function EinstellungenScreen() {
     });
     if (fileBackupAvailable) await saveAndShareBackup(json);
     else await shareBackup(json);
+    // Ehrlicher Bericht: was drin ist — und welche Dokumente ohne Inhalt blieben.
+    try {
+      setFeedback(describeSummary(summarizeBundle(JSON.parse(json) as BackupBundle)));
+    } catch {
+      /* Bericht ist Komfort — der Export selbst ist durch */
+    }
   };
 
   // Gemeinsame Wiederherstellung — aus Datei, Stand oder eingefügtem Text.
@@ -305,6 +311,7 @@ export default function EinstellungenScreen() {
             Sichert Listen, Aufgaben, Notizen, Chats, Filter, Termin-Fotos, Dokumente und
             Abendbetrachtungen in einer Datei — wichtig
             vor dem Nachsignieren (7-Tage-Zyklus) oder einer Neuinstallation.
+            Dokumente über 10 MB liegen nur als Verknüpfung im Backup.
           </Type>
           {autoBackupLabel && (
             <PressableScale accessibilityLabel="Backup jetzt ausführen" onPress={() => void doAutoBackupNow()}>

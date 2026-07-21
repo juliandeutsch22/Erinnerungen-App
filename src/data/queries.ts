@@ -11,6 +11,8 @@ import { newId } from './types';
 export const queryKeys = {
   tasks: ['tasks'] as const,
   lists: ['lists'] as const,
+  tasksTrash: ['tasks-trash'] as const,
+  listsTrash: ['lists-trash'] as const,
 };
 
 // M4 hakt sich hier ein: nach jeder Datenänderung Notifications neu planen.
@@ -19,12 +21,41 @@ export function setOnTasksChanged(fn: (() => void) | null) {
   onTasksChanged = fn;
 }
 
+// Die Standard-Hooks liefern nur AKTIVE Einträge — der Papierkorb hat eigene
+// Hooks. So bleibt jeder bestehende Konsument (Heute, Suche, Assistent, …)
+// automatisch papierkorb-frei.
 export function useLists() {
-  return useQuery<List[]>({ queryKey: queryKeys.lists, queryFn: () => getListRepository().getAll() });
+  return useQuery<List[]>({
+    queryKey: queryKeys.lists,
+    queryFn: async () => (await getListRepository().getAll()).filter((l) => !l.deletedAt),
+  });
 }
 
 export function useTasks() {
-  return useQuery<Task[]>({ queryKey: queryKeys.tasks, queryFn: () => getTaskRepository().getAll() });
+  return useQuery<Task[]>({
+    queryKey: queryKeys.tasks,
+    queryFn: async () => (await getTaskRepository().getAll()).filter((t) => !t.deletedAt),
+  });
+}
+
+/** Papierkorb: kürzlich gelöschte Aufgaben (ohne die einer gelöschten Liste —
+ *  die hängen an ihrer Liste und kommen mit ihr zurück). */
+export function useTrashedTasks() {
+  return useQuery<Task[]>({
+    queryKey: queryKeys.tasksTrash,
+    queryFn: async () => {
+      const [tasks, lists] = await Promise.all([getTaskRepository().getAll(), getListRepository().getAll()]);
+      const trashedListStamps = new Map(lists.filter((l) => l.deletedAt).map((l) => [l.id, l.deletedAt]));
+      return tasks.filter((t) => t.deletedAt && trashedListStamps.get(t.listId) !== t.deletedAt);
+    },
+  });
+}
+
+export function useTrashedLists() {
+  return useQuery<List[]>({
+    queryKey: queryKeys.listsTrash,
+    queryFn: async () => (await getListRepository().getAll()).filter((l) => l.deletedAt),
+  });
 }
 
 function useInvalidate() {
@@ -32,6 +63,8 @@ function useInvalidate() {
   return () => {
     void qc.invalidateQueries({ queryKey: queryKeys.tasks });
     void qc.invalidateQueries({ queryKey: queryKeys.lists });
+    void qc.invalidateQueries({ queryKey: queryKeys.tasksTrash });
+    void qc.invalidateQueries({ queryKey: queryKeys.listsTrash });
     onTasksChanged?.();
   };
 }
@@ -95,7 +128,25 @@ export function useReopenTask() {
   });
 }
 
+/** „Löschen" = Papierkorb (30 Tage) — endgültig löscht useDeleteTaskForever. */
 export function useDeleteTask() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: (id: string) =>
+      getTaskRepository().update(id, { deletedAt: new Date().toISOString(), notificationId: null }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useRestoreTask() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: (id: string) => getTaskRepository().update(id, { deletedAt: null }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteTaskForever() {
   const invalidate = useInvalidate();
   return useMutation({
     mutationFn: (id: string) => getTaskRepository().remove(id),
@@ -163,8 +214,41 @@ export function useUpdateList() {
   });
 }
 
-/** Löscht Liste + zugehörige Aufgaben (zweistufig bestätigen — UI-Sache). */
+/** „Löschen" = Papierkorb: Liste UND ihre aktiven Aufgaben bekommen denselben
+ *  Zeitstempel — beim Wiederherstellen kommen genau diese Aufgaben zurück. */
 export function useDeleteList() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const stamp = new Date().toISOString();
+      const taskRepo = getTaskRepository();
+      const affected = (await taskRepo.getAll()).filter((t) => t.listId === id && !t.deletedAt);
+      for (const t of affected) await taskRepo.update(t.id, { deletedAt: stamp, notificationId: null });
+      await getListRepository().update(id, { deletedAt: stamp });
+    },
+    onSuccess: invalidate,
+  });
+}
+
+export function useRestoreList() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async (list: List) => {
+      const taskRepo = getTaskRepository();
+      // Nur die Aufgaben zurückholen, die MIT der Liste gelöscht wurden
+      // (gleicher Stempel) — vorher einzeln gelöschte bleiben im Papierkorb.
+      const affected = (await taskRepo.getAll()).filter(
+        (t) => t.listId === list.id && t.deletedAt && t.deletedAt === list.deletedAt,
+      );
+      for (const t of affected) await taskRepo.update(t.id, { deletedAt: null });
+      await getListRepository().update(list.id, { deletedAt: null });
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/** Endgültig: entfernt die Liste samt ALLER ihrer Aufgaben. */
+export function useDeleteListForever() {
   const invalidate = useInvalidate();
   return useMutation({
     mutationFn: async (id: string) => {

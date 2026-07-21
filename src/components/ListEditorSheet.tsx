@@ -210,7 +210,7 @@ export function ListEditorSheet({ list, onClose }: { list: List | null; onClose:
 
       {canDelete && (
         <PressableScale
-          accessibilityLabel={confirmDelete ? 'Endgültig löschen' : 'Liste löschen'}
+          accessibilityLabel={confirmDelete ? 'Löschen bestätigen' : 'Liste löschen'}
           onPress={() => {
             if (!confirmDelete) {
               setConfirmDelete(true);
@@ -223,7 +223,7 @@ export function ListEditorSheet({ list, onClose }: { list: List | null; onClose:
         >
           <Trash2 size={15} color={confirmDelete ? colors.indigo : colors.text3} strokeWidth={2} />
           <Type variant="label" tone={confirmDelete ? 'indigo' : 'text3'}>
-            {confirmDelete ? 'Liste samt Aufgaben löschen? Tippe erneut.' : 'Löschen'}
+            {confirmDelete ? 'Samt Aufgaben in den Papierkorb? Tippe erneut.' : 'Löschen'}
           </Type>
         </PressableScale>
       )}

@@ -163,7 +163,7 @@ export function TaskEditorSheet({
       </GlassButton>
       {isEdit && (
         <PressableScale
-          accessibilityLabel={confirmDelete ? 'Endgültig löschen' : 'Aufgabe löschen'}
+          accessibilityLabel={confirmDelete ? 'Löschen bestätigen' : 'Aufgabe löschen'}
           onPress={() => {
             if (!confirmDelete) {
               setConfirmDelete(true);
@@ -176,7 +176,7 @@ export function TaskEditorSheet({
         >
           <Trash2 size={15} color={confirmDelete ? colors.indigo : colors.text3} strokeWidth={2} />
           <Type variant="label" tone={confirmDelete ? 'indigo' : 'text3'}>
-            {confirmDelete ? 'Wirklich löschen? Tippe erneut.' : 'Löschen'}
+            {confirmDelete ? 'In den Papierkorb? Tippe erneut.' : 'Löschen'}
           </Type>
         </PressableScale>
       )}

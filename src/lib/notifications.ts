@@ -90,7 +90,8 @@ export async function rescheduleAll(): Promise<void> {
   if (!granted) return;
 
   const repo = getTaskRepository();
-  const tasks = await repo.getAll();
+  // Papierkorb-Aufgaben bekommen keine Erinnerungen.
+  const tasks = (await repo.getAll()).filter((t) => !t.deletedAt);
 
   // Kandidaten: offen, mit Datum + Uhrzeit, in der Zukunft — chronologisch, Fenster.
   const windowed = selectNotificationWindow(tasks, new Date());
@@ -206,7 +207,7 @@ export async function rescheduleJournalReminder(enabled: boolean, time: string, 
 async function snoozeTask(taskId: string): Promise<void> {
   const repo = getTaskRepository();
   const task = (await repo.getAll()).find((t) => t.id === taskId);
-  if (!task || task.completedAt !== null) return;
+  if (!task || task.completedAt !== null || task.deletedAt) return;
   const id = await Notifications.scheduleNotificationAsync({
     content: {
       title: task.title,

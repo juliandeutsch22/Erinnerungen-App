@@ -1,5 +1,5 @@
 // backup.test.ts — Export/Import-Roundtrip (Fahrplan §3.8) über die InMemory-Repos.
-import { exportToJsonString, importBackup } from './backup';
+import { type BackupBundle, describeSummary, exportToJsonString, importBackup, summarizeBundle } from './backup';
 import {
   __setChatRepositoryForTests,
   __setDocumentRepositoryForTests,
@@ -263,5 +263,73 @@ describe('Backup', () => {
   it('lehnt fremdes/ungültiges JSON ab', async () => {
     await expect(importBackup('kein json')).rejects.toThrow('Kein gültiges JSON.');
     await expect(importBackup('{"app":"cairn","schemaVersion":1}')).rejects.toThrow('Kein Erinnerungen-Backup');
+  });
+});
+
+describe('Papierkorb im Backup', () => {
+  beforeEach(() => {
+    __setListRepositoryForTests(new InMemoryListRepository());
+    __setTaskRepositoryForTests(new InMemoryTaskRepository());
+    __setPhotoRepositoryForTests(new InMemoryPhotoRepository());
+    __setNoteRepositoryForTests(new InMemoryNoteRepository());
+    __setChatRepositoryForTests(new InMemoryChatRepository());
+    __setDocumentRepositoryForTests(new InMemoryDocumentRepository());
+    __setJournalRepositoryForTests(new InMemoryJournalRepository());
+  });
+
+  it('deletedAt überlebt den Export/Import-Roundtrip', async () => {
+    await getTaskRepository().create(task({ id: 'aktiv' }));
+    await getTaskRepository().create(task({ id: 'weg', deletedAt: '2026-07-20T10:00:00.000Z' }));
+    const json = await exportToJsonString(noPhotos);
+    await importBackup(json);
+    const tasks = await getTaskRepository().getAll();
+    expect(tasks.find((t) => t.id === 'aktiv')?.deletedAt ?? null).toBeNull();
+    expect(tasks.find((t) => t.id === 'weg')?.deletedAt).toBe('2026-07-20T10:00:00.000Z');
+  });
+
+  it('alte Backups ohne deletedAt bleiben aktiv', async () => {
+    await getTaskRepository().create(task({ id: 'alt' }));
+    const json = await exportToJsonString(noPhotos);
+    const stripped = JSON.parse(json);
+    for (const t of stripped.tasks) delete t.deletedAt;
+    await importBackup(JSON.stringify(stripped));
+    const restored = (await getTaskRepository().getAll()).find((t) => t.id === 'alt');
+    expect(restored?.deletedAt ?? null).toBeNull();
+  });
+});
+
+describe('summarizeBundle / describeSummary — ehrlicher Bericht', () => {
+  beforeEach(() => {
+    __setListRepositoryForTests(new InMemoryListRepository());
+    __setTaskRepositoryForTests(new InMemoryTaskRepository());
+    __setPhotoRepositoryForTests(new InMemoryPhotoRepository());
+    __setNoteRepositoryForTests(new InMemoryNoteRepository());
+    __setChatRepositoryForTests(new InMemoryChatRepository());
+    __setDocumentRepositoryForTests(new InMemoryDocumentRepository());
+    __setJournalRepositoryForTests(new InMemoryJournalRepository());
+  });
+
+  it('zählt aktive Einträge und weist Dokumente ohne Inhalt aus', async () => {
+    await getTaskRepository().create(task({ id: 'a' }));
+    await getTaskRepository().create(task({ id: 'b', deletedAt: '2026-07-20T10:00:00.000Z' }));
+    await getDocumentRepository().add({ id: 'd1', eventId: 'e1', name: 'Vertrag.pdf', uri: 'file:///x.pdf', addedAt: '2026-07-01T08:00:00.000Z' });
+    const json = await exportToJsonString({
+      savedFilters: [],
+      // Reader vorhanden, liefert aber null → „zu groß/nicht lesbar".
+      readDocumentBase64: async () => null,
+    });
+    const summary = summarizeBundle(JSON.parse(json) as BackupBundle);
+    expect(summary.tasks).toBe(1); // Papierkorb zählt nicht mit
+    expect(summary.documents).toBe(1);
+    expect(summary.skippedDocuments).toEqual(['Vertrag.pdf']);
+    const text = describeSummary(summary);
+    expect(text).toContain('1 Aufgaben');
+    expect(text).toContain('Vertrag.pdf');
+    expect(text).toContain('größer als 10 MB');
+  });
+
+  it('ohne Lücken bleibt der Bericht ein einziger ruhiger Satz', () => {
+    const text = describeSummary({ lists: 2, tasks: 5, notes: 1, chats: 0, journal: 3, photos: 4, documents: 0, skippedDocuments: [] });
+    expect(text).toBe('Gesichert: 5 Aufgaben, 2 Listen, 1 Notizen, 0 Chats, 3 Betrachtungen, 4 Fotos, 0 Dokumente.');
   });
 });
