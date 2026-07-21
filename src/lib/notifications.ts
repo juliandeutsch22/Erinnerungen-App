@@ -223,6 +223,13 @@ async function snoozeTask(taskId: string): Promise<void> {
 /**
  * Verarbeitet Antworten auf Mitteilungen: „Erledigt", „+1 Std" und den Tap
  * (Deep-Link auf die Aufgabe). Im Root-Layout einhängen.
+ *
+ * Zwei Wege, damit KEINE Aktion verloren geht:
+ *  - Live-Listener für Antworten bei laufender/hintergründiger App.
+ *  - getLastNotificationResponseAsync() beim Start, falls eine „Erledigt"-/
+ *    „+1 Std"-Aktion die App aus dem beendeten Zustand geweckt hat (die Antwort
+ *    kann dann VOR dem Listener eintreffen). Ein Set dedupliziert Doppel-
+ *    Zustellungen über die Response-Identität.
  * ⚠️ Auf einem echten Gerät verifizieren — Expo Go verhält sich anders (§8.4).
  */
 export function useNotificationResponses(): void {
@@ -231,7 +238,14 @@ export function useNotificationResponses(): void {
 
   useEffect(() => {
     if (!native) return;
-    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+    const handled = new Set<string>();
+
+    const handle = (response: Notifications.NotificationResponse) => {
+      // Ein und dieselbe Antwort kann von getLast… UND dem Listener kommen.
+      const key = `${response.notification.request.identifier}:${response.actionIdentifier}`;
+      if (handled.has(key)) return;
+      handled.add(key);
+
       const data = response.notification.request.content.data as { taskId?: string; url?: string } | undefined;
       const action = response.actionIdentifier;
 
@@ -239,7 +253,8 @@ export function useNotificationResponses(): void {
         if (action === ACTION_DONE && data?.taskId) {
           const repo = getTaskRepository();
           const task = (await repo.getAll()).find((t) => t.id === data.taskId);
-          if (task && task.completedAt === null) {
+          // completedAt-Guard schützt zusätzlich vor Doppel-Abhaken.
+          if (task && task.completedAt === null && !task.deletedAt) {
             await repo.update(task.id, resolveCompletion(task, todayStr()));
             await qc.invalidateQueries({ queryKey: queryKeys.tasks });
             requestReschedule();
@@ -253,7 +268,17 @@ export function useNotificationResponses(): void {
         // Default-Aktion: Tap öffnet die Aufgabe.
         if (typeof data?.url === 'string') router.push(data.url as never);
       })();
-    });
+    };
+
+    const sub = Notifications.addNotificationResponseReceivedListener(handle);
+
+    // Kaltstart durch eine Notification-Aktion: die auslösende Antwort nachholen.
+    void Notifications.getLastNotificationResponseAsync()
+      .then((last) => {
+        if (last) handle(last);
+      })
+      .catch(() => {});
+
     return () => sub.remove();
   }, [router, qc]);
 }

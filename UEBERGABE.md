@@ -1,6 +1,6 @@
 # ÜBERGABE-PROTOKOLL — Stoa
 
-Stand: **v1.20.0 (Build 39)**, Juli 2026 · 170 Jest-Tests grün · Branch-Modell siehe §3.
+Stand: **v1.20.1 (Build 40)**, Juli 2026 · 170 Jest-Tests grün · Branch-Modell siehe §3.
 Dieses Dokument macht eine neue Session sofort arbeitsfähig. Lies zusätzlich
 `AGENTS.md` (bindende Design-Leitplanken) und `ROADMAP.md` (Ideen-Backlog).
 
@@ -219,6 +219,11 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
 6. **iOS-Notifications:** max. 64 geplant → Fenster-Strategie in
    `notifications.ts`, nie `cancelAll`; geplante Notifications überleben keine
    Neuinstallation → beim Start neu planen (ohne Permission-Prompt!).
+   **Aktionen („Erledigt"/„+1 Std") aus dem BEENDETEN Zustand:** der Live-
+   `addNotificationResponseReceivedListener` allein reicht nicht — die
+   app-startende Antwort kann vor dem Listener eintreffen. Deshalb beim Mount
+   zusätzlich `getLastNotificationResponseAsync()` abfragen, mit Dedupe-Set
+   über `identifier:actionIdentifier` (v1.20.1). Nur am Gerät prüfbar.
 7. **Patch-Disziplin:** kritische UI-Edits nur mit gezielten Edits pro Datei,
    keine Batch-Regex-Skripte (haben schon stumm Edits verschluckt).
 
