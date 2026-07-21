@@ -5,7 +5,7 @@
 // bewusst KEIN Chat: einmal rein, sortiert, fertig.
 import { useRouter } from 'expo-router';
 import { BrainCircuit, Check, ChevronLeft } from 'lucide-react-native';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -13,6 +13,7 @@ import { Backdrop } from '@/components/Backdrop';
 import { GlassButton } from '@/components/GlassButton';
 import { GlassPanel } from '@/components/GlassPanel';
 import { KeyboardDoneBar, keyboardDoneProps } from '@/components/KeyboardDone';
+import { MicButton } from '@/components/MicButton';
 import { PressableScale } from '@/components/PressableScale';
 import { LoadingState } from '@/components/StateView';
 import { Type } from '@/components/Type';
@@ -37,6 +38,8 @@ export default function BraindumpScreen() {
   const today = todayStr();
 
   const [text, setText] = useState('');
+  const dictBaseRef = useRef('');
+  const [dictating, setDictating] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actions, setActions] = useState<AssistantAction | null>(null);
@@ -110,14 +113,28 @@ export default function BraindumpScreen() {
     <View style={{ flex: 1 }}>
       <Backdrop />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <View style={{ paddingTop: insets.top + Spacing.sm, paddingHorizontal: Spacing.md, flexDirection: 'row', alignItems: 'center' }}>
-          <PressableScale accessibilityLabel="Zurück" onPress={() => router.back()} style={{ padding: Spacing.sm }}>
-            <ChevronLeft size={24} color={colors.text2} strokeWidth={2} />
-          </PressableScale>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
-            <BrainCircuit size={20} color={colors.teal} strokeWidth={2} />
-            <Type variant="heading">Braindump</Type>
+        <View style={{ paddingTop: insets.top + Spacing.sm, paddingHorizontal: Spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <PressableScale accessibilityLabel="Zurück" onPress={() => router.back()} style={{ padding: Spacing.sm }}>
+              <ChevronLeft size={24} color={colors.text2} strokeWidth={2} />
+            </PressableScale>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+              <BrainCircuit size={20} color={colors.teal} strokeWidth={2} />
+              <Type variant="heading">Braindump</Type>
+            </View>
           </View>
+          {/* Diktat: gesprochenes direkt ins Feld (On-Device). */}
+          {!pending && (
+            <MicButton
+              onStart={() => {
+                dictBaseRef.current = text;
+              }}
+              onText={(transcript) =>
+                setText((dictBaseRef.current ? `${dictBaseRef.current.trimEnd()} ` : '') + transcript)
+              }
+              onListeningChange={setDictating}
+            />
+          )}
         </View>
 
         <ScrollView
@@ -136,7 +153,11 @@ export default function BraindumpScreen() {
               value={text}
               onChangeText={setText}
               multiline
-              placeholder={'Milch kaufen, morgen Zahnarzt anrufen,\nGeschenkidee für Anna: Kochbuch,\nReifen wechseln vor dem Winter…'}
+              placeholder={
+                dictating
+                  ? 'Ich höre zu … sprich einfach los.'
+                  : 'Milch kaufen, morgen Zahnarzt anrufen,\nGeschenkidee für Anna: Kochbuch,\nReifen wechseln vor dem Winter…'
+              }
               placeholderTextColor={colors.text3}
               textAlignVertical="top"
               accessibilityLabel="Braindump-Text"

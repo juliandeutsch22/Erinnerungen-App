@@ -1,6 +1,6 @@
 # ÜBERGABE-PROTOKOLL — Stoa
 
-Stand: **v1.21.1 (Build 42)**, Juli 2026 · 177 Jest-Tests grün · Branch-Modell siehe §3.
+Stand: **v1.22.0 (Build 43)**, Juli 2026 · 177 Jest-Tests grün · Branch-Modell siehe §3.
 Dieses Dokument macht eine neue Session sofort arbeitsfähig. Lies zusätzlich
 `AGENTS.md` (bindende Design-Leitplanken) und `ROADMAP.md` (Ideen-Backlog).
 
@@ -183,6 +183,12 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
   Modell-Ketten: `gemini-3.5-flash` → `gemini-flash-latest`
   → 2.5 → 2.0; bei 429 Lite-Kette; bei 404 überall Live-Modellsuche (ListModels);
   5xx wandert durch die Ketten + 1 Retry nach 1,5 s.
+  **Diktat (Sprach-Eingabe):** Mikrofon-Knopf in der Chat-Eingabe und im
+  Braindump (`MicButton` + `lib/dictation.ts`, expo-speech-recognition).
+  On-Device — die Stimme wird lokal zu Text, nur der Text geht in den
+  bestehenden Fluss (kein Audio zu Google, keine KI-Änderung). Füllt nur das
+  Feld, gesendet/sortiert wird manuell → alle Bestätigungs-Invarianten bleiben.
+  Nativ echt, im Web reine visuelle Vorschau. **Am Gerät gegenprüfen.**
 - **Abendbetrachtung:** 1 Eintrag/Tag, Autosave, stille Kette, Verlauf mit
   Bearbeiten/Löschen (zweistufig), optionale tägliche Erinnerung (überlebt
   Neuinstallation durch Neu-Planung beim Start), Suche, Backup.
@@ -231,6 +237,10 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
    über `identifier:actionIdentifier` (v1.20.1). Nur am Gerät prüfbar.
 7. **Patch-Disziplin:** kritische UI-Edits nur mit gezielten Edits pro Datei,
    keine Batch-Regex-Skripte (haben schon stumm Edits verschluckt).
+8. **Diktat/Mikrofon:** Beim Verlassen des Screens die native Erkennung mit
+   `ExpoSpeechRecognitionModule.stop()` beenden, nicht nur die Listener
+   entfernen — sonst bleibt das Mikrofon heiß und die Audio-Session offen
+   (v1.22.0). Der Unmount-Effekt in `lib/dictation.ts` erledigt das.
 
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 

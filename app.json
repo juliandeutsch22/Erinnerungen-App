@@ -2,7 +2,7 @@
   "expo": {
     "name": "Stoa",
     "slug": "stille",
-    "version": "1.21.1",
+    "version": "1.22.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "stille",
@@ -10,7 +10,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "app.julian.stille",
-      "buildNumber": "42",
+      "buildNumber": "43",
       "icon": {
         "light": "./assets/images/icon.png",
         "dark": "./assets/images/icon-dark.png",
@@ -65,6 +65,13 @@
         "expo-local-authentication",
         {
           "faceIDPermission": "Stoa nutzt Face ID nur, um die App auf diesem Gerät zu entsperren."
+        }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Stoa nutzt das Mikrofon nur, um dein Diktat auf dem Gerät in Text umzuwandeln.",
+          "speechRecognitionPermission": "Stoa wandelt deine Sprache auf dem Gerät in Text um — es verlässt das iPhone nicht."
         }
       ]
     ],

@@ -18,6 +18,7 @@ import { ChatLinkSheet } from '@/components/ChatLinkSheet';
 import { GlassButton } from '@/components/GlassButton';
 import { keyboardDoneProps, KeyboardDoneBar } from '@/components/KeyboardDone';
 import { MarkdownText } from '@/components/MarkdownText';
+import { MicButton } from '@/components/MicButton';
 import { PressableScale } from '@/components/PressableScale';
 import { Type } from '@/components/Type';
 import * as Clipboard from 'expo-clipboard';
@@ -303,6 +304,9 @@ export default function ChatScreen() {
   const chatLink: ChatLink = linkedNote ? 'note' : linkedTask ? 'task' : effectiveContext ? 'event' : 'none';
 
   const [draft, setDraft] = useState('');
+  // Diktat: der Feldstand vor dem Sprechen, an den das Transkript angehängt wird.
+  const dictBaseRef = useRef('');
+  const [dictating, setDictating] = useState(false);
   const [linkSheet, setLinkSheet] = useState(false);
   const [renameSheet, setRenameSheet] = useState(false);
   const [pending, setPending] = useState(false);
@@ -721,7 +725,9 @@ export default function ChatScreen() {
             <TextInput
               value={draft}
               onChangeText={setDraft}
-              placeholder={apiKey ? 'Frag den Assistenten…' : 'Erst Schlüssel in den Einstellungen hinterlegen'}
+              placeholder={
+                dictating ? 'Ich höre zu …' : apiKey ? 'Frag den Assistenten…' : 'Erst Schlüssel in den Einstellungen hinterlegen'
+              }
               placeholderTextColor={colors.text3}
               editable={apiKey.length > 0}
               multiline
@@ -730,6 +736,18 @@ export default function ChatScreen() {
               style={[{ fontSize: T.md, color: colors.text, maxHeight: 110, paddingVertical: 2 }, webNoOutline]}
             />
           </View>
+          {/* Diktat: füllt das Feld mit gesprochenem Text (On-Device). */}
+          {apiKey.length > 0 && (
+            <MicButton
+              onStart={() => {
+                dictBaseRef.current = draft;
+              }}
+              onText={(transcript) =>
+                setDraft((dictBaseRef.current ? `${dictBaseRef.current.trimEnd()} ` : '') + transcript)
+              }
+              onListeningChange={setDictating}
+            />
+          )}
           <PressableScale
             accessibilityLabel="Senden"
             onPress={() => void send()}
