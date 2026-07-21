@@ -9,6 +9,7 @@ import React, { useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Backdrop } from '@/components/Backdrop';
 import { GlassButton } from '@/components/GlassButton';
 import { GlassPanel } from '@/components/GlassPanel';
 import { KeyboardDoneBar, keyboardDoneProps } from '@/components/KeyboardDone';
@@ -119,6 +120,7 @@ export default function BraindumpScreen() {
 
   return (
     <View style={{ flex: 1 }}>
+      <Backdrop />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <View style={{ paddingTop: insets.top + Spacing.sm, paddingHorizontal: Spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>

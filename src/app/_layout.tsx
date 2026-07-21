@@ -11,7 +11,6 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AppLockGate } from '@/components/AppLockGate';
-import { Backdrop } from '@/components/Backdrop';
 import { setOnTasksChanged } from '@/data/queries';
 import { isAutoBackupDue, runAutoBackup } from '@/lib/autoBackup';
 import { runOrphanDocumentSweep } from '@/lib/orphanDocuments';
@@ -81,13 +80,7 @@ function RootStack() {
     <>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
       <AppLockGate>
-        {/* EIN fester Backdrop hinter dem gesamten Stack: die Säule bleibt beim
-            Screenwechsel / Zurück-Wischen stehen, nur der (transparente) Inhalt
-            gleitet. Screens rendern deshalb keinen eigenen Backdrop mehr. */}
-        <View style={{ flex: 1, backgroundColor: colors.bg }}>
-          <Backdrop />
-          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: 'transparent' } }} />
-        </View>
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
       </AppLockGate>
     </>
   );

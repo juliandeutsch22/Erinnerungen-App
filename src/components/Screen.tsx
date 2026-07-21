@@ -2,12 +2,12 @@
 // Safe-Area oben, Tab-Bar-Clearance unten, zentrierte max. Inhaltsbreite.
 // Scroll-Offset wird an den Backdrop gereicht → Aurora-Parallax (Tiefe hinter Glas).
 import { useScrollToTop } from 'expo-router';
-import React, { useEffect, useRef } from 'react';
+import React, { useRef } from 'react';
 import { RefreshControl, ScrollViewProps, StyleSheet, View } from 'react-native';
-import Animated, { useAnimatedScrollHandler } from 'react-native-reanimated';
+import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { backdropScrollY } from '@/theme/backdropScroll';
+import { Backdrop } from '@/components/Backdrop';
 import { useColors } from '@/theme/ThemeProvider';
 import { MAX_CONTENT_WIDTH, TAB_BAR_SAFE_BOTTOM } from '@/theme/layout';
 import { Spacing } from '@/theme/theme.tokens';
@@ -31,13 +31,9 @@ export function Screen({ children, withTabBar = true, scroll = true, refreshing,
   const insets = useSafeAreaInsets();
   const bottomPad = (withTabBar ? TAB_BAR_SAFE_BOTTOM : insets.bottom) + Spacing.lg;
 
-  // Speist den EINEN Wurzel-Backdrop (Parallax). Beim Betreten auf 0, damit die
-  // Säule nicht vom vorigen Screen versetzt „nachhängt".
-  useEffect(() => {
-    backdropScrollY.value = 0;
-  }, []);
+  const scrollY = useSharedValue(0);
   const onScroll = useAnimatedScrollHandler((e) => {
-    backdropScrollY.value = e.contentOffset.y;
+    scrollY.value = e.contentOffset.y;
   });
 
   // Tippen auf den bereits aktiven Tab scrollt nach oben (iOS-Standard).
@@ -54,6 +50,7 @@ export function Screen({ children, withTabBar = true, scroll = true, refreshing,
   if (!scroll) {
     return (
       <View style={[{ flex: 1, paddingTop: insets.top + Spacing.lg, paddingBottom: bottomPad, paddingHorizontal: Spacing.lg }, style as any]}>
+        <Backdrop />
         {inner}
       </View>
     );
@@ -61,6 +58,7 @@ export function Screen({ children, withTabBar = true, scroll = true, refreshing,
 
   return (
     <View style={{ flex: 1 }}>
+      <Backdrop scrollY={scrollY} />
       <Animated.ScrollView
         ref={(node: React.ElementRef<typeof Animated.ScrollView> | null) => {
           (scrollRef as React.MutableRefObject<unknown>).current = node;
