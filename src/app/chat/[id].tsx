@@ -40,11 +40,12 @@ import { useSettings } from '@/theme/settings.store';
 
 const URL_RE = /(https?:\/\/[^\s)\]}"']+)/g;
 
-/** Nutzer-Nachricht: schlichter Text, URLs bleiben tappbar. */
+/** Nutzer-Nachricht: schlichter, rechtsbündiger Text (editorialer Dialog),
+ *  URLs bleiben tappbar. */
 function UserText({ content, color }: { content: string; color: string }) {
   const parts = content.split(URL_RE);
   return (
-    <Type variant="body" style={{ lineHeight: T.md * 1.5 }}>
+    <Type variant="body" style={{ fontSize: T.md + 1, lineHeight: (T.md + 1) * 1.5, textAlign: 'right' }}>
       {parts.map((part, i) =>
         /^https?:\/\//.test(part) ? (
           <Text
@@ -631,18 +632,19 @@ export default function ChatScreen() {
                   </Type>
                 )}
                 {m.role === 'user' ? (
-                  // Nutzer: randlose tonale Fläche, rechtsbündig.
+                  // Nutzer: editorialer Dialog — rechtsbündiger Text an einem
+                  // schmalen Teal-Rand, keine Blase (Manuskript statt Messenger).
                   <PressableScale
                     accessibilityLabel="Nachricht kopieren"
                     onLongPress={() => void copyMessage(clean)}
                     pressedScale={0.99}
                     style={{
                       alignSelf: 'flex-end',
-                      maxWidth: '85%',
-                      backgroundColor: `${colors.teal}1C`,
-                      borderRadius: R.xl,
-                      paddingVertical: Spacing.sm,
-                      paddingHorizontal: Spacing.md,
+                      maxWidth: '86%',
+                      borderRightWidth: 2,
+                      borderRightColor: colors.teal,
+                      paddingRight: Spacing.md,
+                      paddingVertical: 2,
                     }}
                   >
                     <UserText content={clean} color={colors.teal} />
