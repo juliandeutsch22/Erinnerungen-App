@@ -14,7 +14,11 @@ const MODEL_CHAIN = ['gemini-3.5-flash', 'gemini-flash-latest', 'gemini-2.5-flas
 /** Kleinere Lite-Kette, wenn das Tageskontingent des Hauptmodells erschöpft ist (429). */
 const LITE_CHAIN = ['gemini-3.1-flash-lite', 'gemini-flash-lite-latest', 'gemini-2.5-flash-lite', 'gemini-2.0-flash-lite'];
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
-const endpoint = (model: string) => `${API_BASE}/models/${model}:generateContent`;
+// Streaming läuft über denselben Dienst, nur als Server-Sent-Events —
+// der Status kommt VOR dem Body, darum funktioniert die ganze Ketten-Logik
+// (404/429/5xx) für beide Endpunkte identisch.
+const endpoint = (model: string, stream: boolean) =>
+  `${API_BASE}/models/${model}:${stream ? 'streamGenerateContent' : 'generateContent'}`;
 
 /** Wie viele Verlaufs-Nachrichten mitgeschickt werden (Kosten-/Limit-Schutz). */
 const HISTORY_LIMIT = 24;
@@ -235,6 +239,54 @@ export function buildRequestBody(messages: ChatMessage[], context: string | null
   };
 }
 
+/** Text eines einzelnen Stream-Ereignisses — OHNE trim: führende Leerzeichen
+ *  eines Chunks gehören zum Wortabstand („Hallo" + „ Welt"). */
+export function extractChunkText(event: unknown): string {
+  if (typeof event !== 'object' || event === null) return '';
+  const candidates = (event as { candidates?: unknown }).candidates;
+  if (!Array.isArray(candidates) || candidates.length === 0) return '';
+  const parts = (candidates[0] as { content?: { parts?: { text?: string }[] } }).content?.parts;
+  if (!Array.isArray(parts)) return '';
+  return parts.map((p) => p.text ?? '').join('');
+}
+
+/** Inkrementeller SSE-Parser: rohe Text-Chunks rein, Text-Deltas raus.
+ *  Gemini sendet pro Ereignis eine Zeile `data: {json}`; Chunk-Grenzen können
+ *  mitten in einer Zeile liegen — der Puffer hält den Rest bis zum nächsten Push. */
+export function createSseParser(): { push: (chunk: string) => string[]; flush: () => string[] } {
+  let buffer = '';
+  const parseLine = (line: string): string | null => {
+    if (!line.startsWith('data:')) return null;
+    const payload = line.slice(5).trim();
+    if (payload.length === 0 || payload === '[DONE]') return null;
+    try {
+      const text = extractChunkText(JSON.parse(payload));
+      return text.length > 0 ? text : null;
+    } catch {
+      return null;
+    }
+  };
+  return {
+    push(chunk: string) {
+      buffer += chunk;
+      const out: string[] = [];
+      let idx: number;
+      while ((idx = buffer.indexOf('\n')) >= 0) {
+        const line = buffer.slice(0, idx).replace(/\r$/, '');
+        buffer = buffer.slice(idx + 1);
+        const t = parseLine(line);
+        if (t !== null) out.push(t);
+      }
+      return out;
+    },
+    flush() {
+      const t = parseLine(buffer.replace(/\r$/, ''));
+      buffer = '';
+      return t !== null ? [t] : [];
+    },
+  };
+}
+
 /** Antworttext aus der Gemini-Response ziehen (defensiv). */
 export function extractText(response: unknown): string | null {
   if (typeof response !== 'object' || response === null) return null;
@@ -284,14 +336,34 @@ export function pickModelsFromList(response: unknown): { model: string | null; l
   return { model, lite };
 }
 
-/** Harte Obergrenze — ein hängender Request darf den Chat nicht blockieren. */
+/** Harte Obergrenze — ein hängender Request darf den Chat nicht blockieren.
+ *  Beim Streaming zählt sie bis zu den Response-Headern; danach wacht
+ *  STREAM_STALL_MS über jeden einzelnen Lese-Schritt. */
 const TIMEOUT_MS = 30000;
+const STREAM_STALL_MS = 30000;
 
-async function callModel(model: string, apiKey: string, body: unknown): Promise<Response> {
+// RN-eigenes fetch kann keine Response-Streams — expo/fetch kann es (nativ und
+// Web). Lazy geladen, damit die reine Logik in Tests ohne Expo-Runtime lädt.
+let streamFetchImpl: typeof fetch | null = null;
+function getStreamFetch(): typeof fetch {
+  if (streamFetchImpl === null) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      streamFetchImpl = (require('expo/fetch') as { fetch: unknown }).fetch as typeof fetch;
+    } catch {
+      streamFetchImpl = fetch;
+    }
+  }
+  return streamFetchImpl;
+}
+
+async function callModel(model: string, apiKey: string, body: unknown, stream = false): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const url = `${endpoint(model, stream)}?${stream ? 'alt=sse&' : ''}key=${encodeURIComponent(apiKey)}`;
+  const doFetch = stream ? getStreamFetch() : fetch;
   try {
-    return await fetch(`${endpoint(model)}?key=${encodeURIComponent(apiKey)}`, {
+    return await doFetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -303,6 +375,56 @@ async function callModel(model: string, apiKey: string, body: unknown): Promise<
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** SSE-Antwort konsumieren: Deltas an den Aufrufer, Gesamttext zurück.
+ *  Reißt der Stream ab, ist der bereits erhaltene Text die ehrlichere Antwort
+ *  als ein Fehler — nur ein komplett leerer Abbruch wirft. */
+async function readSse(res: Response, onDelta: (delta: string) => void): Promise<string> {
+  const parser = createSseParser();
+  let full = '';
+  const emit = (deltas: string[]) => {
+    for (const d of deltas) {
+      full += d;
+      onDelta(d);
+    }
+  };
+  const bodyStream = (res as { body?: ReadableStream<Uint8Array> | null }).body;
+  if (bodyStream && typeof bodyStream.getReader === 'function' && typeof TextDecoder === 'function') {
+    const reader = bodyStream.getReader();
+    const decoder = new TextDecoder();
+    try {
+      for (;;) {
+        // Jeder Lese-Schritt bekommt eine eigene Stall-Wache (Timer wird sauber geräumt).
+        const step = await new Promise<ReadableStreamReadResult<Uint8Array>>((resolve, reject) => {
+          const t = setTimeout(() => reject(new Error('stall')), STREAM_STALL_MS);
+          reader.read().then(
+            (r) => {
+              clearTimeout(t);
+              resolve(r);
+            },
+            (e) => {
+              clearTimeout(t);
+              reject(e instanceof Error ? e : new Error(String(e)));
+            },
+          );
+        });
+        if (step.done) break;
+        emit(parser.push(decoder.decode(step.value, { stream: true })));
+      }
+      emit(parser.flush());
+    } catch {
+      void reader.cancel().catch(() => {});
+      if (full.trim().length === 0)
+        throw new Error('Zeitüberschreitung — der Dienst antwortet nicht. Erneut versuchen.');
+    }
+  } else {
+    // Kein Stream-Support in dieser Umgebung: kompletten SSE-Text am Stück parsen.
+    const text = await res.text();
+    emit(parser.push(text));
+    emit(parser.flush());
+  }
+  return full.trim();
 }
 
 /** Live beim Dienst nachfragen, welche Modelle der Schlüssel kann —
@@ -332,7 +454,7 @@ let workingLite: string | null = null;
  *  („überlastet" — jedes Modell hat eigene Kapazität) und Timeout/Netzfehler.
  *  Auth-Fehler (400/401/403) und 429 stoppen sofort — die gelten für den
  *  ganzen Schlüssel, nicht das einzelne Modell. */
-async function callChain(chain: string[], remembered: string | null, apiKey: string, body: unknown): Promise<{ res: Response; model: string }> {
+async function callChain(chain: string[], remembered: string | null, apiKey: string, body: unknown, stream = false): Promise<{ res: Response; model: string }> {
   const order = remembered ? [remembered, ...chain.filter((m) => m !== remembered)] : chain;
   let overloaded: { res: Response; model: string } | null = null;
   let notFound: { res: Response; model: string } | null = null;
@@ -340,7 +462,7 @@ async function callChain(chain: string[], remembered: string | null, apiKey: str
   for (const model of order) {
     let res: Response;
     try {
-      res = await callModel(model, apiKey, body);
+      res = await callModel(model, apiKey, body, stream);
     } catch (e) {
       lastError = e instanceof Error ? e : new Error(String(e));
       continue;
@@ -367,10 +489,18 @@ const RETRY_DELAY_MS = 1500;
 /** Eine Antwort holen. Verschwundene Modelle (404) werden über die Kandidaten-
  *  Kette und notfalls die Modell-Liste des Dienstes überbrückt; Überlast (5xx)
  *  über die Kette + einen kurzen zweiten Versuch; erschöpftes Kontingent (429)
- *  über die Lite-Kette. Wirft Error mit deutscher Meldung. */
-export async function askAssistant(apiKey: string, messages: ChatMessage[], context: string | null): Promise<string> {
+ *  über die Lite-Kette. Wirft Error mit deutscher Meldung.
+ *  Mit `onDelta` läuft die Anfrage als Stream: der Text kommt Stück für Stück
+ *  beim Aufrufer an, zurückgegeben wird am Ende der Gesamttext. */
+export async function askAssistant(
+  apiKey: string,
+  messages: ChatMessage[],
+  context: string | null,
+  onDelta?: (delta: string) => void,
+): Promise<string> {
+  const stream = onDelta !== undefined;
   const body = buildRequestBody(messages, context);
-  let { res, model } = await callChain(MODEL_CHAIN, workingModel, apiKey, body);
+  let { res, model } = await callChain(MODEL_CHAIN, workingModel, apiKey, body, stream);
 
   // Alle bekannten IDs sind 404 → beim Dienst nachfragen, was es wirklich gibt.
   if (res.status === 404) {
@@ -378,7 +508,7 @@ export async function askAssistant(apiKey: string, messages: ChatMessage[], cont
     if (found.lite) workingLite = found.lite;
     if (found.model) {
       model = found.model;
-      res = await callModel(model, apiKey, body);
+      res = await callModel(model, apiKey, body, stream);
     }
   }
   if (res.ok) workingModel = model;
@@ -387,7 +517,7 @@ export async function askAssistant(apiKey: string, messages: ChatMessage[], cont
   // Kontingent und eigene Kapazität.
   if (res.status === 429 || res.status >= 500) {
     try {
-      const lite = await callChain(LITE_CHAIN, workingLite, apiKey, body);
+      const lite = await callChain(LITE_CHAIN, workingLite, apiKey, body, stream);
       if (lite.res.ok) {
         res = lite.res;
         workingLite = lite.model;
@@ -402,7 +532,7 @@ export async function askAssistant(apiKey: string, messages: ChatMessage[], cont
   // Letzte Chance bei Überlast: kurz durchatmen, einmal wiederholen.
   if (!res.ok && res.status >= 500) {
     await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
-    const again = await callModel(model, apiKey, body);
+    const again = await callModel(model, apiKey, body, stream);
     if (again.ok) {
       res = again;
       workingModel = model;
@@ -410,7 +540,7 @@ export async function askAssistant(apiKey: string, messages: ChatMessage[], cont
   }
 
   if (!res.ok) throw new Error(describeError(res.status));
-  const text = extractText(await res.json());
+  const text = onDelta ? await readSse(res, onDelta) : extractText(await res.json());
   if (!text) throw new Error('Leere Antwort erhalten — versuch es nochmal.');
   return text;
 }

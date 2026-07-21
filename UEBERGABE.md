@@ -1,6 +1,6 @@
 # ÜBERGABE-PROTOKOLL — Stoa
 
-Stand: **v1.16.0 (Build 35)**, Juli 2026 · 134 Jest-Tests grün · Branch-Modell siehe §3.
+Stand: **v1.17.0 (Build 36)**, Juli 2026 · 154 Jest-Tests grün · Branch-Modell siehe §3.
 Dieses Dokument macht eine neue Session sofort arbeitsfähig. Lies zusätzlich
 `AGENTS.md` (bindende Design-Leitplanken) und `ROADMAP.md` (Ideen-Backlog).
 
@@ -139,12 +139,20 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
   Checklisten-Block, Verknüpfung zu Aufgabe/Termin, Editor-Tastatur gelöst.
 - **Listen/Projekte:** Ziel + Deadline + Fortschritt, Vorlagen (duplizieren),
   Tags, Unteraufgaben, Smart-Filter (gespeichert), Drag&Drop.
-- **Assistent:** Chats (30-Tage-Papierkorb), Verknüpfung an Termin (Snapshot-
+- **Assistent:** Chats (30-Tage-Papierkorb, umbenennbar über den Titel im
+  Chat-Kopf, Löschen zweistufig), Verknüpfung an Termin (Snapshot-
   Kontext) / Notiz / Aufgabe (Live-Kontext), **App-Schnappschuss** in jedem
   Senden (Termine ~5 Wochen, offene Aufgaben, Listen, Notiz-Titel; abschaltbar;
-  ohne Journal), `stoa-aktionen`-Block → Aktionskarte (Aufgaben/Checklisten/
-  Notizen anlegen), „Plane meinen Tag", Braindump, „Als Notiz speichern",
-  Datum immer im Prompt. Modell-Ketten: `gemini-3.5-flash` → `gemini-flash-latest`
+  ohne Journal), `stoa-aktionen`-Block → Aktionskarte (einzeln abwählbar,
+  deutsche Datumsanzeige; Aufgaben/Checklisten/Notizen anlegen), „Plane meinen
+  Tag", Braindump, „Als Notiz speichern", Datum immer im Prompt.
+  **Antworten streamen** (SSE via `streamGenerateContent` + `expo/fetch`;
+  reißt der Stream ab, zählt der schon erhaltene Text; ohne Stream-Support
+  wird der SSE-Body am Stück geparst) und werden als **Markdown-Licht gesetzt**
+  (`lib/markdown.ts` + `MarkdownText`: Listen, Überschriften in der Antiqua,
+  fett/kursiv, tappbare Links); Nutzer-Nachrichten sind randlose tonale
+  Flächen, Antworten frei gesetzter Text, Warten = drei atmende Punkte.
+  Modell-Ketten: `gemini-3.5-flash` → `gemini-flash-latest`
   → 2.5 → 2.0; bei 429 Lite-Kette; bei 404 überall Live-Modellsuche (ListModels);
   5xx wandert durch die Ketten + 1 Retry nach 1,5 s.
 - **Abendbetrachtung:** 1 Eintrag/Tag, Autosave, stille Kette, Verlauf mit

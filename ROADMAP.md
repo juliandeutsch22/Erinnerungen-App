@@ -8,10 +8,10 @@ für alles, was besprochen, aber noch nicht gebaut ist.
 - **Prompt-Chips im leeren Chat** — kontextabhängige Ein-Tipp-Vorschläge
   („Packliste erstellen", „Zusammenfassen", „Nächste Schritte", „Zerlege in
   Teilschritte") statt Tippen.
-- **Streaming-Antworten** — Text erscheint Wort für Wort (SSE), fühlt sich
-  deutlich schneller an.
+- ~~**Streaming-Antworten**~~ — umgesetzt in v1.17.0 (SSE über expo/fetch,
+  Fallback auf Komplett-Antwort).
 - **Auto-Titel durch das Modell** — kurzer generierter Chat-Titel statt der
-  ersten Nutzer-Nachricht.
+  ersten Nutzer-Nachricht (Umbenennen von Hand gibt es seit v1.17.0).
 - **On-Device-Stufe** — Apple Foundation Models (iOS 26) für einfache
   Aufgaben komplett offline; braucht das native Kapitel.
 

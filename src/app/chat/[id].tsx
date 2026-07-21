@@ -1,54 +1,46 @@
-// chat/[id].tsx — Vollbild-Chat mit dem Assistenten. Nachrichten-Verlauf auf
-// der Schreibtafel, Eingabezeile unten, Antworten kommen von Gemini (eigener
-// Schlüssel, direkt vom Gerät — kein Mittelsmann). URLs in Antworten sind
-// tappbar (z. B. vorbefüllte Airbnb-/Booking-Suchen). Der Termin-Kontext
-// steckt als Snapshot im Chat und wandert in die System-Instruction.
+// chat/[id].tsx — Vollbild-Chat mit dem Assistenten. Der Verlauf liegt wie ein
+// Briefwechsel direkt auf der Schreibtafel: Nutzer-Nachrichten als randlose
+// tonale Teal-Fläche, Antworten als frei gesetzter Text (Markdown-Licht über
+// MarkdownText — Listen, Überschriften, fett, tappbare Links). Antworten
+// streamen Wort für Wort (SSE); während des Wartens atmen drei stille Punkte.
+// Der Termin-Kontext steckt als Snapshot im Chat und wandert in die
+// System-Instruction; Notiz/Aufgabe werden live mitgelesen.
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowUp, CalendarDays, ChevronLeft, Link2, ListTodo, NotebookPen, Sparkles, Trash2 } from 'lucide-react-native';
-import React, { useEffect, useRef, useState } from 'react';
+import { ArrowUp, CalendarDays, Check, ChevronLeft, Link2, ListTodo, NotebookPen, Pencil, Sparkles, Trash2 } from 'lucide-react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Keyboard, KeyboardAvoidingView, Linking, Platform, ScrollView, Text, TextInput, View } from 'react-native';
+import Animated, { Easing, type SharedValue, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Backdrop } from '@/components/Backdrop';
+import { BottomSheet } from '@/components/BottomSheet';
 import { ChatLinkSheet } from '@/components/ChatLinkSheet';
+import { GlassButton } from '@/components/GlassButton';
 import { keyboardDoneProps, KeyboardDoneBar } from '@/components/KeyboardDone';
+import { MarkdownText } from '@/components/MarkdownText';
 import { PressableScale } from '@/components/PressableScale';
-import { LoadingState } from '@/components/StateView';
 import { Type } from '@/components/Type';
 import * as Clipboard from 'expo-clipboard';
 
 import { useDeviceEvents } from '@/data/calendarQueries';
-import { useAppendMessage, useChatMessages, useChats, useDeleteChat, useUpdateChat } from '@/data/chatQueries';
+import { useAppendMessage, useChatMessages, useChats, useUpdateChat } from '@/data/chatQueries';
 import { useCreateNote, useNotes, useUpdateNote } from '@/data/noteQueries';
 import { useCreateTask, useLists, useTasks } from '@/data/queries';
-import type { ChatMessage } from '@/data/types';
-import { askAssistant, buildAppContext, buildNoteContext, buildTaskContext, extractActions } from '@/lib/assistant';
-import { addDays, todayStr } from '@/lib/dates';
+import type { Chat, ChatMessage } from '@/data/types';
+import { askAssistant, type AssistantAction, buildAppContext, buildNoteContext, buildTaskContext, extractActions } from '@/lib/assistant';
+import { addDays, formatDueDate, toDateStr, todayStr } from '@/lib/dates';
 import { hasCalendarPermission } from '@/lib/deviceCalendar';
 import { noteTitle } from '@/lib/noteLogic';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { webNoOutline } from '@/theme/layout';
-import { useColors } from '@/theme/ThemeProvider';
+import { useColors, useReducedMotion } from '@/theme/ThemeProvider';
 import { R, Spacing, T } from '@/theme/theme.tokens';
 import { useSettings } from '@/theme/settings.store';
 
 const URL_RE = /(https?:\/\/[^\s)\]}"']+)/g;
 
-/** Markdown-light: **fett** innerhalb eines Textstücks rendern. */
-function boldParts(text: string, keyPrefix: number): React.ReactNode[] {
-  return text.split(/\*\*([^*]+)\*\*/g).map((part, i) =>
-    i % 2 === 1 ? (
-      <Text key={`${keyPrefix}-${i}`} style={{ fontWeight: '700' }}>
-        {part}
-      </Text>
-    ) : (
-      part
-    ),
-  );
-}
-
-/** Nachrichtentext mit tappbaren Links + **fett** rendern. */
-function LinkedText({ content, color }: { content: string; color: string }) {
+/** Nutzer-Nachricht: schlichter Text, URLs bleiben tappbar. */
+function UserText({ content, color }: { content: string; color: string }) {
   const parts = content.split(URL_RE);
   return (
     <Type variant="body" style={{ lineHeight: T.md * 1.5 }}>
@@ -62,10 +54,201 @@ function LinkedText({ content, color }: { content: string; color: string }) {
             {part.replace(/^https?:\/\/(www\.)?/, '').slice(0, 48)}
           </Text>
         ) : (
-          boldParts(part, i)
+          part
         ),
       )}
     </Type>
+  );
+}
+
+/** Ein Punkt des Denk-Indikators — die Phase versetzt die Atmung. */
+function ThinkingDot({ progress, phase, color }: { progress: SharedValue<number>; phase: number; color: string }) {
+  const style = useAnimatedStyle(() => {
+    const v = (progress.value + phase) % 1;
+    return { opacity: 0.2 + 0.55 * Math.sin(v * Math.PI) };
+  });
+  return <Animated.View style={[{ width: 6, height: 6, borderRadius: 3, backgroundColor: color }, style]} />;
+}
+
+/** Drei still atmende Punkte statt Spinner — der Assistent denkt nach. */
+function ThinkingDots() {
+  const colors = useColors();
+  const reduced = useReducedMotion();
+  const progress = useSharedValue(0);
+  useEffect(() => {
+    if (reduced) return;
+    progress.value = withRepeat(withTiming(1, { duration: 1500, easing: Easing.linear }), -1, false);
+  }, [reduced, progress]);
+
+  if (reduced) {
+    return (
+      <View style={{ flexDirection: 'row', gap: 5, paddingVertical: Spacing.sm, paddingLeft: 2 }}>
+        {[0, 1, 2].map((i) => (
+          <View key={i} style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.text3, opacity: 0.5 }} />
+        ))}
+      </View>
+    );
+  }
+  return (
+    <View style={{ flexDirection: 'row', gap: 5, paddingVertical: Spacing.sm, paddingLeft: 2 }}>
+      {[0, 1, 2].map((i) => (
+        <ThinkingDot key={i} progress={progress} phase={i * 0.18} color={colors.text2} />
+      ))}
+    </View>
+  );
+}
+
+/** Aktionskarte: Vorschläge des Assistenten — einzeln abwählbar, ein Tipp übernimmt. */
+function ActionCard({
+  actions,
+  applied,
+  today,
+  onApply,
+}: {
+  actions: AssistantAction;
+  applied: boolean;
+  today: string;
+  onApply: (selected: AssistantAction) => void;
+}) {
+  const colors = useColors();
+  const [excluded, setExcluded] = useState<Set<string>>(new Set());
+  const included = (key: string) => !excluded.has(key);
+  const toggle = (key: string) => {
+    hapticSelect();
+    setExcluded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const selected: AssistantAction = {
+    aufgaben: actions.aufgaben.filter((_, i) => included(`a${i}`)),
+    checkliste: actions.checkliste.filter((_, i) => included(`c${i}`)),
+    notizen: actions.notizen.filter((_, i) => included(`n${i}`)),
+  };
+  const count = selected.aufgaben.length + selected.checkliste.length + selected.notizen.length;
+
+  const row = (key: string, label: string, sub: string | null) => {
+    const on = included(key);
+    return (
+      <PressableScale
+        key={key}
+        accessibilityLabel={on ? `„${label}" abwählen` : `„${label}" auswählen`}
+        disabled={applied}
+        onPress={() => toggle(key)}
+        pressedScale={0.99}
+        style={{ flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm, paddingVertical: 4 }}
+      >
+        <View
+          style={{
+            width: 18,
+            height: 18,
+            borderRadius: 9,
+            marginTop: 1,
+            borderWidth: 1.5,
+            borderColor: on ? colors.teal : colors.border2,
+            backgroundColor: on ? colors.teal : 'transparent',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {on && <Check size={11} color="#FFFFFF" strokeWidth={3} />}
+        </View>
+        <View style={{ flex: 1, opacity: on || applied ? 1 : 0.45 }}>
+          <Type variant="body" style={{ fontSize: T.sm, lineHeight: T.sm * 1.4 }}>{label}</Type>
+          {sub && (
+            <Type variant="caption" tone="text3" style={{ marginTop: 1 }}>{sub}</Type>
+          )}
+        </View>
+      </PressableScale>
+    );
+  };
+
+  return (
+    <View
+      style={{
+        marginTop: Spacing.sm,
+        backgroundColor: `${colors.teal}12`,
+        borderRadius: R.lg,
+        padding: Spacing.md,
+        gap: 2,
+        alignSelf: 'stretch',
+      }}
+    >
+      <Type variant="eyebrow" tone="text3" style={{ marginBottom: Spacing.xs }}>Vorschläge</Type>
+      {actions.aufgaben.map((a, i) =>
+        row(
+          `a${i}`,
+          a.titel,
+          a.datum ? `${formatDueDate(a.datum, today)}${a.zeit ? ` · ${a.zeit} Uhr` : ''}` : a.zeit ? `${a.zeit} Uhr` : null,
+        ),
+      )}
+      {actions.checkliste.map((c, i) => row(`c${i}`, c, 'Checkliste der Notiz'))}
+      {actions.notizen.map((n, i) => row(`n${i}`, n.split('\n')[0], 'Notiz'))}
+      {applied ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingTop: Spacing.xs }}>
+          <Check size={13} color={colors.teal} strokeWidth={2.6} />
+          <Type variant="label" tone="teal">Übernommen</Type>
+        </View>
+      ) : (
+        <GlassButton
+          accessibilityLabel="Ausgewählte Vorschläge übernehmen"
+          size="sm"
+          onPress={() => onApply(selected)}
+          disabled={count === 0}
+          style={{ marginTop: Spacing.sm }}
+        >
+          <Type variant="label" style={{ color: '#FFFFFF' }}>
+            {count === 1 ? '1 Vorschlag übernehmen' : `${count} Vorschläge übernehmen`}
+          </Type>
+        </GlassButton>
+      )}
+    </View>
+  );
+}
+
+/** Umbenennen-Sheet: der Titel gehört dem Nutzer, nicht der ersten Nachricht. */
+function RenameSheet({ chat, onClose }: { chat: Chat; onClose: () => void }) {
+  const colors = useColors();
+  const updateChat = useUpdateChat();
+  const [title, setTitle] = useState(chat.title);
+  const save = () => {
+    const t = title.trim();
+    if (t.length > 0 && t !== chat.title) {
+      hapticSuccess();
+      updateChat.mutate({ id: chat.id, patch: { title: t } });
+    }
+    onClose();
+  };
+  return (
+    <BottomSheet
+      visible
+      title="Chat umbenennen"
+      onClose={onClose}
+      footer={
+        <GlassButton accessibilityLabel="Titel sichern" onPress={save} disabled={title.trim().length === 0}>
+          <Type variant="label" style={{ color: '#FFFFFF' }}>Sichern</Type>
+        </GlassButton>
+      }
+    >
+      <TextInput
+        value={title}
+        onChangeText={setTitle}
+        placeholder="Titel des Chats"
+        placeholderTextColor={colors.text3}
+        autoFocus
+        selectTextOnFocus
+        returnKeyType="done"
+        onSubmitEditing={save}
+        accessibilityLabel="Titel des Chats"
+        style={[
+          { fontSize: T.xl, fontWeight: '600', color: colors.text, paddingVertical: Spacing.sm, marginBottom: Spacing.sm },
+          webNoOutline,
+        ]}
+      />
+    </BottomSheet>
   );
 }
 
@@ -78,7 +261,6 @@ export default function ChatScreen() {
   const { data: messages } = useChatMessages(id);
   const appendMessage = useAppendMessage();
   const updateChat = useUpdateChat();
-  const deleteChat = useDeleteChat();
   const apiKey = useSettings((s) => s.geminiApiKey);
 
   const chat = (chats ?? []).find((c) => c.id === id);
@@ -117,7 +299,9 @@ export default function ChatScreen() {
 
   const [draft, setDraft] = useState('');
   const [linkSheet, setLinkSheet] = useState(false);
+  const [renameSheet, setRenameSheet] = useState(false);
   const [pending, setPending] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedNoteIds, setSavedNoteIds] = useState<Set<string>>(new Set());
   const [appliedActionIds, setAppliedActionIds] = useState<Set<string>>(new Set());
@@ -127,12 +311,30 @@ export default function ChatScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const listHeight = useRef(0);
 
-  /** Aktions-Block übernehmen: Aufgaben anlegen, Checkliste an die Notiz anhängen. */
-  const applyActions = async (m: ChatMessage) => {
-    const { actions } = extractActions(m.content);
-    if (!actions) return;
+  // Streaming: der wachsende Antwort-Text. Er bleibt sichtbar, bis die
+  // persistierte Nachricht im Verlauf angekommen ist — sonst blinkt der Übergang.
+  const [streamText, setStreamText] = useState<string | null>(null);
+  const streamRef = useRef('');
+  const clearOnMessageId = useRef<string | null>(null);
+  useEffect(() => {
+    if (clearOnMessageId.current && (messages ?? []).some((m) => m.id === clearOnMessageId.current)) {
+      clearOnMessageId.current = null;
+      streamRef.current = '';
+      setStreamText(null);
+    }
+  }, [messages]);
+
+  // Die „Löschen?"-Rückfrage verfällt still nach ein paar Sekunden.
+  useEffect(() => {
+    if (!confirmDelete) return;
+    const t = setTimeout(() => setConfirmDelete(false), 3500);
+    return () => clearTimeout(t);
+  }, [confirmDelete]);
+
+  /** Aktions-Auswahl übernehmen: Aufgaben anlegen, Checkliste an die Notiz hängen. */
+  const applyActions = async (m: ChatMessage, selected: AssistantAction) => {
     hapticSuccess();
-    for (const a of actions.aufgaben) {
+    for (const a of selected.aufgaben) {
       await createTask.mutateAsync({
         listId: 'default',
         title: a.titel,
@@ -141,11 +343,11 @@ export default function ChatScreen() {
         eventId: chat?.eventId ?? null,
       });
     }
-    if (actions.checkliste.length > 0 && linkedNote) {
-      const lines = actions.checkliste.map((c) => `- [ ] ${c}`).join('\n');
+    if (selected.checkliste.length > 0 && linkedNote) {
+      const lines = selected.checkliste.map((c) => `- [ ] ${c}`).join('\n');
       updateNote.mutate({ id: linkedNote.id, patch: { body: `${linkedNote.body}\n${lines}` } });
     }
-    for (const n of actions.notizen) {
+    for (const n of selected.notizen) {
       await createNote.mutateAsync({ body: n, taskId: chat?.taskId ?? null, eventId: chat?.eventId ?? null });
     }
     setAppliedActionIds((prev) => new Set(prev).add(m.id));
@@ -156,6 +358,7 @@ export default function ChatScreen() {
     if (!id) return;
     setPending(true);
     setError(null);
+    streamRef.current = '';
     try {
       const appContext = assistantContextEnabled
         ? buildAppContext({
@@ -168,10 +371,17 @@ export default function ChatScreen() {
           })
         : null;
       const combined = [effectiveContext, appContext].filter(Boolean).join('\n\n') || null;
-      const answer = await askAssistant(apiKey, history, combined);
-      await appendMessage.mutateAsync({ chatId: id, role: 'assistant', content: answer });
+      const answer = await askAssistant(apiKey, history, combined, (delta) => {
+        streamRef.current += delta;
+        setStreamText(streamRef.current);
+        scrollRef.current?.scrollToEnd({ animated: false });
+      });
+      const saved = await appendMessage.mutateAsync({ chatId: id, role: 'assistant', content: answer });
+      clearOnMessageId.current = saved.id;
       hapticSuccess();
     } catch (e) {
+      streamRef.current = '';
+      setStreamText(null);
       setError(e instanceof Error ? e.message : 'Unbekannter Fehler.');
     } finally {
       setPending(false);
@@ -223,7 +433,7 @@ export default function ChatScreen() {
     setError(null);
     hapticSelect();
     const userMsg = await appendMessage.mutateAsync({ chatId: id, role: 'user', content: text });
-    // Titel = erste Nutzer-Nachricht (gekürzt) — wie bei Notizen die erste Zeile.
+    // Titel = erste Nutzer-Nachricht (gekürzt) — bis der Nutzer selbst umbenennt.
     if ((messages ?? []).length === 0 && chat.title === 'Neuer Chat') {
       updateChat.mutate({ id, patch: { title: text.length > 60 ? `${text.slice(0, 59)}…` : text } });
     }
@@ -240,11 +450,25 @@ export default function ChatScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ask, chat?.id, messages?.length]);
 
+  /** Zweistufig: erst „Löschen?", dann in den Papierkorb (30 Tage, wie die Liste). */
   const remove = () => {
     hapticSelect();
-    if (id) deleteChat.mutate(id);
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
+    if (id) updateChat.mutate({ id, patch: { deletedAt: new Date().toISOString() } });
     router.back();
   };
+
+  // Tages-Trenner nur, wenn der Chat über mehrere Tage geht.
+  const showDayLabels = useMemo(() => {
+    const days = new Set((messages ?? []).map((m) => toDateStr(new Date(m.createdAt))));
+    return days.size > 1;
+  }, [messages]);
+
+  // Während des Streamens den (noch unvollständigen) Aktions-Block verbergen.
+  const streamVisible = streamText !== null ? streamText.split('```')[0] : null;
 
   return (
     <View style={{ flex: 1 }}>
@@ -264,7 +488,18 @@ export default function ChatScreen() {
             <ChevronLeft size={24} color={colors.text2} strokeWidth={2} />
           </PressableScale>
           <View style={{ flex: 1, alignItems: 'center' }}>
-            <Type variant="label" numberOfLines={1}>{chat?.title ?? 'Chat'}</Type>
+            <PressableScale
+              accessibilityLabel="Chat umbenennen"
+              disabled={!chat}
+              onPress={() => {
+                hapticSelect();
+                setRenameSheet(true);
+              }}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 5, maxWidth: '100%' }}
+            >
+              <Type variant="label" numberOfLines={1} style={{ flexShrink: 1 }}>{chat?.title ?? 'Chat'}</Type>
+              <Pencil size={11} color={colors.text3} strokeWidth={2} />
+            </PressableScale>
             {contextLabel && (
               <PressableScale
                 accessibilityLabel={`Verknüpfte Quelle ${contextLabel} öffnen`}
@@ -293,8 +528,16 @@ export default function ChatScreen() {
             >
               <Link2 size={20} color={colors.text3} strokeWidth={2} />
             </PressableScale>
-            <PressableScale accessibilityLabel="Chat löschen" onPress={remove} style={{ padding: Spacing.sm }}>
-              <Trash2 size={20} color={colors.text3} strokeWidth={2} />
+            <PressableScale
+              accessibilityLabel={confirmDelete ? 'Löschen bestätigen' : 'Chat löschen'}
+              onPress={remove}
+              style={{ padding: Spacing.sm }}
+            >
+              {confirmDelete ? (
+                <Type variant="label" tone="indigo">Löschen?</Type>
+              ) : (
+                <Trash2 size={20} color={colors.text3} strokeWidth={2} />
+              )}
             </PressableScale>
           </View>
         </View>
@@ -312,7 +555,7 @@ export default function ChatScreen() {
             listHeight.current = h;
           }}
           style={{ flex: 1 }}
-          contentContainerStyle={{ paddingHorizontal: Spacing.md, paddingTop: Spacing.sm, paddingBottom: Spacing.md, gap: Spacing.sm }}
+          contentContainerStyle={{ paddingHorizontal: Spacing.md, paddingTop: Spacing.sm, paddingBottom: Spacing.md, gap: Spacing.md }}
         >
           {(messages ?? []).length === 0 && !pending && (
             <View style={{ alignItems: 'center', paddingTop: Spacing.xxl, gap: Spacing.sm }}>
@@ -328,88 +571,79 @@ export default function ChatScreen() {
               </Type>
             </View>
           )}
-          {(messages ?? []).map((m) => {
+          {(messages ?? []).map((m, i, arr) => {
+            const day = toDateStr(new Date(m.createdAt));
+            const prevDay = i > 0 ? toDateStr(new Date(arr[i - 1].createdAt)) : null;
+            const separator = showDayLabels && day !== prevDay ? formatDueDate(day, today) : null;
             const { clean, actions } = m.role === 'assistant' ? extractActions(m.content) : { clean: m.content, actions: null };
             return (
-            <View key={m.id} style={{ alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '88%' }}>
-              <PressableScale
-                accessibilityLabel={`Nachricht kopieren`}
-                onLongPress={() => void copyMessage(clean)}
-                pressedScale={0.99}
-                style={{
-                  backgroundColor: m.role === 'user' ? `${colors.teal}1A` : colors.bg2,
-                  borderWidth: 1,
-                  borderColor: m.role === 'user' ? `${colors.teal}33` : colors.border,
-                  borderRadius: R.lg,
-                  paddingVertical: Spacing.sm,
-                  paddingHorizontal: Spacing.md,
-                }}
-              >
-                <LinkedText content={clean} color={colors.teal} />
-              </PressableScale>
-              {/* Aktions-Karte: strukturierte Vorschläge mit einem Tipp übernehmen. */}
-              {actions && (
-                <View
-                  style={{
-                    marginTop: Spacing.xs,
-                    borderWidth: 1,
-                    borderColor: `${colors.teal}44`,
-                    backgroundColor: `${colors.teal}0D`,
-                    borderRadius: R.md,
-                    padding: Spacing.sm,
-                    gap: 3,
-                  }}
-                >
-                  {actions.aufgaben.map((a, i) => (
-                    <Type key={`a${i}`} variant="caption" tone="text2" numberOfLines={1}>
-                      ☐ {a.titel}{a.datum ? ` · ${a.datum}` : ''}{a.zeit ? ` ${a.zeit}` : ''}
-                    </Type>
-                  ))}
-                  {actions.checkliste.map((c, i) => (
-                    <Type key={`c${i}`} variant="caption" tone="text2" numberOfLines={1}>
-                      ☐ {c} <Type variant="caption" tone="text3">(Notiz-Checkliste)</Type>
-                    </Type>
-                  ))}
-                  {actions.notizen.map((n, i) => (
-                    <Type key={`n${i}`} variant="caption" tone="text2" numberOfLines={1}>
-                      ✎ {n.split('\n')[0]} <Type variant="caption" tone="text3">(Notiz)</Type>
-                    </Type>
-                  ))}
-                  <PressableScale
-                    accessibilityLabel="Vorschläge übernehmen"
-                    onPress={() => void applyActions(m)}
-                    disabled={appliedActionIds.has(m.id)}
-                    style={{ paddingTop: 4 }}
-                  >
-                    <Type variant="label" tone={appliedActionIds.has(m.id) ? 'text3' : 'teal'}>
-                      {appliedActionIds.has(m.id)
-                        ? 'Übernommen ✓'
-                        : actions.aufgaben.length > 0
-                          ? `${actions.aufgaben.length + actions.checkliste.length} ${actions.aufgaben.length + actions.checkliste.length === 1 ? 'Vorschlag' : 'Vorschläge'} übernehmen`
-                          : 'In die Notiz-Checkliste übernehmen'}
-                    </Type>
-                  </PressableScale>
-                </View>
-              )}
-              {/* Antworten lassen sich mit einem Tipp als Notiz ablegen —
-                  inklusive der Verknüpfung des Chats (Aufgabe/Termin). */}
-              {m.role === 'assistant' && (
-                <PressableScale
-                  accessibilityLabel="Antwort als Notiz speichern"
-                  onPress={() => saveAsNote(m)}
-                  disabled={savedNoteIds.has(m.id)}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingTop: 4, paddingLeft: Spacing.xs }}
-                >
-                  <NotebookPen size={12} color={savedNoteIds.has(m.id) ? colors.text3 : colors.teal} strokeWidth={2} />
-                  <Type variant="caption" tone={savedNoteIds.has(m.id) ? 'text3' : 'teal'}>
-                    {savedNoteIds.has(m.id) ? 'Als Notiz gespeichert ✓' : 'Als Notiz speichern'}
+              <View key={m.id}>
+                {separator && (
+                  <Type variant="eyebrow" tone="text3" style={{ textAlign: 'center', marginBottom: Spacing.md, marginTop: i > 0 ? Spacing.sm : 0 }}>
+                    {separator}
                   </Type>
-                </PressableScale>
-              )}
-            </View>
+                )}
+                {m.role === 'user' ? (
+                  // Nutzer: randlose tonale Fläche, rechtsbündig.
+                  <PressableScale
+                    accessibilityLabel="Nachricht kopieren"
+                    onLongPress={() => void copyMessage(clean)}
+                    pressedScale={0.99}
+                    style={{
+                      alignSelf: 'flex-end',
+                      maxWidth: '85%',
+                      backgroundColor: `${colors.teal}1C`,
+                      borderRadius: R.xl,
+                      paddingVertical: Spacing.sm,
+                      paddingHorizontal: Spacing.md,
+                    }}
+                  >
+                    <UserText content={clean} color={colors.teal} />
+                  </PressableScale>
+                ) : (
+                  // Assistent: frei gesetzter Text direkt auf der Tafel — ein Brief, keine SMS.
+                  <View style={{ alignSelf: 'stretch', paddingRight: Spacing.sm }}>
+                    <PressableScale
+                      accessibilityLabel="Antwort kopieren"
+                      onLongPress={() => void copyMessage(clean)}
+                      pressedScale={0.995}
+                    >
+                      <MarkdownText markdown={clean} />
+                    </PressableScale>
+                    {/* Aktionskarte: strukturierte Vorschläge, einzeln abwählbar. */}
+                    {actions && (
+                      <ActionCard
+                        actions={actions}
+                        applied={appliedActionIds.has(m.id)}
+                        today={today}
+                        onApply={(selected) => void applyActions(m, selected)}
+                      />
+                    )}
+                    {/* Antworten lassen sich mit einem Tipp als Notiz ablegen —
+                        inklusive der Verknüpfung des Chats (Aufgabe/Termin). */}
+                    <PressableScale
+                      accessibilityLabel="Antwort als Notiz speichern"
+                      onPress={() => saveAsNote(m)}
+                      disabled={savedNoteIds.has(m.id)}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingTop: Spacing.sm, alignSelf: 'flex-start' }}
+                    >
+                      <NotebookPen size={12} color={savedNoteIds.has(m.id) ? colors.text3 : colors.teal} strokeWidth={2} />
+                      <Type variant="caption" tone={savedNoteIds.has(m.id) ? 'text3' : 'teal'}>
+                        {savedNoteIds.has(m.id) ? 'Als Notiz gespeichert ✓' : 'Als Notiz speichern'}
+                      </Type>
+                    </PressableScale>
+                  </View>
+                )}
+              </View>
             );
           })}
-          {pending && <LoadingState label="Assistent denkt…" />}
+          {/* Streaming: die Antwort wächst Wort für Wort auf der Tafel. */}
+          {streamVisible !== null && streamVisible.length > 0 && (
+            <View style={{ alignSelf: 'stretch', paddingRight: Spacing.sm }}>
+              <MarkdownText markdown={streamVisible} />
+            </View>
+          )}
+          {pending && (streamVisible === null || streamVisible.length === 0) && <ThinkingDots />}
           {error && (
             <View style={{ gap: Spacing.xs, paddingHorizontal: Spacing.sm }}>
               <Type variant="caption" tone="indigo">{error}</Type>
@@ -420,7 +654,7 @@ export default function ChatScreen() {
           )}
         </ScrollView>
 
-        {/* Eingabe */}
+        {/* Eingabe — bleibt während des Wartens tippbar, nur Senden pausiert. */}
         <View
           style={{
             flexDirection: 'row',
@@ -435,8 +669,6 @@ export default function ChatScreen() {
             style={{
               flex: 1,
               backgroundColor: colors.bg2,
-              borderWidth: 1,
-              borderColor: colors.border,
               borderRadius: R.xl,
               paddingHorizontal: Spacing.md,
               paddingVertical: Spacing.sm,
@@ -447,7 +679,7 @@ export default function ChatScreen() {
               onChangeText={setDraft}
               placeholder={apiKey ? 'Frag den Assistenten…' : 'Erst Schlüssel in den Einstellungen hinterlegen'}
               placeholderTextColor={colors.text3}
-              editable={apiKey.length > 0 && !pending}
+              editable={apiKey.length > 0}
               multiline
               accessibilityLabel="Nachricht an den Assistenten"
               {...keyboardDoneProps}
@@ -473,6 +705,7 @@ export default function ChatScreen() {
       </KeyboardAvoidingView>
       <KeyboardDoneBar />
       {linkSheet && id && <ChatLinkSheet chatId={id} onClose={() => setLinkSheet(false)} />}
+      {renameSheet && chat && <RenameSheet chat={chat} onClose={() => setRenameSheet(false)} />}
     </View>
   );
 }

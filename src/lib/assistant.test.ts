@@ -1,7 +1,7 @@
 // assistant.test.ts — Prompt-Bau, Antwort-Extraktion, Fehlertexte.
 import type { ChatMessage } from '@/data/types';
 
-import { buildAppContext, buildRequestBody, describeError, extractActions, extractText, pickModelsFromList } from './assistant';
+import { buildAppContext, buildRequestBody, createSseParser, describeError, extractActions, extractChunkText, extractText, pickModelsFromList } from './assistant';
 
 const msg = (role: 'user' | 'assistant', content: string, at: string): ChatMessage => ({
   id: `m-${at}`, chatId: 'c1', role, content, createdAt: at,
@@ -176,5 +176,43 @@ describe('buildAppContext — Kalenderzugriff', () => {
     const ctx = buildAppContext({ events: [], tasks: [], lists: [], notes: [], today: '2026-07-20', calendarDenied: true });
     expect(ctx).toContain('keinen Kalenderzugriff');
     expect(ctx).not.toContain('Termine der nächsten ~5 Wochen:\n- keine');
+  });
+});
+
+describe('createSseParser / extractChunkText — Streaming', () => {
+  const event = (text: string) => `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text }] } }] })}\n`;
+
+  it('extrahiert Chunk-Text OHNE trim (Wortabstände bleiben erhalten)', () => {
+    expect(extractChunkText({ candidates: [{ content: { parts: [{ text: ' Welt' }] } }] })).toBe(' Welt');
+    expect(extractChunkText({ kaputt: true })).toBe('');
+    expect(extractChunkText(null)).toBe('');
+  });
+
+  it('liefert Deltas aus vollständigen data-Zeilen', () => {
+    const p = createSseParser();
+    expect(p.push(event('Hallo') + event(' Welt'))).toEqual(['Hallo', ' Welt']);
+  });
+
+  it('puffert Chunk-Grenzen mitten in einer Zeile', () => {
+    const p = createSseParser();
+    const line = event('Zusammen');
+    expect(p.push(line.slice(0, 20))).toEqual([]);
+    expect(p.push(line.slice(20))).toEqual(['Zusammen']);
+  });
+
+  it('flush liest eine letzte Zeile ohne Zeilenumbruch', () => {
+    const p = createSseParser();
+    expect(p.push('data: {"candidates":[{"content":{"parts":[{"text":"Ende"}]}}]}')).toEqual([]);
+    expect(p.flush()).toEqual(['Ende']);
+  });
+
+  it('ignoriert Leerzeilen, [DONE] und kaputtes JSON still', () => {
+    const p = createSseParser();
+    expect(p.push('\r\n' + 'data: [DONE]\n' + 'data: {kaputt\n' + event('ok'))).toEqual(['ok']);
+  });
+
+  it('verkraftet CRLF-Zeilenenden', () => {
+    const p = createSseParser();
+    expect(p.push(event('a').replace('\n', '\r\n'))).toEqual(['a']);
   });
 });
