@@ -1,6 +1,6 @@
 # ÜBERGABE-PROTOKOLL — Stoa
 
-Stand: **v1.25.1 (Build 49)**, Juli 2026 · 177 Jest-Tests grün · Branch-Modell siehe §3.
+Stand: **v1.26.0 (Build 50)**, Juli 2026 · 182 Jest-Tests grün · Branch-Modell siehe §3.
 Dieses Dokument macht eine neue Session sofort arbeitsfähig. Lies zusätzlich
 `AGENTS.md` (bindende Design-Leitplanken) und `ROADMAP.md` (Ideen-Backlog).
 

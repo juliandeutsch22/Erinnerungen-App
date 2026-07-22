@@ -4,6 +4,8 @@
 // automatisch — kein eigener Sync, kein Backend. Web: nicht verfügbar.
 import { Platform } from 'react-native';
 
+import { parseDateStr } from '@/lib/dates';
+
 export const deviceCalendarAvailable = Platform.OS === 'ios' || Platform.OS === 'android';
 
 export type DeviceCalendar = {
@@ -127,6 +129,49 @@ export async function createDeviceEvent(calendarId: string, draft: EventDraft): 
     startDate: draft.start,
     endDate: draft.end,
   });
+}
+
+// ——— Termin aus einer Assistenten-Aktion (Sprach-Sheet, Chat, Braindump). ———
+export type AssistantEventInput = { titel: string; datum: string; start?: string; ende?: string };
+
+/** Baut aus {datum, start, ende} einen EventDraft — rein & testbar (lokale Zeit,
+ *  KEIN UTC). Ohne start: ganztägig. Ende ≤ Start oder fehlend → eine Stunde. */
+export function buildEventDraft(input: AssistantEventInput): EventDraft {
+  const base = parseDateStr(input.datum);
+  if (!input.start) {
+    const end = new Date(base);
+    end.setDate(end.getDate() + 1);
+    return { title: input.titel, notes: null, allDay: true, start: base, end };
+  }
+  const [sh, sm] = input.start.split(':').map(Number);
+  const start = new Date(base);
+  start.setHours(sh, sm, 0, 0);
+  let end: Date;
+  if (input.ende) {
+    const [eh, em] = input.ende.split(':').map(Number);
+    end = new Date(base);
+    end.setHours(eh, em, 0, 0);
+  } else {
+    end = new Date(start.getTime() + 60 * 60 * 1000);
+  }
+  if (end.getTime() <= start.getTime()) end = new Date(start.getTime() + 60 * 60 * 1000);
+  return { title: input.titel, notes: null, allDay: false, start, end };
+}
+
+/** Legt einen Termin im Standard-Kalender an. Kümmert sich um Berechtigung und
+ *  Kalender-Wahl; gibt zurück, ob es geklappt hat (false = kein Zugriff/Web). */
+export async function createAssistantEvent(input: AssistantEventInput): Promise<boolean> {
+  if (!deviceCalendarAvailable) return false;
+  try {
+    const granted = await ensureCalendarPermission();
+    if (!granted) return false;
+    const calId = await defaultCalendarId();
+    if (!calId) return false;
+    await createDeviceEvent(calId, buildEventDraft(input));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function updateDeviceEvent(ev: DeviceEvent, draft: EventDraft): Promise<void> {

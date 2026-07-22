@@ -18,6 +18,7 @@ import { BottomSheet } from '@/components/BottomSheet';
 import { GlassButton } from '@/components/GlassButton';
 import { PressableScale } from '@/components/PressableScale';
 import { Type } from '@/components/Type';
+import { useCreateAssistantEvents } from '@/data/calendarQueries';
 import { useCreateNote } from '@/data/noteQueries';
 import { useCreateTask } from '@/data/queries';
 import type { ChatMessage } from '@/data/types';
@@ -169,12 +170,18 @@ export function QuickVoiceView({
   }
 
   // result
-  const items: { key: string; title: string; sub?: string; kind: 'Aufgabe' | 'Notiz' }[] = [
+  const items: { key: string; title: string; sub?: string; kind: 'Aufgabe' | 'Termin' | 'Notiz' }[] = [
     ...(actions?.aufgaben ?? []).map((a, i) => ({
       key: `a${i}`,
       title: a.titel,
       sub: a.datum || a.zeit ? `${a.datum ? formatDueDate(a.datum, today) : ''}${a.zeit ? ` · ${a.zeit}` : ''}` : undefined,
       kind: 'Aufgabe' as const,
+    })),
+    ...(actions?.termine ?? []).map((t, i) => ({
+      key: `t${i}`,
+      title: t.titel,
+      sub: `${formatDueDate(t.datum, today)}${t.start ? ` · ${t.start}${t.ende ? `–${t.ende}` : ''}` : ' · ganztägig'}`,
+      kind: 'Termin' as const,
     })),
     ...(actions?.notizen ?? []).map((n, i) => ({ key: `n${i}`, title: n.split('\n')[0], kind: 'Notiz' as const })),
   ];
@@ -237,6 +244,7 @@ export function QuickVoiceView({
 export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean; onClose: () => void; apiKey: string }) {
   const createTask = useCreateTask();
   const createNote = useCreateNote();
+  const createEvents = useCreateAssistantEvents();
   const today = todayStr();
 
   const [phase, setPhase] = useState<QuickVoicePhase>('listening');
@@ -351,7 +359,9 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
     if (available) toggle();
   };
 
-  const selectedCount = actions ? actions.aufgaben.length + actions.notizen.length - deselected.size : 0;
+  const selectedCount = actions
+    ? actions.aufgaben.length + actions.termine.length + actions.notizen.length - deselected.size
+    : 0;
 
   const confirm = async () => {
     if (!actions) return;
@@ -369,8 +379,11 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
       await createNote.mutateAsync({ body: actions.notizen[i] });
       notes += 1;
     }
+    const termine = actions.termine.filter((_, i) => !deselected.has(`t${i}`));
+    const events = termine.length > 0 ? await createEvents(termine) : 0;
     const parts: string[] = [];
     if (tasks > 0) parts.push(`${tasks} ${tasks === 1 ? 'Aufgabe' : 'Aufgaben'}`);
+    if (events > 0) parts.push(`${events} ${events === 1 ? 'Termin' : 'Termine'}`);
     if (notes > 0) parts.push(`${notes} ${notes === 1 ? 'Notiz' : 'Notizen'}`);
     setSummary(`${parts.join(' und ') || 'Nichts'} angelegt.`);
     setPhase('done');

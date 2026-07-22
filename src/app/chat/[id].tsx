@@ -24,7 +24,7 @@ import { PressableScale } from '@/components/PressableScale';
 import { Type } from '@/components/Type';
 import * as Clipboard from 'expo-clipboard';
 
-import { useDeviceEvents } from '@/data/calendarQueries';
+import { useCreateAssistantEvents, useDeviceEvents } from '@/data/calendarQueries';
 import { useAppendMessage, useChatMessages, useChats, useUpdateChat } from '@/data/chatQueries';
 import { useCreateNote, useNotes, useUpdateNote } from '@/data/noteQueries';
 import { useCreateTask, useLists, useTasks } from '@/data/queries';
@@ -132,10 +132,11 @@ function ActionCard({
 
   const selected: AssistantAction = {
     aufgaben: actions.aufgaben.filter((_, i) => included(`a${i}`)),
+    termine: actions.termine.filter((_, i) => included(`t${i}`)),
     checkliste: actions.checkliste.filter((_, i) => included(`c${i}`)),
     notizen: actions.notizen.filter((_, i) => included(`n${i}`)),
   };
-  const count = selected.aufgaben.length + selected.checkliste.length + selected.notizen.length;
+  const count = selected.aufgaben.length + selected.termine.length + selected.checkliste.length + selected.notizen.length;
 
   const row = (key: string, label: string, sub: string | null) => {
     const on = included(key);
@@ -190,6 +191,13 @@ function ActionCard({
           `a${i}`,
           a.titel,
           a.datum ? `${formatDueDate(a.datum, today)}${a.zeit ? ` · ${a.zeit} Uhr` : ''}` : a.zeit ? `${a.zeit} Uhr` : null,
+        ),
+      )}
+      {actions.termine.map((t, i) =>
+        row(
+          `t${i}`,
+          t.titel,
+          `Termin · ${formatDueDate(t.datum, today)}${t.start ? ` · ${t.start}${t.ende ? `–${t.ende}` : ''} Uhr` : ' · ganztägig'}`,
         ),
       )}
       {actions.checkliste.map((c, i) => row(`c${i}`, c, hasLinkedNote ? 'Checkliste der Notiz' : 'Neue Notiz-Checkliste'))}
@@ -319,6 +327,7 @@ export default function ChatScreen() {
   const [appliedActionIds, setAppliedActionIds] = useState<Set<string>>(new Set());
   const createNote = useCreateNote();
   const createTask = useCreateTask();
+  const createEvents = useCreateAssistantEvents();
   const updateNote = useUpdateNote();
   const scrollRef = useRef<ScrollView>(null);
   const listHeight = useRef(0);
@@ -380,6 +389,7 @@ export default function ChatScreen() {
     for (const n of selected.notizen) {
       await createNote.mutateAsync({ body: n, taskId: chat?.taskId ?? null, eventId: chat?.eventId ?? null });
     }
+    if (selected.termine.length > 0) await createEvents(selected.termine);
     setAppliedActionIds((prev) => new Set(prev).add(m.id));
   };
 

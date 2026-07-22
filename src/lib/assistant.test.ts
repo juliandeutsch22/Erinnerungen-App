@@ -48,6 +48,15 @@ describe('extractActions', () => {
     ]);
     expect(actions?.checkliste).toEqual(['Milch']);
   });
+  it('zieht Termine (mit/ohne Uhrzeit) und verwirft solche ohne gültiges Datum', () => {
+    const text =
+      '```stoa-aktionen\n{"termine":[{"titel":"Zahnarzt","datum":"2026-08-03","start":"10:00","ende":"11:00"},{"titel":"Geburtstag","datum":"2026-08-05"},{"titel":"Ohne Datum"}]}\n```';
+    const { actions } = extractActions(text);
+    expect(actions?.termine).toEqual([
+      { titel: 'Zahnarzt', datum: '2026-08-03', start: '10:00', ende: '11:00' },
+      { titel: 'Geburtstag', datum: '2026-08-05', start: undefined, ende: undefined },
+    ]);
+  });
   it('verkraftet echte Zeilenumbrüche in JSON-Strings (Modell-Marotte)', () => {
     const { actions } = extractActions('```stoa-aktionen\n{"notizen":["Idee\nZweite Zeile"]}\n```');
     expect(actions?.notizen).toEqual(['Idee\nZweite Zeile']);

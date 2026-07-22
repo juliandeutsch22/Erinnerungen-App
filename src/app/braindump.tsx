@@ -17,6 +17,7 @@ import { MicButton } from '@/components/MicButton';
 import { PressableScale } from '@/components/PressableScale';
 import { LoadingState } from '@/components/StateView';
 import { Type } from '@/components/Type';
+import { useCreateAssistantEvents } from '@/data/calendarQueries';
 import { useCreateNote } from '@/data/noteQueries';
 import { useCreateTask } from '@/data/queries';
 import type { ChatMessage } from '@/data/types';
@@ -35,6 +36,7 @@ export default function BraindumpScreen() {
   const apiKey = useSettings((s) => s.geminiApiKey);
   const createTask = useCreateTask();
   const createNote = useCreateNote();
+  const createEvents = useCreateAssistantEvents();
   const today = todayStr();
 
   const [text, setText] = useState('');
@@ -107,15 +109,20 @@ export default function BraindumpScreen() {
       await createNote.mutateAsync({ body: actions.notizen[i] });
       notes += 1;
     }
+    const termine = actions.termine.filter((_, i) => !deselected.has(`t${i}`));
+    const events = termine.length > 0 ? await createEvents(termine) : 0;
     setActions(null);
     setText('');
-    setDone(
-      `${tasks} ${tasks === 1 ? 'Aufgabe' : 'Aufgaben'} und ${notes} ${notes === 1 ? 'Notiz' : 'Notizen'} angelegt. Kopf frei.`,
-    );
+    const parts = [
+      `${tasks} ${tasks === 1 ? 'Aufgabe' : 'Aufgaben'}`,
+      ...(events > 0 ? [`${events} ${events === 1 ? 'Termin' : 'Termine'}`] : []),
+      `${notes} ${notes === 1 ? 'Notiz' : 'Notizen'}`,
+    ];
+    setDone(`${parts.join(', ')} angelegt. Kopf frei.`);
   };
 
   const selectedCount = actions
-    ? actions.aufgaben.length + actions.notizen.length - deselected.size
+    ? actions.aufgaben.length + actions.termine.length + actions.notizen.length - deselected.size
     : 0;
 
   return (
@@ -221,6 +228,28 @@ export default function BraindumpScreen() {
                         )}
                       </View>
                       <Type variant="caption" tone="text3">Aufgabe</Type>
+                    </PressableScale>
+                  );
+                })}
+                {actions.termine.map((t, i) => {
+                  const off = deselected.has(`t${i}`);
+                  return (
+                    <PressableScale
+                      key={`t${i}`}
+                      accessibilityLabel={`Termin ${t.titel} ${off ? 'wieder auswählen' : 'abwählen'}`}
+                      onPress={() => toggle(`t${i}`)}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.xs + 1, opacity: off ? 0.4 : 1 }}
+                    >
+                      <View style={{ width: 18, height: 18, borderRadius: 5, borderWidth: 1.5, borderColor: off ? colors.border3 : colors.teal, backgroundColor: off ? 'transparent' : colors.teal, alignItems: 'center', justifyContent: 'center' }}>
+                        {!off && <Check size={12} color="#FFFFFF" strokeWidth={3} />}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Type variant="body" numberOfLines={1}>{t.titel}</Type>
+                        <Type variant="caption" tone="text3" tabular>
+                          {formatDueDate(t.datum, today)}{t.start ? ` · ${t.start}${t.ende ? `–${t.ende}` : ''}` : ' · ganztägig'}
+                        </Type>
+                      </View>
+                      <Type variant="caption" tone="text3">Termin</Type>
                     </PressableScale>
                   );
                 })}

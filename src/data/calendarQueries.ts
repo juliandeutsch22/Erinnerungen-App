@@ -3,6 +3,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
+  type AssistantEventInput,
+  createAssistantEvent,
   createDeviceEvent,
   deleteDeviceEvent,
   deviceCalendarAvailable,
@@ -56,6 +58,20 @@ export function useCreateEvent() {
       createDeviceEvent(calendarId, draft),
     onSuccess: invalidate,
   });
+}
+
+/** Legt mehrere Assistenten-Termine im Gerätekalender an; gibt zurück, wie viele
+ *  wirklich angelegt wurden (0 im Web / ohne Kalender-Zugriff). */
+export function useCreateAssistantEvents() {
+  const invalidate = useInvalidateEvents();
+  return async (termine: AssistantEventInput[]): Promise<number> => {
+    let created = 0;
+    for (const t of termine) {
+      if (await createAssistantEvent(t)) created += 1;
+    }
+    if (created > 0) invalidate();
+    return created;
+  };
 }
 
 export function useUpdateEvent() {

@@ -33,11 +33,15 @@ export const SYSTEM_PROMPT =
   'Du hast KEINEN Live-Internetzugriff — sage das ehrlich, wenn aktuelle Preise/' +
   'Verfügbarkeiten gefragt sind, und liefere stattdessen die besten Links und Kriterien. ' +
   'Nutze schlichtes Markdown (Listen, **fett**), keine Tabellen. ' +
-  'AKTIONEN: Wenn der Nutzer dich bittet, Aufgaben/Erinnerungen oder eine Checkliste ' +
-  'ANZULEGEN (z. B. „mach mir daraus Aufgaben", „erstelle eine Packliste"), hänge ans ' +
-  'ENDE deiner Antwort GENAU EINEN Block in diesem Format an:\n' +
-  '```stoa-aktionen\n{"aufgaben":[{"titel":"…","datum":"YYYY-MM-DD","zeit":"HH:MM"}],"checkliste":["…"],"notizen":["…"]}\n```\n' +
-  'datum/zeit sind optional; „checkliste" nur, wenn der Chat zu einer Notiz gehört; ' +
+  'AKTIONEN: Wenn der Nutzer dich bittet, Aufgaben/Erinnerungen, Termine oder eine Checkliste ' +
+  'ANZULEGEN (z. B. „mach mir daraus Aufgaben", „trag das als Termin ein", „erstelle eine Packliste"), ' +
+  'hänge ans ENDE deiner Antwort GENAU EINEN Block in diesem Format an:\n' +
+  '```stoa-aktionen\n{"aufgaben":[{"titel":"…","datum":"YYYY-MM-DD","zeit":"HH:MM"}],"termine":[{"titel":"…","datum":"YYYY-MM-DD","start":"HH:MM","ende":"HH:MM"}],"checkliste":["…"],"notizen":["…"]}\n```\n' +
+  '„aufgaben" sind zu ERLEDIGENDE Handlungen (anrufen, kaufen, vorbereiten), datum/zeit optional. ' +
+  '„termine" sind feste Verabredungen zu einem Zeitpunkt (Arzttermin, Meeting, Kino, Zug, Geburtstag) — ' +
+  'sie landen im Gerätekalender; datum ist Pflicht, start/ende optional (ohne start = ganztägig). ' +
+  'Im Zweifel: fester Zeitpunkt/Verabredung → Termin, etwas zu TUN → Aufgabe. ' +
+  '„checkliste" nur, wenn der Chat zu einer Notiz gehört; ' +
   '„notizen" für Gedanken/Ideen ohne Handlung (erste Zeile wird der Titel). ' +
   'Nutze den Block NUR bei einer ausdrücklichen Anlege-Bitte, nie ungefragt.';
 
@@ -45,8 +49,10 @@ export const SYSTEM_PROMPT =
 export function buildBraindumpContext(todayLabel: string, strict = false): string {
   return (
     `Heute ist ${todayLabel}. Der Nutzer kippt einen unsortierten Braindump ab. ` +
-    'Zerlege ALLES vollständig in den stoa-aktionen-Block: Handlungen → "aufgaben" ' +
-    '(mit datum/zeit, wenn erkennbar — relative Angaben wie „morgen" auflösen), ' +
+    'Zerlege ALLES vollständig in den stoa-aktionen-Block: zu erledigende Handlungen → "aufgaben" ' +
+    '(mit datum/zeit, wenn erkennbar — relative Angaben wie „morgen" auflösen); ' +
+    'feste Verabredungen zu einer Uhrzeit (Arzttermin, Meeting, Zug, Kino) → "termine" ' +
+    '(datum Pflicht, start/ende optional); ' +
     'Gedanken/Ideen/Fakten → "notizen" (sinnvoll gruppiert, erste Zeile = Titel). ' +
     'Keine "checkliste". Antworte mit maximal einem kurzen Satz plus dem Block — nichts darf verloren gehen. ' +
     'Gib den stoa-aktionen-Block IMMER aus — auch bei kurzen, stichpunktartigen oder ' +
@@ -64,6 +70,8 @@ export function buildBraindumpContext(todayLabel: string, strict = false): strin
 // ——— Aktions-Block: strukturierte Vorschläge aus der Antwort ziehen. ———
 export type AssistantAction = {
   aufgaben: { titel: string; datum?: string; zeit?: string }[];
+  /** Feste Verabredungen → Gerätekalender. datum Pflicht; ohne start = ganztägig. */
+  termine: { titel: string; datum: string; start?: string; ende?: string }[];
   checkliste: string[];
   notizen: string[];
 };
@@ -99,14 +107,32 @@ export function extractActions(text: string): { clean: string; actions: Assistan
             zeit: typeof a.zeit === 'string' && /^\d{2}:\d{2}$/.test(a.zeit) ? a.zeit : undefined,
           }))
       : [];
+    const termine = Array.isArray(raw.termine)
+      ? raw.termine
+          .filter((t): t is Record<string, unknown> => typeof t === 'object' && t !== null)
+          .filter(
+            (t) =>
+              typeof t.titel === 'string' &&
+              (t.titel as string).trim().length > 0 &&
+              typeof t.datum === 'string' &&
+              /^\d{4}-\d{2}-\d{2}$/.test(t.datum as string),
+          )
+          .map((t) => ({
+            titel: (t.titel as string).trim(),
+            datum: t.datum as string,
+            start: typeof t.start === 'string' && /^\d{2}:\d{2}$/.test(t.start) ? (t.start as string) : undefined,
+            ende: typeof t.ende === 'string' && /^\d{2}:\d{2}$/.test(t.ende) ? (t.ende as string) : undefined,
+          }))
+      : [];
     const checkliste = Array.isArray(raw.checkliste)
       ? raw.checkliste.filter((c): c is string => typeof c === 'string' && c.trim().length > 0).map((c) => c.trim())
       : [];
     const notizen = Array.isArray(raw.notizen)
       ? raw.notizen.filter((n): n is string => typeof n === 'string' && n.trim().length > 0).map((n) => n.trim())
       : [];
-    if (aufgaben.length === 0 && checkliste.length === 0 && notizen.length === 0) return { clean, actions: null };
-    return { clean, actions: { aufgaben, checkliste, notizen } };
+    if (aufgaben.length === 0 && termine.length === 0 && checkliste.length === 0 && notizen.length === 0)
+      return { clean, actions: null };
+    return { clean, actions: { aufgaben, termine, checkliste, notizen } };
   } catch {
     return { clean, actions: null };
   }
