@@ -4,7 +4,7 @@
 // übernimmt — nichts wird ohne Bestätigung angelegt. Der Braindump ist
 // bewusst KEIN Chat: einmal rein, sortiert, fertig.
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { BrainCircuit, Check, ChevronLeft } from 'lucide-react-native';
+import { BrainCircuit, CalendarDays, Check, ChevronLeft, NotebookPen } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -44,10 +44,13 @@ export default function BraindumpScreen() {
   const { text: sharedText } = useLocalSearchParams<{ text?: string }>();
   const [text, setText] = useState('');
   const seeded = useRef(false);
+  const scrollRef = useRef<ScrollView>(null);
   useEffect(() => {
     if (!seeded.current && typeof sharedText === 'string' && sharedText.trim().length > 0) {
       seeded.current = true;
       setText(sharedText);
+      // Punkt 6: nach dem Teilen direkt zum Sortier-Knopf rücken.
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 250);
     }
   }, [sharedText]);
   const dictBaseRef = useRef('');
@@ -55,9 +58,22 @@ export default function BraindumpScreen() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actions, setActions] = useState<AssistantAction | null>(null);
-  // Abwählbare Vorschläge: 'a0', 'a1', … Aufgaben; 'n0', … Notizen.
+  // Abwählbare Vorschläge: 'a0', 'a1', … Aufgaben; 't0', … Termine; 'n0', … Notizen.
   const [deselected, setDeselected] = useState<Set<string>>(new Set());
   const [done, setDone] = useState<string | null>(null);
+  const [doneEvents, setDoneEvents] = useState(0);
+
+  // Punkt 5: Ist der Wurf genau EIN Link, geht er mit einem Tipp als „Notiz mit
+  // Link" — ohne Assistent (Notiz-Body rendert die URL tappbar).
+  const trimmed = text.trim();
+  const isBareUrl = /^https?:\/\/\S+$/.test(trimmed) && !/\s/.test(trimmed);
+  const saveUrlAsNote = async () => {
+    hapticSuccess();
+    await createNote.mutateAsync({ body: trimmed });
+    setText('');
+    setDoneEvents(0);
+    setDone('Als Notiz mit Link gesichert.');
+  };
 
   const sort = async () => {
     const dump = text.trim();
@@ -66,6 +82,7 @@ export default function BraindumpScreen() {
     setError(null);
     setActions(null);
     setDone(null);
+    setDoneEvents(0);
     try {
       const dateLabel = `${parseDateStr(today).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} (${today})`;
       const msg: ChatMessage = { id: 'dump', chatId: 'dump', role: 'user', content: dump, createdAt: new Date().toISOString() };
@@ -123,9 +140,10 @@ export default function BraindumpScreen() {
     const events = termine.length > 0 ? await createEvents(termine) : 0;
     setActions(null);
     setText('');
+    setDoneEvents(events);
     const parts = [
       `${tasks} ${tasks === 1 ? 'Aufgabe' : 'Aufgaben'}`,
-      ...(events > 0 ? [`${events} ${events === 1 ? 'Termin' : 'Termine'}`] : []),
+      ...(events > 0 ? [`${events} ${events === 1 ? 'Termin im Kalender' : 'Termine im Kalender'}`] : []),
       `${notes} ${notes === 1 ? 'Notiz' : 'Notizen'}`,
     ];
     setDone(`${parts.join(', ')} angelegt. Kopf frei.`);
@@ -164,6 +182,7 @@ export default function BraindumpScreen() {
         </View>
 
         <ScrollView
+          ref={scrollRef}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           alwaysBounceVertical
@@ -198,6 +217,18 @@ export default function BraindumpScreen() {
             />
           </View>
 
+          {/* Ist der Wurf genau ein Link, geht er auch ohne Assistent als Notiz. */}
+          {isBareUrl && !pending && !actions && (
+            <PressableScale
+              accessibilityLabel="Als Notiz mit Link sichern"
+              onPress={() => void saveUrlAsNote()}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start' }}
+            >
+              <NotebookPen size={15} color={colors.teal} strokeWidth={2} />
+              <Type variant="label" tone="teal">Als Notiz mit Link sichern</Type>
+            </PressableScale>
+          )}
+
           {apiKey.length === 0 ? (
             <Type variant="caption" tone="text3">
               Für den Braindump brauchst du den Assistenten — Schlüssel unter Einstellungen → Assistent.
@@ -211,7 +242,21 @@ export default function BraindumpScreen() {
 
           {pending && <LoadingState label="Assistent sortiert…" />}
           {error && <Type variant="caption" tone="indigo">{error}</Type>}
-          {done && <Type variant="label" tone="teal">{done}</Type>}
+          {done && (
+            <View style={{ gap: Spacing.xs }}>
+              <Type variant="label" tone="teal">{done}</Type>
+              {doneEvents > 0 && (
+                <PressableScale
+                  accessibilityLabel="Im Kalender ansehen"
+                  onPress={() => router.push('/kalender')}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start' }}
+                >
+                  <CalendarDays size={15} color={colors.teal} strokeWidth={2} />
+                  <Type variant="label" tone="teal">Im Kalender ansehen</Type>
+                </PressableScale>
+              )}
+            </View>
+          )}
 
           {actions && (
             <GlassPanel>

@@ -118,6 +118,7 @@ function ActionCard({
   onApply: (selected: AssistantAction) => void;
 }) {
   const colors = useColors();
+  const router = useRouter();
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
   const included = (key: string) => !excluded.has(key);
   const toggle = (key: string) => {
@@ -153,7 +154,9 @@ function ActionCard({
           style={{
             width: 18,
             height: 18,
-            borderRadius: 9,
+            // Einheitliche Grammatik über Chat/Braindump/Sprach-Sheet: Handlungen
+            // (Aufgabe/Termin) eckig, Gedanken (Checkliste/Notiz) rund.
+            borderRadius: key.startsWith('a') || key.startsWith('t') ? 5 : 9,
             marginTop: 1,
             borderWidth: 1.5,
             borderColor: on ? colors.teal : colors.border2,
@@ -203,9 +206,21 @@ function ActionCard({
       {actions.checkliste.map((c, i) => row(`c${i}`, c, hasLinkedNote ? 'Checkliste der Notiz' : 'Neue Notiz-Checkliste'))}
       {actions.notizen.map((n, i) => row(`n${i}`, n.split('\n')[0], 'Notiz'))}
       {applied ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingTop: Spacing.xs }}>
-          <Check size={13} color={colors.teal} strokeWidth={2.6} />
-          <Type variant="label" tone="teal">Übernommen</Type>
+        <View style={{ gap: Spacing.xs, paddingTop: Spacing.xs }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+            <Check size={13} color={colors.teal} strokeWidth={2.6} />
+            <Type variant="label" tone="teal">Übernommen</Type>
+          </View>
+          {actions.termine.length > 0 && (
+            <PressableScale
+              accessibilityLabel="Im Kalender ansehen"
+              onPress={() => router.push('/kalender')}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
+            >
+              <CalendarDays size={13} color={colors.teal} strokeWidth={2} />
+              <Type variant="label" tone="teal">Im Kalender ansehen</Type>
+            </PressableScale>
+          )}
         </View>
       ) : (
         <GlassButton

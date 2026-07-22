@@ -9,9 +9,10 @@
 // Aufbau: QuickVoiceView ist rein präsentativ (pro Zustand ein Bild, im Web
 // screenshot-bar); QuickVoiceSheet hält Zustand + Diktat + Assistent und rendert
 // die View im (absturzsicheren) BottomSheet.
-import { Check, Mic, Sparkles } from 'lucide-react-native';
+import { CalendarDays, Check, Mic, RotateCcw, Sparkles } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { Linking, View } from 'react-native';
+import { AppState, Linking, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 
 import { BottomSheet } from '@/components/BottomSheet';
@@ -79,9 +80,12 @@ export function QuickVoiceView({
   summary,
   today,
   denied = false,
+  hasEvents = false,
   onToggleItem,
   onSpeakAgain,
+  onSpeakFresh,
   onOpenSettings,
+  onOpenCalendar,
 }: {
   phase: QuickVoicePhase;
   interim: string;
@@ -93,9 +97,15 @@ export function QuickVoiceView({
   today: string;
   /** Mikrofon-Berechtigung verweigert → ruhiger Hinweis statt endlosem „hört zu". */
   denied?: boolean;
+  /** Im Ergebnis wurden Termine angelegt → „Im Kalender ansehen" anbieten. */
+  hasEvents?: boolean;
   onToggleItem?: (key: string) => void;
+  /** Ergänzen (anhängen) — auch: Aufnahme früher beenden, Fehler erneut. */
   onSpeakAgain?: () => void;
+  /** Neu — verwirft das Erkannte und hört frisch zu. */
+  onSpeakFresh?: () => void;
   onOpenSettings?: () => void;
+  onOpenCalendar?: () => void;
 }) {
   const colors = useColors();
 
@@ -153,6 +163,16 @@ export function QuickVoiceView({
           <Check size={30} color={colors.teal} strokeWidth={2.4} />
         </View>
         <Type variant="body" tone="text" style={{ textAlign: 'center' }}>{summary}</Type>
+        {hasEvents && (
+          <PressableScale
+            accessibilityLabel="Im Kalender ansehen"
+            onPress={onOpenCalendar}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: Spacing.xs }}
+          >
+            <CalendarDays size={15} color={colors.teal} strokeWidth={2} />
+            <Type variant="label" tone="teal">Im Kalender ansehen</Type>
+          </PressableScale>
+        )}
       </View>
     );
   }
@@ -229,19 +249,30 @@ export function QuickVoiceView({
           <Type variant="caption" tone="text3">Nichts Anzulegendes erkannt — sprich es etwas konkreter.</Type>
         )}
       </View>
-      <PressableScale
-        accessibilityLabel="Weiter sprechen"
-        onPress={onSpeakAgain}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingVertical: Spacing.xs, marginTop: Spacing.xs }}
-      >
-        <Mic size={15} color={colors.teal} strokeWidth={2} />
-        <Type variant="label" tone="teal">Weiter sprechen</Type>
-      </PressableScale>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.lg, marginTop: Spacing.xs }}>
+        <PressableScale
+          accessibilityLabel="Ergänzen — weiter sprechen"
+          onPress={onSpeakAgain}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: Spacing.xs }}
+        >
+          <Mic size={15} color={colors.teal} strokeWidth={2} />
+          <Type variant="label" tone="teal">Ergänzen</Type>
+        </PressableScale>
+        <PressableScale
+          accessibilityLabel="Neu — das Erkannte verwerfen und frisch sprechen"
+          onPress={onSpeakFresh}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: Spacing.xs }}
+        >
+          <RotateCcw size={14} color={colors.text3} strokeWidth={2} />
+          <Type variant="label" tone="text3">Neu</Type>
+        </PressableScale>
+      </View>
     </View>
   );
 }
 
 export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean; onClose: () => void; apiKey: string }) {
+  const router = useRouter();
   const createTask = useCreateTask();
   const createNote = useCreateNote();
   const createEvents = useCreateAssistantEvents();
@@ -254,6 +285,7 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
   const [deselected, setDeselected] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState('');
+  const [createdEvents, setCreatedEvents] = useState(0);
 
   const interimRef = useRef('');
   const transcriptRef = useRef('');
@@ -321,6 +353,7 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
       setDeselected(new Set());
       setError(null);
       setSummary('');
+      setCreatedEvents(0);
       interimRef.current = '';
       transcriptRef.current = '';
       started.current = false;
@@ -348,6 +381,7 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
     });
   };
 
+  // Ergänzen: weiter sprechen, das Neue wird an den bisherigen Wurf angehängt.
   const speakAgain = () => {
     if (listening) {
       // Läuft noch → beenden (die Pause-Logik übernimmt das Sortieren).
@@ -358,6 +392,30 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
     setError(null);
     if (available) toggle();
   };
+
+  // Neu: das bisher Erkannte verwerfen und frisch zuhören.
+  const speakFresh = () => {
+    interimRef.current = '';
+    transcriptRef.current = '';
+    setInterim('');
+    setTranscript('');
+    setActions(null);
+    setDeselected(new Set());
+    setError(null);
+    setPhase('listening');
+    if (available && !listening) toggle();
+  };
+
+  // Punkt 7: Kommt man aus den Einstellungen zurück (Berechtigung erlaubt),
+  // beim App-Fokus erneut zuhören — statt schließen/neu öffnen zu müssen.
+  useEffect(() => {
+    if (!visible) return undefined;
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active' && denied && phase === 'listening' && !listening) toggle();
+    });
+    return () => sub.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, denied, phase, listening]);
 
   const selectedCount = actions
     ? actions.aufgaben.length + actions.termine.length + actions.notizen.length - deselected.size
@@ -383,11 +441,13 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
     const events = termine.length > 0 ? await createEvents(termine) : 0;
     const parts: string[] = [];
     if (tasks > 0) parts.push(`${tasks} ${tasks === 1 ? 'Aufgabe' : 'Aufgaben'}`);
-    if (events > 0) parts.push(`${events} ${events === 1 ? 'Termin' : 'Termine'}`);
+    if (events > 0) parts.push(`${events} ${events === 1 ? 'Termin im Kalender' : 'Termine im Kalender'}`);
     if (notes > 0) parts.push(`${notes} ${notes === 1 ? 'Notiz' : 'Notizen'}`);
     setSummary(`${parts.join(' und ') || 'Nichts'} angelegt.`);
+    setCreatedEvents(events);
     setPhase('done');
-    setTimeout(onClose, 1100);
+    // Mit Terminen bleibt das „Erledigt" stehen (Tipp „Im Kalender ansehen"); sonst schnell weiter.
+    if (events === 0) setTimeout(onClose, 1100);
   };
 
   const title =
@@ -423,9 +483,15 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
         summary={summary}
         today={today}
         denied={denied}
+        hasEvents={createdEvents > 0}
         onToggleItem={toggleItem}
         onSpeakAgain={speakAgain}
+        onSpeakFresh={speakFresh}
         onOpenSettings={() => void Linking.openSettings()}
+        onOpenCalendar={() => {
+          onClose();
+          router.push('/kalender');
+        }}
       />
     </BottomSheet>
   );
