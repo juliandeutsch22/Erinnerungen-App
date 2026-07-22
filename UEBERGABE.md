@@ -1,6 +1,6 @@
 # ÜBERGABE-PROTOKOLL — Stoa
 
-Stand: **v1.24.1 (Build 47)**, Juli 2026 · 177 Jest-Tests grün · Branch-Modell siehe §3.
+Stand: **v1.25.0 (Build 48)**, Juli 2026 · 177 Jest-Tests grün · Branch-Modell siehe §3.
 Dieses Dokument macht eine neue Session sofort arbeitsfähig. Lies zusätzlich
 `AGENTS.md` (bindende Design-Leitplanken) und `ROADMAP.md` (Ideen-Backlog).
 
@@ -260,6 +260,16 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
    im Verdacht, am Gerät beim Absenden abzustürzen, und wurde in v1.24.1 auf die
    bewährte In-Komponenten-Generierung zurückgesetzt. Wer das Feature erneut will:
    erst am Gerät verifizieren, nicht nur im Web.
+11. **Sprach-Schnellzugriff** (`components/QuickVoiceSheet.tsx`, v1.25.0): Der
+   Mic-Knopf auf „Heute" öffnet ein Sheet (im absturzsicheren `BottomSheet`, KEIN
+   eigener GestureDetector), das sofort diktiert; eine Sprechpause (Diktat
+   `continuous:false` → `end`-Event → `listening=false`) schickt das Gesagte ohne
+   Senden-Knopf an den Assistenten (`buildBraindumpContext` erzwingt den Aktions-
+   Block, wie beim Braindump). Erkanntes wird bestätigt (Tipp), „Weiter sprechen"
+   hängt an. WICHTIG: Diktat beim Schließen stoppen — das Sheet ist dauerhaft in
+   „Heute" gemountet, also stoppt der `visible=false`-Effekt die Erkennung (das
+   Unmount-Cleanup von `useDictation` greift hier NICHT). `QuickVoiceView` ist rein
+   präsentativ (im Web pro Zustand screenshot-bar); das echte Zuhören nur am Gerät.
 
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
