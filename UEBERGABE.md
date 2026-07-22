@@ -1,6 +1,6 @@
 # ÜBERGABE-PROTOKOLL — Stoa
 
-Stand: **v1.26.0 (Build 50)**, Juli 2026 · 182 Jest-Tests grün · Branch-Modell siehe §3.
+Stand: **v1.26.1 (Build 51)**, Juli 2026 · 182 Jest-Tests grün · Branch-Modell siehe §3.
 Dieses Dokument macht eine neue Session sofort arbeitsfähig. Lies zusätzlich
 `AGENTS.md` (bindende Design-Leitplanken) und `ROADMAP.md` (Ideen-Backlog).
 
@@ -273,6 +273,16 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
    Verweigerte Mikrofon-Berechtigung wird abgefangen: `useDictation` liefert
    zusätzlich `denied` (rein additiv), das Sheet zeigt dann einen ruhigen Hinweis
    mit „Einstellungen öffnen" statt endlosem „hört zu" (v1.25.1).
+12. **Assistent legt Termine an** (v1.26.0): Aktions-Schema kennt `termine`
+   (`assistant.ts`), Anlegen über `createAssistantEvent`/`useCreateAssistantEvents`
+   in Chat/Braindump/Sprach-Sheet. `buildEventDraft` ist rein/getestet; das
+   Schreiben in den Kalender ist nativ (nur am Gerät prüfbar).
+13. **Teilen an Stoa — Stufe 1 (Deep-Link, v1.26.1):** Braindump liest einen
+   `text`-Suchparameter (`stille://braindump?text=…`) und füllt das Feld vor.
+   Der Nutzer richtet dazu einen iOS-Kurzbefehl „An Stoa senden" ein (Share-Sheet-
+   Eingabe → URL-encoden → diesen Deep-Link öffnen). REIN JS, kein nativer
+   Eingriff. Stufe 2 (echte native Share-Extension mit App Group) ist bewusst als
+   eigener, sorgfältig zu verifizierender Build-Schritt geparkt.
 
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 

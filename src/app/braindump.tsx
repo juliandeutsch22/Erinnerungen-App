@@ -3,9 +3,9 @@
 // erkannten Daten) und Notizen. Vorschläge einzeln abwählbar, EIN Tipp
 // übernimmt — nichts wird ohne Bestätigung angelegt. Der Braindump ist
 // bewusst KEIN Chat: einmal rein, sortiert, fertig.
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { BrainCircuit, Check, ChevronLeft } from 'lucide-react-native';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -39,7 +39,17 @@ export default function BraindumpScreen() {
   const createEvents = useCreateAssistantEvents();
   const today = todayStr();
 
+  // Geteilter Text (iOS-Kurzbefehl → stille://braindump?text=…) füllt das Feld
+  // einmalig vor — der Nutzer prüft und lässt sortieren.
+  const { text: sharedText } = useLocalSearchParams<{ text?: string }>();
   const [text, setText] = useState('');
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (!seeded.current && typeof sharedText === 'string' && sharedText.trim().length > 0) {
+      seeded.current = true;
+      setText(sharedText);
+    }
+  }, [sharedText]);
   const dictBaseRef = useRef('');
   const [dictating, setDictating] = useState(false);
   const [pending, setPending] = useState(false);
