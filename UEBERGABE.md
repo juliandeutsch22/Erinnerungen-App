@@ -1,6 +1,17 @@
 # ÜBERGABE-PROTOKOLL — Stoa
 
-Stand: **v1.27.1 (Build 53)**, Juli 2026 · 182 Jest-Tests grün · Branch-Modell siehe §3.
+Stand: **v1.27.2 (Build 54)**, Juli 2026 · 182 Jest-Tests grün · Branch-Modell siehe §3.
+
+> ⚠️ **Native-Falle (gekostet: mehrere Fehl-Releases):** `Easing` für Reanimated
+> **immer** aus `react-native-reanimated` importieren, NIE aus `react-native`.
+> RNs `Easing.bezier` ist eine JS-Funktion — in einem Reanimated-`withTiming`/
+> `withRepeat`-Worklet läuft sie am Gerät auf dem UI-Thread, wo sie nicht
+> existiert → **harter nativer Absturz**, während der Web-Build (Worklet auf dem
+> JS-Thread) fröhlich weiterläuft. Das ist genau der Chat-Absturz „beim Senden"
+> gewesen (v1.24.0–v1.27.1): `motion.tokens.ts` zog `Easing` aus `react-native`,
+> `Appear` schob es in `withTiming`. Web-Tests konnten es NIE zeigen — nur das
+> Gerät. Merke: stürzt etwas nur nativ ab, aber nie im Web, zuerst nach
+> JS-Funktionen in Worklets suchen (Easing, Callbacks ohne `worklet`-Direktive).
 Dieses Dokument macht eine neue Session sofort arbeitsfähig. Lies zusätzlich
 `AGENTS.md` (bindende Design-Leitplanken) und `ROADMAP.md` (Ideen-Backlog).
 

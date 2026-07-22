@@ -2,7 +2,12 @@
 //
 // Philosophie (Emil Kowalski): UI-Animationen < 300 ms. Nie `ease-in` für UI.
 // Enter/Exit = ease-out, Bewegung/Morph = ease-in-out. Eine Bewegung pro Aktion.
-import { Easing } from 'react-native';
+//
+// WICHTIG: Easing MUSS aus reanimated kommen — diese Tokens werden in
+// reanimated-`withTiming` benutzt (Appear.tsx). RNs `Easing.bezier` ist eine
+// reine JS-Funktion; im UI-Thread-Worklet (nur nativ!) ist sie nicht erreichbar
+// → HARTER Absturz am Gerät, während der Web-Build (Worklet auf JS-Thread) läuft.
+import { Easing } from 'react-native-reanimated';
 
 export const Ease = {
   out: Easing.bezier(0.23, 1, 0.32, 1), // Default: Entering/Feedback/Dismiss
