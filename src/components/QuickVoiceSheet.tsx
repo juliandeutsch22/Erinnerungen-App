@@ -11,7 +11,7 @@
 // die View im (absturzsicheren) BottomSheet.
 import { Check, Mic, Sparkles } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { View } from 'react-native';
+import { Linking, View } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 
 import { BottomSheet } from '@/components/BottomSheet';
@@ -77,8 +77,10 @@ export function QuickVoiceView({
   error,
   summary,
   today,
+  denied = false,
   onToggleItem,
   onSpeakAgain,
+  onOpenSettings,
 }: {
   phase: QuickVoicePhase;
   interim: string;
@@ -88,10 +90,30 @@ export function QuickVoiceView({
   error: string | null;
   summary: string;
   today: string;
+  /** Mikrofon-Berechtigung verweigert → ruhiger Hinweis statt endlosem „hört zu". */
+  denied?: boolean;
   onToggleItem?: (key: string) => void;
   onSpeakAgain?: () => void;
+  onOpenSettings?: () => void;
 }) {
   const colors = useColors();
+
+  if (phase === 'listening' && denied) {
+    return (
+      <View style={{ gap: Spacing.md, paddingVertical: Spacing.lg, alignItems: 'center' }}>
+        <View style={{ width: 84, height: 84, borderRadius: 42, backgroundColor: colors.bg2, alignItems: 'center', justifyContent: 'center' }}>
+          <Mic size={34} color={colors.text3} strokeWidth={2} />
+        </View>
+        <Type variant="eyebrow" tone="text3">Mikrofon nötig</Type>
+        <Type variant="body" tone="text2" style={{ textAlign: 'center' }}>
+          Für den Sprach-Schnellzugriff braucht Stoa Zugriff aufs Mikrofon. Du kannst ihn in den Einstellungen erlauben.
+        </Type>
+        <GlassButton accessibilityLabel="Einstellungen öffnen" onPress={onOpenSettings}>
+          <Type variant="label" style={{ color: '#FFFFFF' }}>Einstellungen öffnen</Type>
+        </GlassButton>
+      </View>
+    );
+  }
 
   if (phase === 'listening') {
     const heard = interim.trim();
@@ -230,7 +252,7 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
   const prevListening = useRef(false);
   const started = useRef(false);
 
-  const { available, listening, toggle } = useDictation({
+  const { available, listening, denied, toggle } = useDictation({
     onText: (t) => {
       interimRef.current = t;
       setInterim(t);
@@ -355,7 +377,16 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
     setTimeout(onClose, 1100);
   };
 
-  const title = phase === 'result' ? 'Bereit' : phase === 'thinking' ? 'Einen Moment' : phase === 'done' ? 'Erledigt' : 'Sprich';
+  const title =
+    phase === 'listening' && denied
+      ? 'Mikrofon'
+      : phase === 'result'
+        ? 'Bereit'
+        : phase === 'thinking'
+          ? 'Einen Moment'
+          : phase === 'done'
+            ? 'Erledigt'
+            : 'Sprich';
 
   const footer =
     phase === 'result' ? (
@@ -378,8 +409,10 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
         error={error}
         summary={summary}
         today={today}
+        denied={denied}
         onToggleItem={toggleItem}
         onSpeakAgain={speakAgain}
+        onOpenSettings={() => void Linking.openSettings()}
       />
     </BottomSheet>
   );

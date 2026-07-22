@@ -37,6 +37,9 @@ type ResultEvent = { results?: { transcript?: string }[]; isFinal?: boolean };
 export function useDictation(opts: { onStart?: () => void; onText: (transcript: string, final: boolean) => void }) {
   const { onStart, onText } = opts;
   const [listening, setListening] = useState(false);
+  // true, sobald die Mikrofon-/Erkennungs-Berechtigung verweigert wurde — der
+  // Aufrufer kann dann einen Hinweis zeigen (Zusatzinfo, ändert nichts am Rest).
+  const [denied, setDenied] = useState(false);
   const subs = useRef<{ remove: () => void }[]>([]);
 
   const cleanup = useCallback(() => {
@@ -84,7 +87,11 @@ export function useDictation(opts: { onStart?: () => void; onText: (transcript: 
     try {
       const M = mod().ExpoSpeechRecognitionModule;
       const perm = await M.requestPermissionsAsync();
-      if (!perm.granted) return;
+      if (!perm.granted) {
+        setDenied(true);
+        return;
+      }
+      setDenied(false);
       cleanup();
       subs.current.push(
         M.addListener('result', (raw) => {
@@ -108,5 +115,5 @@ export function useDictation(opts: { onStart?: () => void; onText: (transcript: 
     else void start();
   }, [listening, start, stop]);
 
-  return { available: dictationAvailable, listening, toggle };
+  return { available: dictationAvailable, listening, denied, toggle };
 }
