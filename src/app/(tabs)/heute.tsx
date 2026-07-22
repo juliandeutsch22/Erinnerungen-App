@@ -26,7 +26,7 @@ import { TaskQuickSheet } from '@/components/TaskQuickSheet';
 import { TaskRow } from '@/components/TaskRow';
 import { Type } from '@/components/Type';
 import { WelcomeCard } from '@/components/WelcomeCard';
-import { useCreateChat } from '@/data/chatQueries';
+import { QuickVoiceSheet } from '@/components/QuickVoiceSheet';
 import { useDeviceCalendars, useDeviceEvents } from '@/data/calendarQueries';
 import { useJournal } from '@/data/journalQueries';
 import { usePhotoCounts } from '@/data/photoQueries';
@@ -52,13 +52,14 @@ export default function HeuteScreen() {
   const complete = useCompleteTask();
   const reopen = useReopenTask();
   const adoptOverdue = useAdoptOverdue();
-  const createChat = useCreateChat();
   const apiKey = useSettings((s) => s.geminiApiKey);
 
-  // Quick-Access: sofort einen neuen Chat öffnen, der bereits zuhört.
-  const startVoiceChat = () => {
+  // Sprach-Schnellzugriff: ein Sheet, das sofort zuhört und das Gesagte ohne
+  // Senden-Knopf an den Assistenten gibt (kein Chat wird angelegt).
+  const [voiceOpen, setVoiceOpen] = useState(false);
+  const openVoice = () => {
     hapticSuccess();
-    createChat.mutate({}, { onSuccess: (chat) => router.push(`/chat/${chat.id}?dictate=1`) });
+    setVoiceOpen(true);
   };
 
   // undefined = Editor zu, null = neue Aufgabe, Task = bearbeiten.
@@ -392,7 +393,7 @@ export default function HeuteScreen() {
             {apiKey.length > 0 && dictationAvailable && (
               <PressableScale
                 accessibilityLabel="Dem Assistenten diktieren"
-                onPress={startVoiceChat}
+                onPress={openVoice}
                 style={{ padding: Spacing.sm }}
               >
                 <Mic size={20} color={colors.text3} strokeWidth={2} />
@@ -545,6 +546,7 @@ export default function HeuteScreen() {
 
     {/* Quick-Add klebt über der Tab-Bar — Gedanke rein, Kopf frei (§1). */}
     <QuickAdd />
+    <QuickVoiceSheet visible={voiceOpen} onClose={() => setVoiceOpen(false)} apiKey={apiKey} />
     </View>
   );
 }
