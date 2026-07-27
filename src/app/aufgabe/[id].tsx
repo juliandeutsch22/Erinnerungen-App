@@ -28,7 +28,7 @@ export default function AufgabeScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <Backdrop />
+      <Backdrop columns={false} />
       {task && <TaskEditorSheet task={task} onClose={close} />}
     </View>
   );

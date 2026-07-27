@@ -46,7 +46,7 @@ export const SYSTEM_PROMPT =
   'Nutze den Block NUR bei einer ausdrücklichen Anlege-Bitte, nie ungefragt.';
 
 /** Braindump: ein Wurf unsortierter Gedanken → NUR der Aktions-Block. */
-export function buildBraindumpContext(todayLabel: string, strict = false): string {
+export function buildBraindumpContext(todayLabel: string, strict = false, listen: string[] = []): string {
   return (
     `Heute ist ${todayLabel}. Der Nutzer kippt einen unsortierten Braindump ab. ` +
     'Zerlege ALLES vollständig in den stoa-aktionen-Block: zu erledigende Handlungen → "aufgaben" ' +
@@ -55,6 +55,13 @@ export function buildBraindumpContext(todayLabel: string, strict = false): strin
     '(datum Pflicht, start/ende optional); ' +
     'Gedanken/Ideen/Fakten → "notizen" (sinnvoll gruppiert, erste Zeile = Titel). ' +
     'Keine "checkliste". Antworte mit maximal einem kurzen Satz plus dem Block — nichts darf verloren gehen. ' +
+    // Der Nutzer hat Listen/Projekte — Aufgaben sollen dort landen, wo sie
+    // hingehören, statt pauschal im Eingang. Unsicher → Feld weglassen.
+    (listen.length > 0
+      ? `Der Nutzer hat diese Listen: ${listen.map((l) => `„${l}"`).join(', ')}. ` +
+        'Gib bei jeder Aufgabe zusätzlich "liste" mit dem passenden Listennamen an — ' +
+        'aber NUR, wenn die Zuordnung klar ist; im Zweifel das Feld weglassen. '
+      : '') +
     'Gib den stoa-aktionen-Block IMMER aus — auch bei kurzen, stichpunktartigen oder ' +
     'listenartigen Eingaben (z. B. „Titel:" gefolgt von Zeilen). Überschriften/Doppelpunkt-' +
     'Zeilen sind Kontext, die Zeilen darunter werden Aufgaben oder Notizen. Wenn etwas eine ' +
@@ -69,12 +76,29 @@ export function buildBraindumpContext(todayLabel: string, strict = false): strin
 
 // ——— Aktions-Block: strukturierte Vorschläge aus der Antwort ziehen. ———
 export type AssistantAction = {
-  aufgaben: { titel: string; datum?: string; zeit?: string }[];
+  aufgaben: { titel: string; datum?: string; zeit?: string; /** Zielliste (Name, wie vom Modell vorgeschlagen) — wird beim Anlegen aufgelöst. */ liste?: string }[];
   /** Feste Verabredungen → Gerätekalender. datum Pflicht; ohne start = ganztägig. */
   termine: { titel: string; datum: string; start?: string; ende?: string }[];
   checkliste: string[];
   notizen: string[];
 };
+
+/**
+ * Löst einen vom Modell vorgeschlagenen Listennamen auf die echte Listen-ID auf.
+ * Tolerant (Groß-/Kleinschreibung, Leerzeichen); ohne klaren Treffer bleibt es
+ * beim Eingang (`fallback`) — lieber im Eingang als in der falschen Liste.
+ */
+export function resolveListId(
+  name: string | undefined,
+  lists: { id: string; name: string }[],
+  fallback = 'default',
+): string {
+  if (!name) return fallback;
+  const needle = name.trim().toLowerCase();
+  if (needle.length === 0) return fallback;
+  const exact = lists.find((l) => l.name.trim().toLowerCase() === needle);
+  return exact ? exact.id : fallback;
+}
 
 const ACTION_RE = /```stoa-aktionen\s*\n([\s\S]*?)```/;
 
@@ -105,6 +129,7 @@ export function extractActions(text: string): { clean: string; actions: Assistan
             titel: (a.titel as string).trim(),
             datum: typeof a.datum === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(a.datum) ? a.datum : undefined,
             zeit: typeof a.zeit === 'string' && /^\d{2}:\d{2}$/.test(a.zeit) ? a.zeit : undefined,
+            liste: typeof a.liste === 'string' && (a.liste as string).trim().length > 0 ? (a.liste as string).trim() : undefined,
           }))
       : [];
     const termine = Array.isArray(raw.termine)

@@ -19,9 +19,9 @@ import { LoadingState } from '@/components/StateView';
 import { Type } from '@/components/Type';
 import { useCreateAssistantEvents } from '@/data/calendarQueries';
 import { useCreateNote } from '@/data/noteQueries';
-import { useCreateTask } from '@/data/queries';
+import { useCreateTask, useLists } from '@/data/queries';
 import type { ChatMessage } from '@/data/types';
-import { askAssistant, buildBraindumpContext, extractActions, type AssistantAction } from '@/lib/assistant';
+import { askAssistant, buildBraindumpContext, extractActions, resolveListId, type AssistantAction } from '@/lib/assistant';
 import { formatDueDate, parseDateStr, todayStr } from '@/lib/dates';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { webNoOutline } from '@/theme/layout';
@@ -37,6 +37,7 @@ export default function BraindumpScreen() {
   const createTask = useCreateTask();
   const createNote = useCreateNote();
   const createEvents = useCreateAssistantEvents();
+  const { data: lists } = useLists();
   const today = todayStr();
 
   // Geteilter Text (iOS-Kurzbefehl → stille://braindump?text=…) füllt das Feld
@@ -62,6 +63,9 @@ export default function BraindumpScreen() {
   const [deselected, setDeselected] = useState<Set<string>>(new Set());
   const [done, setDone] = useState<string | null>(null);
   const [doneEvents, setDoneEvents] = useState(0);
+  // Der Assistent streamt bereits — sichtbar gemacht wirkt dieselbe Wartezeit
+  // deutlich kürzer als ein toter Spinner. Der Aktions-Block bleibt verborgen.
+  const [stream, setStream] = useState('');
 
   // Punkt 5: Ist der Wurf genau EIN Link, geht er mit einem Tipp als „Notiz mit
   // Link" — ohne Assistent (Notiz-Body rendert die URL tappbar).
@@ -83,14 +87,20 @@ export default function BraindumpScreen() {
     setActions(null);
     setDone(null);
     setDoneEvents(0);
+    setStream('');
     try {
+      const listNames = (lists ?? []).filter((l) => !l.deletedAt).map((l) => l.name);
       const dateLabel = `${parseDateStr(today).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} (${today})`;
       const msg: ChatMessage = { id: 'dump', chatId: 'dump', role: 'user', content: dump, createdAt: new Date().toISOString() };
-      const answer = await askAssistant(apiKey, [msg], buildBraindumpContext(dateLabel));
+      let acc = '';
+      const answer = await askAssistant(apiKey, [msg], buildBraindumpContext(dateLabel, false, listNames), (delta) => {
+        acc += delta;
+        setStream(acc);
+      });
       let parsed = extractActions(answer).actions;
       // Manche Modelle vergessen den Block — EIN strikter Zweitversuch, der ihn erzwingt.
       if (!parsed) {
-        const retry = await askAssistant(apiKey, [msg], buildBraindumpContext(dateLabel, true));
+        const retry = await askAssistant(apiKey, [msg], buildBraindumpContext(dateLabel, true, listNames));
         parsed = extractActions(retry).actions;
       }
       if (!parsed) {
@@ -107,6 +117,7 @@ export default function BraindumpScreen() {
       setError(e instanceof Error ? e.message : 'Unbekannter Fehler.');
     } finally {
       setPending(false);
+      setStream('');
     }
   };
 
@@ -128,7 +139,12 @@ export default function BraindumpScreen() {
     for (let i = 0; i < actions.aufgaben.length; i += 1) {
       if (deselected.has(`a${i}`)) continue;
       const a = actions.aufgaben[i];
-      await createTask.mutateAsync({ listId: 'default', title: a.titel, dueDate: a.datum ?? null, dueTime: a.zeit ?? null });
+      await createTask.mutateAsync({
+        listId: resolveListId(a.liste, lists ?? []),
+        title: a.titel,
+        dueDate: a.datum ?? null,
+        dueTime: a.zeit ?? null,
+      });
       tasks += 1;
     }
     for (let i = 0; i < actions.notizen.length; i += 1) {
@@ -155,7 +171,7 @@ export default function BraindumpScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <Backdrop />
+      <Backdrop columns={false} />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <View style={{ paddingTop: insets.top + Spacing.sm, paddingHorizontal: Spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -240,7 +256,14 @@ export default function BraindumpScreen() {
             </GlassButton>
           )}
 
-          {pending && <LoadingState label="Assistent sortiert…" />}
+          {/* Warten mit Leben: die ersten Worte laufen ein, der Aktions-Block
+              (alles ab ```) bleibt verborgen, bis sortiert ist. */}
+          {pending &&
+            (stream.split('```')[0].trim().length > 0 ? (
+              <Type variant="body" tone="text2">{stream.split('```')[0].trim()}</Type>
+            ) : (
+              <LoadingState label="Assistent sortiert…" />
+            ))}
           {error && <Type variant="caption" tone="indigo">{error}</Type>}
           {done && (
             <View style={{ gap: Spacing.xs }}>
@@ -276,9 +299,11 @@ export default function BraindumpScreen() {
                       </View>
                       <View style={{ flex: 1 }}>
                         <Type variant="body" numberOfLines={1}>{a.titel}</Type>
-                        {(a.datum || a.zeit) && (
+                        {(a.datum || a.zeit || a.liste) && (
                           <Type variant="caption" tone="text3" tabular>
-                            {a.datum ? formatDueDate(a.datum, today) : ''}{a.zeit ? ` · ${a.zeit}` : ''}
+                            {[a.datum ? formatDueDate(a.datum, today) : '', a.zeit ?? '', a.liste ? `→ ${a.liste}` : '']
+                              .filter(Boolean)
+                              .join(' · ')}
                           </Type>
                         )}
                       </View>

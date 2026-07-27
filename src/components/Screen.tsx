@@ -50,7 +50,7 @@ export function Screen({ children, withTabBar = true, scroll = true, refreshing,
   if (!scroll) {
     return (
       <View style={[{ flex: 1, paddingTop: insets.top + Spacing.lg, paddingBottom: bottomPad, paddingHorizontal: Spacing.lg }, style as any]}>
-        <Backdrop />
+        <Backdrop columns={withTabBar} />
         {inner}
       </View>
     );
@@ -58,7 +58,10 @@ export function Screen({ children, withTabBar = true, scroll = true, refreshing,
 
   return (
     <View style={{ flex: 1 }}>
-      <Backdrop scrollY={scrollY} />
+      {/* Tab-Screens tragen den vollen Tempel; aufgeschobene Screens
+          (withTabBar={false}) nur den Marmor → beim Zurück-Wischen wandert
+          keine zweite Säule über das Bild. */}
+      <Backdrop scrollY={scrollY} columns={withTabBar} />
       <Animated.ScrollView
         ref={(node: React.ElementRef<typeof Animated.ScrollView> | null) => {
           (scrollRef as React.MutableRefObject<unknown>).current = node;

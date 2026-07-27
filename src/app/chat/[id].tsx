@@ -536,7 +536,7 @@ export default function ChatScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <Backdrop />
+      <Backdrop columns={false} />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         {/* Kopf */}
         <View

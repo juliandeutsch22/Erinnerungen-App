@@ -90,7 +90,7 @@ function DoricColumn({ tone, opacity, flip = false }: { tone: string; opacity: n
   );
 }
 
-export function Backdrop({ scrollY }: { scrollY?: SharedValue<number> }) {
+export function Backdrop({ scrollY, columns = true }: { scrollY?: SharedValue<number>; columns?: boolean }) {
   const isDark = useScheme() === 'dark';
   const reduced = useReducedMotion();
   const { width } = useWindowDimensions();
@@ -120,13 +120,22 @@ export function Backdrop({ scrollY }: { scrollY?: SharedValue<number> }) {
         <View style={{ position: 'absolute', top: BLEED, left: 0, right: 0, height: 120 }}>
           <Pediment tone={tone} opacity={opacity} />
         </View>
-        {/* Schäfte links + rechts — schließen bündig unter den Kapitellen an. */}
-        <View style={{ position: 'absolute', top: BLEED + 118, bottom: 0, left: -colWidth * 0.55, width: colWidth }}>
-          <DoricColumn tone={tone} opacity={opacity} flip />
-        </View>
-        <View style={{ position: 'absolute', top: BLEED + 118, bottom: 0, right: -colWidth * 0.55, width: colWidth }}>
-          <DoricColumn tone={tone} opacity={opacity} />
-        </View>
+        {/* Schäfte links + rechts — schließen bündig unter den Kapitellen an.
+            NUR auf Haupt-/Tab-Screens (`columns`): Beim Zurück-Wischen gleiten
+            sonst ZWEI Säulen-Ebenen aneinander vorbei und die Säule „wandert"
+            über das Bild. Aufgeschobene Screens (Chat, Editoren, Braindump …)
+            tragen deshalb nur den Marmor — sie decken weiterhin voll ab, also
+            scheint nichts durch (anders als beim Transparenz-Versuch v1.24.0). */}
+        {columns && (
+          <>
+            <View style={{ position: 'absolute', top: BLEED + 118, bottom: 0, left: -colWidth * 0.55, width: colWidth }}>
+              <DoricColumn tone={tone} opacity={opacity} flip />
+            </View>
+            <View style={{ position: 'absolute', top: BLEED + 118, bottom: 0, right: -colWidth * 0.55, width: colWidth }}>
+              <DoricColumn tone={tone} opacity={opacity} />
+            </View>
+          </>
+        )}
       </Animated.View>
     </View>
   );

@@ -222,7 +222,7 @@ export default function NotizScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <Backdrop />
+      <Backdrop columns={false} />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         {/* Kopf: zurück · Zuletzt bearbeitet · Checkliste · zuweisen · anheften · löschen */}
         <View

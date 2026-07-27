@@ -21,9 +21,9 @@ import { PressableScale } from '@/components/PressableScale';
 import { Type } from '@/components/Type';
 import { useCreateAssistantEvents } from '@/data/calendarQueries';
 import { useCreateNote } from '@/data/noteQueries';
-import { useCreateTask } from '@/data/queries';
+import { useCreateTask, useLists } from '@/data/queries';
 import type { ChatMessage } from '@/data/types';
-import { type AssistantAction, askAssistant, buildBraindumpContext, extractActions } from '@/lib/assistant';
+import { type AssistantAction, askAssistant, buildBraindumpContext, extractActions, resolveListId } from '@/lib/assistant';
 import { formatDueDate, parseDateStr, todayStr } from '@/lib/dates';
 import { useDictation } from '@/lib/dictation';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
@@ -74,6 +74,7 @@ export function QuickVoiceView({
   phase,
   interim,
   transcript,
+  stream = '',
   actions,
   deselected,
   error,
@@ -90,6 +91,8 @@ export function QuickVoiceView({
   phase: QuickVoicePhase;
   interim: string;
   transcript: string;
+  /** Laufende Assistenten-Antwort (Streaming) — macht das Warten lebendig. */
+  stream?: string;
   actions: AssistantAction | null;
   deselected: Set<string>;
   error: string | null;
@@ -143,14 +146,21 @@ export function QuickVoiceView({
   }
 
   if (phase === 'thinking') {
+    // Sobald der Assistent zu schreiben beginnt, treten seine Worte an die
+    // Stelle des Gehörten — dieselbe Wartezeit fühlt sich viel kürzer an.
+    const leading = stream.split('```')[0].trim();
     return (
       <View style={{ gap: Spacing.md, paddingVertical: Spacing.lg, alignItems: 'center' }}>
         <MicOrb active={false} label="Assistent denkt nach" />
         <Type variant="eyebrow" tone="text3">Einen Moment</Type>
-        {transcript.trim().length > 0 && (
-          <Type variant="body" tone="text2" style={{ textAlign: 'center' }}>
-            „{transcript.trim()}"
-          </Type>
+        {leading.length > 0 ? (
+          <Type variant="body" tone="text" style={{ textAlign: 'center' }}>{leading}</Type>
+        ) : (
+          transcript.trim().length > 0 && (
+            <Type variant="body" tone="text2" style={{ textAlign: 'center' }}>
+              „{transcript.trim()}"
+            </Type>
+          )
         )}
       </View>
     );
@@ -194,7 +204,12 @@ export function QuickVoiceView({
     ...(actions?.aufgaben ?? []).map((a, i) => ({
       key: `a${i}`,
       title: a.titel,
-      sub: a.datum || a.zeit ? `${a.datum ? formatDueDate(a.datum, today) : ''}${a.zeit ? ` · ${a.zeit}` : ''}` : undefined,
+      // Datum/Zeit und — wenn der Assistent eine Liste vorschlägt — auch das
+      // Ziel zeigen: du siehst vor dem Bestätigen, wo es landet.
+      sub:
+        [a.datum ? formatDueDate(a.datum, today) : '', a.zeit ?? '', a.liste ? `→ ${a.liste}` : '']
+          .filter(Boolean)
+          .join(' · ') || undefined,
       kind: 'Aufgabe' as const,
     })),
     ...(actions?.termine ?? []).map((t, i) => ({
@@ -276,6 +291,7 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
   const createTask = useCreateTask();
   const createNote = useCreateNote();
   const createEvents = useCreateAssistantEvents();
+  const { data: lists } = useLists();
   const today = todayStr();
 
   const [phase, setPhase] = useState<QuickVoicePhase>('listening');
@@ -286,6 +302,7 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState('');
   const [createdEvents, setCreatedEvents] = useState(0);
+  const [stream, setStream] = useState('');
 
   const interimRef = useRef('');
   const transcriptRef = useRef('');
@@ -304,12 +321,18 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
   const sort = async (dump: string) => {
     setPhase('thinking');
     setError(null);
+    setStream('');
     try {
+      const listNames = (lists ?? []).filter((l) => !l.deletedAt).map((l) => l.name);
       const msg: ChatMessage = { id: 'qv', chatId: 'qv', role: 'user', content: dump, createdAt: new Date().toISOString() };
-      const answer = await askAssistant(apiKey, [msg], buildBraindumpContext(dateLabel));
+      let acc = '';
+      const answer = await askAssistant(apiKey, [msg], buildBraindumpContext(dateLabel, false, listNames), (delta) => {
+        acc += delta;
+        setStream(acc);
+      });
       let parsed = extractActions(answer).actions;
       if (!parsed) {
-        const retry = await askAssistant(apiKey, [msg], buildBraindumpContext(dateLabel, true));
+        const retry = await askAssistant(apiKey, [msg], buildBraindumpContext(dateLabel, true, listNames));
         parsed = extractActions(retry).actions;
       }
       if (!parsed) {
@@ -353,7 +376,7 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
       setDeselected(new Set());
       setError(null);
       setSummary('');
-      setCreatedEvents(0);
+      setStream('');
       interimRef.current = '';
       transcriptRef.current = '';
       started.current = false;
@@ -402,6 +425,7 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
     setActions(null);
     setDeselected(new Set());
     setError(null);
+    setStream('');
     setPhase('listening');
     if (available && !listening) toggle();
   };
@@ -429,7 +453,12 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
     for (let i = 0; i < actions.aufgaben.length; i += 1) {
       if (deselected.has(`a${i}`)) continue;
       const a = actions.aufgaben[i];
-      await createTask.mutateAsync({ listId: 'default', title: a.titel, dueDate: a.datum ?? null, dueTime: a.zeit ?? null });
+      await createTask.mutateAsync({
+        listId: resolveListId(a.liste, lists ?? []),
+        title: a.titel,
+        dueDate: a.datum ?? null,
+        dueTime: a.zeit ?? null,
+      });
       tasks += 1;
     }
     for (let i = 0; i < actions.notizen.length; i += 1) {
@@ -477,6 +506,7 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
         phase={phase}
         interim={interim}
         transcript={transcript}
+        stream={stream}
         actions={actions}
         deselected={deselected}
         error={error}

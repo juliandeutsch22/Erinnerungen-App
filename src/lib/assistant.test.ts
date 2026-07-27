@@ -1,7 +1,7 @@
 // assistant.test.ts — Prompt-Bau, Antwort-Extraktion, Fehlertexte.
 import type { ChatMessage } from '@/data/types';
 
-import { buildAppContext, buildRequestBody, createSseParser, describeError, extractActions, extractChunkText, extractText, pickModelsFromList, promptChips, sanitizeChatTitle } from './assistant';
+import { buildAppContext,  buildRequestBody, createSseParser, describeError, extractActions, extractChunkText, extractText, pickModelsFromList, promptChips, resolveListId, sanitizeChatTitle } from './assistant';
 
 const msg = (role: 'user' | 'assistant', content: string, at: string): ChatMessage => ({
   id: `m-${at}`, chatId: 'c1', role, content, createdAt: at,
@@ -56,6 +56,11 @@ describe('extractActions', () => {
       { titel: 'Zahnarzt', datum: '2026-08-03', start: '10:00', ende: '11:00' },
       { titel: 'Geburtstag', datum: '2026-08-05', start: undefined, ende: undefined },
     ]);
+  });
+  it('liest die vorgeschlagene Liste an einer Aufgabe mit', () => {
+    const { actions } = extractActions('```stoa-aktionen\n{"aufgaben":[{"titel":"Reifen","liste":"Auto"},{"titel":"Ohne"}]}\n```');
+    expect(actions?.aufgaben[0].liste).toBe('Auto');
+    expect(actions?.aufgaben[1].liste).toBeUndefined();
   });
   it('verkraftet echte Zeilenumbrüche in JSON-Strings (Modell-Marotte)', () => {
     const { actions } = extractActions('```stoa-aktionen\n{"notizen":["Idee\nZweite Zeile"]}\n```');
@@ -259,5 +264,22 @@ describe('promptChips', () => {
     for (const link of ['note', 'task', 'event', 'none'] as const) {
       expect(promptChips(link).length).toBeGreaterThanOrEqual(2);
     }
+  });
+});
+
+describe('resolveListId', () => {
+  const lists = [
+    { id: 'default', name: 'Erinnerungen' },
+    { id: 'l-auto', name: 'Auto' },
+    { id: 'l-haus', name: 'Haus & Garten' },
+  ];
+  it('trifft exakt, unabhängig von Groß-/Kleinschreibung und Rand-Leerzeichen', () => {
+    expect(resolveListId('Auto', lists)).toBe('l-auto');
+    expect(resolveListId('  haus & garten ', lists)).toBe('l-haus');
+  });
+  it('fällt ohne klaren Treffer auf den Eingang zurück (nie die falsche Liste)', () => {
+    expect(resolveListId('Werkstatt', lists)).toBe('default');
+    expect(resolveListId(undefined, lists)).toBe('default');
+    expect(resolveListId('', lists)).toBe('default');
   });
 });

@@ -13,16 +13,13 @@ Eingriff, nur am Gerät prüfbar → eigene Risikoklasse (siehe §6) ·
 
 ---
 
-## 1. Offene Kanten — zuerst aufräumen
+## 1. Offene Kanten
 
-- **Wandernde Säule beim Zurück-Wischen** `[JS · klein]` — Ursache: zwei
-  Screens mit Säulen gleiten aneinander vorbei. **Lösungsweg steht:** nur
-  Haupt-/Tab-Screens tragen den vollen Tempel, Detail-Screens (Chat, Notiz,
-  Aufgabe, Braindump) nur den Marmor. Kein Transparenz-Trick → kein
-  Durchscheinen wie bei den zwei Fehlversuchen. Am Gerät gegenprüfen. **NEU**
-- **Wartezeit spürbar verkürzen** `[JS · klein]` — Braindump und Sprach-Sheet
-  warten mit totem Spinner, obwohl `askAssistant` streamen kann. Erste Worte
-  früh zeigen → gleiche API-Zeit, halb so lange gefühlt. **NEU**
+*(Die beiden hier gelisteten Punkte — wandernde Säule und gefühlte Wartezeit —
+sind in v1.28.0 umgesetzt. Die Säule ist am Gerät gegenzuprüfen: Tab-Screens
+tragen den vollen Tempel, aufgeschobene Screens nur den Marmor.)*
+
+Aktuell keine bekannten offenen Kanten.
 
 ## 2. Flaggschiff: Der Bogen des Tages
 
@@ -60,9 +57,6 @@ meisten Wirkung pro Zeile Code. Alle **NEU**, sofern nicht anders vermerkt.
 - **Aufgabe auf die Zeitachse ziehen** `[JS · mittel]` — *Timeboxing zeigt
   Aufgaben, kann aber keine Zeit vergeben.* Seit v1.26.0 können wir in den
   Kalender schreiben → Aufgabe auf eine Stunde ziehen = echter Zeitblock.
-- **Braindump sortiert in die richtige Liste** `[JS · klein]` — *alles landet in
-  `default`.* Der Assistent kennt die Listen/Projekte bereits aus dem Kontext —
-  er soll sie mitschlagen (du bestätigst wie immer).
 - **QuickAdd + Assistent als Hybrid** `[JS · mittel]` — *lokaler Parser =
   sofort, aber begrenzt; Assistent = klug, aber langsam.* Erst lokal parsen
   (Millisekunden), und nur bei Unklarheit „genauer sortieren" anbieten.
@@ -163,11 +157,12 @@ Damit die Linie klar bleibt — diese Dinge wurden erwogen und verworfen:
 
 ## 8. Empfohlene Reihenfolge
 
-1. **§1 Offene Kanten** — Säule + gefühlte Wartezeit. Klein, sofort spürbar.
+1. ~~**§1 Offene Kanten**~~ — erledigt in v1.28.0 (Säule + gefühlte Wartezeit).
 2. **§2 Der Bogen** — das Flaggschiff, macht die App zu einer Praxis.
+   Vorher Mocks zeigen: es ist UX-lastig, da lohnt sich ein Blick vor dem Bau.
 3. **§3 Vernetzungen**, in dieser Reihenfolge: Checklisten-Zeile → Aufgabe ·
-   Braindump in die richtige Liste · Projekt-Deadline im Kalender ·
-   Tags über alles. (Erst die kleinen mit sofortiger Wirkung, dann das Rückgrat.)
+   Projekt-Deadline im Kalender · Tags über alles.
+   (Erst die kleinen mit sofortiger Wirkung, dann das Rückgrat.)
 4. **Web-Suche** — erweitert den Assistenten spürbar, sobald der Bogen steht.
 5. **Widget** `[NATIV]` — größter Alltagsgewinn, aber erst wenn alles
    JS-seitige rund ist und ein ruhiger Build-Rhythmus da ist.

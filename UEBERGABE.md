@@ -1,6 +1,6 @@
 # ÜBERGABE-PROTOKOLL — Stoa
 
-Stand: **v1.27.2 (Build 54)**, Juli 2026 · 182 Jest-Tests grün · Branch-Modell siehe §3.
+Stand: **v1.28.0 (Build 55)**, Juli 2026 · 185 Jest-Tests grün · Branch-Modell siehe §3.
 
 > ⚠️ **Native-Falle (gekostet: mehrere Fehl-Releases):** `Easing` für Reanimated
 > **immer** aus `react-native-reanimated` importieren, NIE aus `react-native`.
@@ -12,6 +12,7 @@ Stand: **v1.27.2 (Build 54)**, Juli 2026 · 182 Jest-Tests grün · Branch-Model
 > `Appear` schob es in `withTiming`. Web-Tests konnten es NIE zeigen — nur das
 > Gerät. Merke: stürzt etwas nur nativ ab, aber nie im Web, zuerst nach
 > JS-Funktionen in Worklets suchen (Easing, Callbacks ohne `worklet`-Direktive).
+
 Dieses Dokument macht eine neue Session sofort arbeitsfähig. Lies zusätzlich
 `AGENTS.md` (bindende Design-Leitplanken) und `ROADMAP.md` (Ideen-Backlog).
 

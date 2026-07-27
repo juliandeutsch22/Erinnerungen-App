@@ -63,7 +63,7 @@ export function ReorderSheet({ tasks, onClose }: { tasks: Task[]; onClose: () =>
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <Backdrop />
+        <Backdrop columns={false} />
         <View style={{ flex: 1, paddingTop: insets.top + Spacing.lg, paddingHorizontal: Spacing.lg }}>
           <View style={{ width: '100%', maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center', flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: Spacing.md }}>
