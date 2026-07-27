@@ -8,6 +8,9 @@
 //       Karte fast 1:1 an, das Korn überlebt die Skalierung. Die erste Fassung
 //       war 800x600 mit stddev 1,1 — beim Herunterskalieren blieb davon nichts
 //       als Papierweiß übrig.
+//     · Die Dosis liegt bei stddev ~2,6. Darunter (unter ~1,5) kippt es zurück
+//       ins Papierweiße, darüber (ab ~4) fängt die Patina an, wie Flecken zu
+//       lesen statt wie Stein.
 //     · KEIN `resizeMode="repeat"`: react-native-web kachelt damit nicht (es
 //       legt genau EINE Kachel an, der Rest bleibt leer) — die Web-Verifikation
 //       zeigte dann etwas anderes als das Gerät.
