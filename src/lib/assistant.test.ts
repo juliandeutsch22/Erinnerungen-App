@@ -1,7 +1,7 @@
 // assistant.test.ts — Prompt-Bau, Antwort-Extraktion, Fehlertexte.
-import type { ChatMessage } from '@/data/types';
+import type { ChatMessage, Task } from '@/data/types';
 
-import { buildAppContext,  buildBraindumpContext, buildRequestBody, createSseParser, describeError, describeSchritte, extractActions, extractChunkText, extractText, pickModelsFromList, promptChips, resolveListId, sanitizeChatTitle, SYSTEM_PROMPT, subtasksFromSchritte, describeExtras, MEMORY_LIMIT } from './assistant';
+import { buildAppContext,  buildBraindumpContext, buildRequestBody, createSseParser, describeError, describeSchritte, extractActions, extractChunkText, extractText, pickModelsFromList, promptChips, resolveListId, sanitizeChatTitle, SYSTEM_PROMPT, subtasksFromSchritte, describeExtras, describeAenderung, MEMORY_LIMIT, resolveTaskHandle, taskHandle } from './assistant';
 
 const msg = (role: 'user' | 'assistant', content: string, at: string): ChatMessage => ({
   id: `m-${at}`, chatId: 'c1', role, content, createdAt: at,
@@ -181,7 +181,8 @@ describe('buildAppContext', () => {
   it('kappt große Bestände (Limits)', () => {
     const many = Array.from({ length: 60 }, (_, i) => task(`Aufgabe ${i}`, { dueDate: '2026-08-01' }));
     const ctx = buildAppContext({ events: [], tasks: many, lists: [], notes: [], today: '2026-07-20' });
-    expect((ctx.match(/- Aufgabe /g) ?? []).length).toBe(40);
+    // Seit v1.36.0 trägt jede Zeile ihr Handle: '- [ab12cd] Aufgabe 3 · …'
+    expect((ctx.match(/- \[[^\]]+\] Aufgabe /g) ?? []).length).toBe(40);
   });
 });
 
@@ -363,5 +364,64 @@ describe('Merkzettel', () => {
   it('deckelt die Länge — er geht bei JEDEM Aufruf mit', () => {
     expect(body('x'.repeat(5000))).toContain('x'.repeat(MEMORY_LIMIT));
     expect(body('x'.repeat(5000))).not.toContain('x'.repeat(MEMORY_LIMIT + 1));
+  });
+});
+
+describe('Änderungen an bestehenden Aufgaben', () => {
+  const t = (id: string, title: string): Task => ({
+    id, listId: 'default', title, note: null, dueDate: null, dueTime: null, rrule: null,
+    flagged: false, eventId: null, completedAt: null, notificationId: null, tags: [], subtasks: [],
+    createdAt: '2026-07-01T08:00:00.000Z', sort: 1,
+  });
+
+  it('das Handle nimmt den ZUFALLS-Teil der ID, nicht den Zeitstempel', () => {
+    // newId() = Zeitstempel + Zufall. Zwei am selben Tag angelegte Aufgaben
+    // teilen den ANFANG — nur hinten unterscheiden sie sich verlässlich.
+    expect(taskHandle('m9x1a2b3cdef12')).toBe('def12'.slice(-5) === 'def12' ? 'cdef12' : '');
+    expect(taskHandle('m9x1a2b3cdef12')).toHaveLength(6);
+  });
+
+  it('löst ein Handle auf — aber nie mehrdeutig oder erfunden', () => {
+    const a = t('aaaaaaaa111111', 'Müll');
+    const b = t('bbbbbbbb222222', 'Steuer');
+    expect(resolveTaskHandle(taskHandle(a.id), [a, b])?.title).toBe('Müll');
+    expect(resolveTaskHandle('ZZZZZZ', [a, b])).toBeNull();
+    // Gleiches Handle zweimal → lieber nichts anfassen als das Falsche.
+    const doppelt = t('cccccccc111111', 'Zwilling');
+    expect(resolveTaskHandle(taskHandle(a.id), [a, doppelt])).toBeNull();
+  });
+
+  it('liest Änderungen und wirft leere Einträge weg', () => {
+    const { actions } = extractActions(
+      '```stoa-aktionen\n{"aenderungen":[{"handle":"abc123","datum":"2026-08-03"},{"handle":"leer"}]}\n```',
+    );
+    expect(actions!.aenderungen).toEqual([{ handle: 'abc123', datum: '2026-08-03', erledigt: undefined, zeit: undefined, titel: undefined, liste: undefined, papierkorb: undefined }]);
+  });
+
+  it('unterscheidet „Datum entfernen" (null) von „nicht angefasst" (fehlt)', () => {
+    const weg = extractActions('```stoa-aktionen\n{"aenderungen":[{"handle":"a1","datum":null}]}\n```');
+    expect(weg.actions!.aenderungen[0].datum).toBeNull();
+    const unberuehrt = extractActions('```stoa-aktionen\n{"aenderungen":[{"handle":"a1","erledigt":true}]}\n```');
+    expect(unberuehrt.actions!.aenderungen[0].datum).toBeUndefined();
+  });
+
+  it('beschreibt die Änderung im Klartext', () => {
+    const f = (d: string) => `am ${d}`;
+    expect(describeAenderung({ handle: 'x', erledigt: true }, f)).toBe('abhaken');
+    expect(describeAenderung({ handle: 'x', datum: '2026-08-03', zeit: '09:00' }, f)).toBe('auf am 2026-08-03 · 09:00 Uhr');
+    expect(describeAenderung({ handle: 'x', datum: null }, f)).toBe('Datum entfernen');
+    expect(describeAenderung({ handle: 'x', papierkorb: true }, f)).toBe('in den Papierkorb');
+  });
+
+  it('der Prompt verbietet endgültiges Löschen und erfundene Handles', () => {
+    expect(SYSTEM_PROMPT).toContain('ENDGÜLTIG LÖSCHEN KANNST DU NICHT');
+    expect(SYSTEM_PROMPT).toContain('nie erfundene');
+  });
+
+  it('der App-Überblick trägt die Handles', () => {
+    const ctx = buildAppContext({
+      events: [], tasks: [t('aaaaaaaa111111', 'Müll')], lists: [], notes: [], today: '2026-07-27',
+    });
+    expect(ctx).toContain(`[${taskHandle('aaaaaaaa111111')}] Müll`);
   });
 });

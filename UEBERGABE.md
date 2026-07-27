@@ -348,6 +348,24 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
     als PFLICHT-Parameter — so kann ihn keine Aufrufstelle stillschweigend
     vergessen, tsc meldet es.
 
+19. **Der Assistent darf ÄNDERN** (`aenderungen`, v1.36.0) — verschieben,
+    abhaken, umbenennen, Liste wechseln, in den Papierkorb. Vier Leitplanken,
+    alle bewusst:
+    · **Kein endgültiges Löschen**, auch nicht auf Bitte — nur der (wiederher-
+      stellbare) Papierkorb. Steht so im SYSTEM_PROMPT und ist getestet.
+    · Adressiert über `taskHandle` = die LETZTEN 6 Zeichen der ID. Der Anfang
+      von `newId()` ist ein Zeitstempel und bei am selben Tag angelegten
+      Aufgaben nahezu gleich — vorne abschneiden hätte Kollisionen erzeugt.
+      `resolveTaskHandle` liefert bei unbekannt ODER mehrdeutig `null`; die
+      Änderung fällt dann weg, statt die falsche Aufgabe anzufassen.
+    · Ausgeführt über DIESELBEN Mutationen wie die Handbedienung
+      (`useCompleteTask`/`useUpdateTask`/`useDeleteTask`) — sonst umgeht der
+      Assistent die Wiederholungs-Logik und die Notification-Neuplanung.
+    · Nur im CHAT, nicht im Braindump/Sprach-Sheet: dort gibt es keinen
+      App-Überblick, also keine Handles.
+    Die Aktionskarte zeigt jede Änderung im Klartext („umbenennen in … · auf
+    Mo 3.8.") und ein unbekanntes Handle als „Nicht mehr gefunden".
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

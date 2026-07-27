@@ -39,7 +39,7 @@ export const SYSTEM_PROMPT =
   'AKTIONEN: Wenn der Nutzer dich bittet, Aufgaben/Erinnerungen, Termine oder eine Checkliste ' +
   'ANZULEGEN (z. B. „mach mir daraus Aufgaben", „trag das als Termin ein", „erstelle eine Packliste"), ' +
   'hänge ans ENDE deiner Antwort GENAU EINEN Block in diesem Format an:\n' +
-  '```stoa-aktionen\n{"aufgaben":[{"titel":"…","datum":"YYYY-MM-DD","zeit":"HH:MM","schritte":["…"],"wiederholung":"weekly","tags":["…"],"notiz":"…"}],"termine":[{"titel":"…","datum":"YYYY-MM-DD","start":"HH:MM","ende":"HH:MM","notiz":"…"}],"listen":[{"name":"…","ziel":"…","deadline":"YYYY-MM-DD"}],"checkliste":["…"],"notizen":["…"]}\n```\n' +
+  '```stoa-aktionen\n{"aufgaben":[{"titel":"…","datum":"YYYY-MM-DD","zeit":"HH:MM","schritte":["…"],"wiederholung":"weekly","tags":["…"],"notiz":"…"}],"termine":[{"titel":"…","datum":"YYYY-MM-DD","start":"HH:MM","ende":"HH:MM","notiz":"…"}],"listen":[{"name":"…","ziel":"…","deadline":"YYYY-MM-DD"}],"aenderungen":[{"handle":"abc123","erledigt":true,"datum":"YYYY-MM-DD","zeit":"HH:MM","titel":"…","liste":"…","papierkorb":true}],"checkliste":["…"],"notizen":["…"]}\n```\n' +
   '„aufgaben" sind zu ERLEDIGENDE Handlungen (anrufen, kaufen, vorbereiten), datum/zeit optional. ' +
   '„wiederholung" nur bei ausdrücklich wiederkehrenden Dingen: "daily", "weekly", "monthly", "yearly", ' +
   'oder mit Abstand "every:2w" (alle 2 Wochen; d=Tage, w=Wochen, m=Monate, y=Jahre), ' +
@@ -58,7 +58,14 @@ export const SYSTEM_PROMPT =
   'Im Zweifel: fester Zeitpunkt/Verabredung → Termin, etwas zu TUN → Aufgabe. ' +
   '„checkliste" nur, wenn der Chat zu einer Notiz gehört; ' +
   '„notizen" für Gedanken/Ideen ohne Handlung (erste Zeile wird der Titel). ' +
-  'Nutze den Block NUR bei einer ausdrücklichen Anlege-Bitte, nie ungefragt.';
+  'ÄNDERN: „aenderungen" bearbeitet BESTEHENDE Aufgaben („verschieb das auf Montag", ' +
+  '„hak die drei ab", „schieb das in die Liste Umzug"). „handle" ist das Kürzel in eckigen ' +
+  'Klammern aus dem App-Überblick — NUR dort gesehene Handles verwenden, nie erfundene, ' +
+  'und nur Felder angeben, die sich wirklich ändern. „erledigt":true hakt ab, ' +
+  '"papierkorb":true legt in den Papierkorb (wiederherstellbar). ' +
+  'ENDGÜLTIG LÖSCHEN KANNST DU NICHT — biete es auch nicht an. ' +
+  'Ohne App-Überblick (keine Handles sichtbar) gibt es keine „aenderungen". ' +
+  'Nutze den Block NUR bei einer ausdrücklichen Anlege- oder Änderungs-Bitte, nie ungefragt.';
 
 /** Braindump: ein Wurf unsortierter Gedanken → NUR der Aktions-Block. */
 export function buildBraindumpContext(todayLabel: string, strict = false, listen: string[] = []): string {
@@ -123,6 +130,17 @@ export type AssistantAction = {
   /** Neue Projekte/Listen. Werden VOR den Aufgaben angelegt, damit deren
    *  „liste" auf die frische Liste zeigen kann. */
   listen: { name: string; ziel?: string; deadline?: string }[];
+  /** Änderungen an BESTEHENDEN Aufgaben, adressiert über `taskHandle`.
+   *  Bewusst OHNE endgültiges Löschen — `papierkorb` ist wiederherstellbar. */
+  aenderungen: {
+    handle: string;
+    erledigt?: boolean;
+    datum?: string | null;
+    zeit?: string | null;
+    titel?: string;
+    liste?: string;
+    papierkorb?: boolean;
+  }[];
   checkliste: string[];
   notizen: string[];
 };
@@ -168,6 +186,24 @@ export function describeExtras(a: { wiederholung?: Rrule; tags?: string[] }): st
   const parts = [a.wiederholung ? rruleLabel(a.wiederholung) : '', (a.tags ?? []).map((t) => `#${t}`).join(' ')];
   const text = parts.filter(Boolean).join(' · ');
   return text.length > 0 ? text : null;
+}
+
+/** Eine Änderung im Klartext — sie muss VOR dem Übernehmen lesbar sein, weil
+ *  sie im Gegensatz zum Anlegen etwas Bestehendes anfasst. */
+export function describeAenderung(
+  c: AssistantAction['aenderungen'][number],
+  formatDatum: (d: string) => string,
+): string {
+  const parts: string[] = [];
+  if (c.erledigt) parts.push('abhaken');
+  if (c.papierkorb) parts.push('in den Papierkorb');
+  if (c.titel) parts.push(`umbenennen in „${c.titel}"`);
+  if (c.liste) parts.push(`in die Liste „${c.liste}"`);
+  if (c.datum === null) parts.push('Datum entfernen');
+  else if (c.datum) parts.push(`auf ${formatDatum(c.datum)}${c.zeit ? ` · ${c.zeit} Uhr` : ''}`);
+  else if (c.zeit === null) parts.push('Uhrzeit entfernen');
+  else if (c.zeit) parts.push(`auf ${c.zeit} Uhr`);
+  return parts.join(' · ');
 }
 
 /** Kurzfassung der Schritte für die Bestätigungskarte — du sollst VOR dem
@@ -262,15 +298,40 @@ export function extractActions(text: string): { clean: string; actions: Assistan
             deadline: typeof l.deadline === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(l.deadline as string) ? (l.deadline as string) : undefined,
           }))
       : [];
+    const aenderungen = Array.isArray(raw.aenderungen)
+      ? raw.aenderungen
+          .filter((c): c is Record<string, unknown> => typeof c === 'object' && c !== null)
+          .filter((c) => typeof c.handle === 'string' && (c.handle as string).trim().length > 0)
+          .map((c) => ({
+            handle: (c.handle as string).trim(),
+            erledigt: c.erledigt === true ? true : undefined,
+            // null ist hier bedeutungsvoll: „nimm das Datum weg".
+            datum:
+              c.datum === null ? null : typeof c.datum === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(c.datum) ? c.datum : undefined,
+            zeit: c.zeit === null ? null : typeof c.zeit === 'string' && /^\d{2}:\d{2}$/.test(c.zeit) ? c.zeit : undefined,
+            titel: typeof c.titel === 'string' && (c.titel as string).trim().length > 0 ? (c.titel as string).trim() : undefined,
+            liste: typeof c.liste === 'string' && (c.liste as string).trim().length > 0 ? (c.liste as string).trim() : undefined,
+            papierkorb: c.papierkorb === true ? true : undefined,
+          }))
+          // Eine Änderung ohne Feld ist ein Rauschen-Eintrag — weg damit.
+          .filter((c) => c.erledigt || c.papierkorb || c.titel || c.liste || c.datum !== undefined || c.zeit !== undefined)
+      : [];
     const checkliste = Array.isArray(raw.checkliste)
       ? raw.checkliste.filter((c): c is string => typeof c === 'string' && c.trim().length > 0).map((c) => c.trim())
       : [];
     const notizen = Array.isArray(raw.notizen)
       ? raw.notizen.filter((n): n is string => typeof n === 'string' && n.trim().length > 0).map((n) => n.trim())
       : [];
-    if (aufgaben.length === 0 && termine.length === 0 && listen.length === 0 && checkliste.length === 0 && notizen.length === 0)
+    if (
+      aufgaben.length === 0 &&
+      termine.length === 0 &&
+      listen.length === 0 &&
+      aenderungen.length === 0 &&
+      checkliste.length === 0 &&
+      notizen.length === 0
+    )
       return { clean, actions: null };
-    return { clean, actions: { aufgaben, termine, listen, checkliste, notizen } };
+    return { clean, actions: { aufgaben, termine, listen, aenderungen, checkliste, notizen } };
   } catch {
     return { clean, actions: null };
   }
@@ -378,6 +439,25 @@ export function buildTaskContext(task: Task): string {
 // ——— App-Schnappschuss: kompakter Live-Überblick für JEDEN Chat. ———
 // Bewusst NICHT enthalten: die Abendbetrachtung (Journal) — der intimste
 // Datenbestand verlässt das Gerät nur, wenn er ausdrücklich verknüpft wird.
+/**
+ * Kurz-Handle einer Aufgabe für den Assistenten: die letzten 6 Zeichen der ID.
+ * Die ersten Zeichen sind ein Zeitstempel (siehe newId) und bei am selben Tag
+ * angelegten Aufgaben fast gleich — der ZUFALLS-Teil hinten unterscheidet.
+ * Aufgelöst wird trotzdem defensiv: mehrdeutig oder unbekannt → Änderung fällt
+ * weg, statt die falsche Aufgabe anzufassen.
+ */
+export function taskHandle(id: string): string {
+  return id.slice(-6);
+}
+
+/** Handle → Aufgabe. null bei unbekannt ODER mehrdeutig (nie raten). */
+export function resolveTaskHandle(handle: string, tasks: Task[]): Task | null {
+  const needle = handle.trim().toLowerCase();
+  if (needle.length === 0) return null;
+  const hits = tasks.filter((t) => taskHandle(t.id).toLowerCase() === needle);
+  return hits.length === 1 ? hits[0] : null;
+}
+
 const CTX_EVENT_LIMIT = 40;
 const CTX_TASK_LIMIT = 40;
 const CTX_NOTE_LIMIT = 30;
@@ -409,7 +489,7 @@ export function buildAppContext(input: {
   const open = tasks.filter((t) => t.completedAt === null);
   const sortKey = (t: Task) => `${t.dueDate ?? '9999-12-31'} ${t.dueTime ?? '99:99'}`;
   const taskLine = (t: Task) => {
-    const parts = [t.title];
+    const parts = [`[${taskHandle(t.id)}] ${t.title}`];
     if (t.dueDate) parts.push(`fällig ${t.dueDate}${t.dueTime ? ` ${t.dueTime}` : ''}${t.dueDate < today ? ' (überfällig)' : ''}`);
     const ln = listName.get(t.listId);
     if (ln && t.listId !== 'default') parts.push(`Liste „${ln}"`);
@@ -451,7 +531,9 @@ export function buildAppContext(input: {
     `Notizen (nur Titel): ${noteTitles.length ? noteTitles.join(', ') : 'keine'}`,
     '',
     'Beantworte Fragen zu Terminen, Aufgaben und Planung direkt aus diesem Überblick. ' +
-      'Erfinde keine Einträge dazu; was hier nicht steht, existiert in der App nicht.',
+      'Erfinde keine Einträge dazu; was hier nicht steht, existiert in der App nicht. ' +
+      'Die Kürzel in eckigen Klammern sind die Handles der Aufgaben — nur DIESE dürfen in ' +
+      '"aenderungen" stehen, nie erfundene.',
   ].join('\n');
 }
 

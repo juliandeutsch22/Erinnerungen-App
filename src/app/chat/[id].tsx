@@ -28,9 +28,9 @@ import * as Clipboard from 'expo-clipboard';
 import { useCreateAssistantEvents, useDeviceEvents } from '@/data/calendarQueries';
 import { useAppendMessage, useChatMessages, useChats, useUpdateChat } from '@/data/chatQueries';
 import { useCreateNote, useNotes, useUpdateNote } from '@/data/noteQueries';
-import { useCreateList, useCreateTask, useLists, useTasks } from '@/data/queries';
-import type { Chat, ChatMessage } from '@/data/types';
-import { askAssistant, type AssistantAction, buildAppContext, buildNoteContext, buildTaskContext, type ChatLink, describeExtras, describeSchritte, extractActions, generateChatTitle, promptChips, resolveListId, subtasksFromSchritte } from '@/lib/assistant';
+import { useCompleteTask, useCreateList, useCreateTask, useDeleteTask, useLists, useTasks, useUpdateTask } from '@/data/queries';
+import type { Chat, ChatMessage, Task } from '@/data/types';
+import { askAssistant, type AssistantAction, buildAppContext, buildNoteContext, buildTaskContext, type ChatLink, describeAenderung, describeExtras, describeSchritte, extractActions, generateChatTitle, promptChips, resolveListId, resolveTaskHandle, subtasksFromSchritte } from '@/lib/assistant';
 import { addDays, formatDueDate, toDateStr, todayStr } from '@/lib/dates';
 import { hasCalendarPermission } from '@/lib/deviceCalendar';
 import { noteTitle } from '@/lib/noteLogic';
@@ -108,12 +108,15 @@ function ActionCard({
   actions,
   applied,
   today,
+  tasks,
   hasLinkedNote,
   onApply,
 }: {
   actions: AssistantAction;
   applied: boolean;
   today: string;
+  /** Aktuelle Aufgaben — nur zum Auflösen der Handles in „aenderungen". */
+  tasks: Task[];
   /** Ob der Chat an eine Notiz gehängt ist — sonst wird die Checkliste eine neue Notiz. */
   hasLinkedNote: boolean;
   onApply: (selected: AssistantAction) => void;
@@ -135,12 +138,18 @@ function ActionCard({
   const selected: AssistantAction = {
     aufgaben: actions.aufgaben.filter((_, i) => included(`a${i}`)),
     listen: actions.listen.filter((_, i) => included(`l${i}`)),
+    aenderungen: actions.aenderungen.filter((_, i) => included(`x${i}`)),
     termine: actions.termine.filter((_, i) => included(`t${i}`)),
     checkliste: actions.checkliste.filter((_, i) => included(`c${i}`)),
     notizen: actions.notizen.filter((_, i) => included(`n${i}`)),
   };
   const count =
-    selected.listen.length + selected.aufgaben.length + selected.termine.length + selected.checkliste.length + selected.notizen.length;
+    selected.listen.length +
+    selected.aufgaben.length +
+    selected.termine.length +
+    selected.aenderungen.length +
+    selected.checkliste.length +
+    selected.notizen.length;
 
   const row = (key: string, label: string, sub: string | null) => {
     const on = included(key);
@@ -159,7 +168,7 @@ function ActionCard({
             height: 18,
             // Einheitliche Grammatik über Chat/Braindump/Sprach-Sheet: Handlungen
             // (Aufgabe/Termin) eckig, Gedanken (Checkliste/Notiz) rund.
-            borderRadius: key.startsWith('a') || key.startsWith('t') ? 5 : 9,
+            borderRadius: key.startsWith('a') || key.startsWith('t') || key.startsWith('x') ? 5 : 9,
             marginTop: 1,
             borderWidth: 1.5,
             borderColor: on ? colors.teal : colors.border2,
@@ -209,6 +218,18 @@ function ActionCard({
           `Termin · ${formatDueDate(t.datum, today)}${t.start ? ` · ${t.start}${t.ende ? `–${t.ende}` : ''} Uhr` : ' · ganztägig'}`,
         ),
       )}
+      {/* Änderungen zuletzt: sie fassen Bestehendes an, das liest man mit
+          anderem Blick als „wird neu angelegt". */}
+      {actions.aenderungen.map((c, i) => {
+        const t = resolveTaskHandle(c.handle, tasks);
+        // Unbekanntes Handle → die Zeile zeigt das ehrlich an und wird beim
+        // Übernehmen übersprungen, statt still zu verschwinden.
+        return row(
+          `x${i}`,
+          t ? t.title : 'Unbekannte Aufgabe',
+          t ? describeAenderung(c, (d) => formatDueDate(d, today)) : 'Nicht mehr gefunden — wird übersprungen',
+        );
+      })}
       {actions.checkliste.map((c, i) => row(`c${i}`, c, hasLinkedNote ? 'Checkliste der Notiz' : 'Neue Notiz-Checkliste'))}
       {actions.notizen.map((n, i) => row(`n${i}`, n.split('\n')[0], 'Notiz'))}
       {applied ? (
@@ -350,6 +371,9 @@ export default function ChatScreen() {
   const createNote = useCreateNote();
   const createTask = useCreateTask();
   const createList = useCreateList();
+  const updateTask = useUpdateTask();
+  const completeTask = useCompleteTask();
+  const deleteTask = useDeleteTask();
   const createEvents = useCreateAssistantEvents();
   const updateNote = useUpdateNote();
   const scrollRef = useRef<ScrollView>(null);
@@ -404,6 +428,28 @@ export default function ChatScreen() {
       frisch.push({ id: created.id, name: created.name });
     }
     const alleListen = [...(lists ?? []), ...frisch];
+
+    // Änderungen an Bestehendem laufen über DIESELBEN Mutationen wie die
+    // Handbedienung — sonst umgeht der Assistent die Wiederholungs-Logik
+    // (resolveCompletion) und die Notification-Neuplanung.
+    for (const c of selected.aenderungen) {
+      const t = resolveTaskHandle(c.handle, tasks ?? []);
+      if (!t) continue; // unbekanntes/mehrdeutiges Handle → nie raten
+      if (c.papierkorb) {
+        await deleteTask.mutateAsync(t.id);
+        continue;
+      }
+      const patch: Partial<Omit<Task, 'id'>> = {};
+      if (c.titel) patch.title = c.titel;
+      if (c.datum !== undefined) patch.dueDate = c.datum;
+      if (c.zeit !== undefined) patch.dueTime = c.zeit;
+      if (c.liste) patch.listId = resolveListId(c.liste, alleListen, t.listId);
+      if (Object.keys(patch).length > 0) await updateTask.mutateAsync({ id: t.id, patch });
+      // Abhaken zuletzt: bei einer Wiederholung wandert dabei das Datum, das
+      // soll auf dem bereits geänderten Stand passieren.
+      if (c.erledigt) await completeTask.mutateAsync({ ...t, ...patch });
+    }
+
     for (const a of selected.aufgaben) {
       await createTask.mutateAsync({
         listId: resolveListId(a.liste, alleListen),
@@ -729,6 +775,7 @@ export default function ChatScreen() {
                           actions={actions}
                           applied={appliedActionIds.has(m.id)}
                           today={today}
+                          tasks={tasks ?? []}
                           hasLinkedNote={!!linkedNote}
                           onApply={(selected) => void applyActions(m, selected)}
                         />
