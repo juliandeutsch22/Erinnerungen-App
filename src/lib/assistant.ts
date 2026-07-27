@@ -58,6 +58,11 @@ export const SYSTEM_PROMPT =
   'Im Zweifel: fester Zeitpunkt/Verabredung → Termin, etwas zu TUN → Aufgabe. ' +
   '„checkliste" nur, wenn der Chat zu einer Notiz gehört; ' +
   '„notizen" für Gedanken/Ideen ohne Handlung (erste Zeile wird der Titel). ' +
+  'NACHSEHEN: Reicht der App-Überblick nicht, benutze die Werkzeuge statt zu raten — ' +
+  'aufgaben_suchen (auch erledigte, auch außerhalb des Überblicks), liste_inhalt (eine Liste ' +
+  'vollständig), notiz_lesen (der Überblick zeigt nur Notiz-TITEL, nie den Inhalt). ' +
+  'Erfinde nie Einträge, die du nicht gesehen hast — lieber nachschlagen oder ehrlich sagen, ' +
+  'dass du es nicht weißt. ' +
   'ÄNDERN: „aenderungen" bearbeitet BESTEHENDE Aufgaben („verschieb das auf Montag", ' +
   '„hak die drei ab", „schieb das in die Liste Umzug"). „handle" ist das Kürzel in eckigen ' +
   'Klammern aus dem App-Überblick — NUR dort gesehene Handles verwenden, nie erfundene, ' +
@@ -537,6 +542,134 @@ export function buildAppContext(input: {
   ].join('\n');
 }
 
+// ——— Werkzeuge (Function Calling): der Assistent darf NACHSEHEN. ———
+// Streng LESEND. Alles, was schreibt, läuft weiterhin über den Aktions-Block
+// mit Bestätigungskarte — ein Werkzeug, das still etwas verändert, gibt es
+// nicht und soll es nicht geben.
+// Die Abendbetrachtung ist hier strukturell unerreichbar: sie steckt in keinem
+// Werkzeug und in keinem ToolData. Das ist Absicht und darf nicht aufweichen.
+
+/** Daten, auf denen die Werkzeuge arbeiten — der Aufrufer reicht sie herein,
+ *  damit dieses Modul rein und testbar bleibt. */
+export type ToolData = { tasks: Task[]; lists: List[]; notes: Note[]; today: string };
+
+export type ToolCall = { name: string; args: Record<string, unknown> };
+
+/** Wie viele Werkzeug-Runden höchstens, bevor eine Antwort kommen MUSS.
+ *  Deckelt Kosten und Wartezeit — und verhindert eine Endlosschleife, wenn das
+ *  Modell immer wieder dasselbe nachschlägt. */
+export const MAX_TOOL_ROUNDS = 3;
+/** Obergrenze der Treffer je Werkzeug-Antwort (Token-Schutz). */
+const TOOL_RESULT_LIMIT = 25;
+
+export const ASSISTANT_TOOLS = [
+  {
+    name: 'aufgaben_suchen',
+    description:
+      'Sucht in ALLEN Aufgaben — auch in erledigten und in solchen, die nicht im Überblick stehen. ' +
+      'Nutze das, wenn der Überblick nicht reicht („habe ich das schon erledigt?", „was liegt zum Thema X?").',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        text: { type: 'STRING', description: 'Suchbegriff in Titel, Notiz, Tags oder Unteraufgaben.' },
+        liste: { type: 'STRING', description: 'Nur Aufgaben dieser Liste.' },
+        tag: { type: 'STRING', description: 'Nur Aufgaben mit diesem Tag (ohne #).' },
+        erledigt: { type: 'BOOLEAN', description: 'true = nur erledigte, false = nur offene, weglassen = beides.' },
+      },
+    },
+  },
+  {
+    name: 'liste_inhalt',
+    description: 'Gibt alle offenen Aufgaben einer Liste/eines Projekts zurück — vollständig, nicht nur den Auszug aus dem Überblick.',
+    parameters: { type: 'OBJECT', properties: { name: { type: 'STRING', description: 'Name der Liste.' } }, required: ['name'] },
+  },
+  {
+    name: 'notiz_lesen',
+    description:
+      'Liest den INHALT einer Notiz. Im Überblick stehen nur die Titel — wenn du den Text brauchst, hol ihn hiermit.',
+    parameters: { type: 'OBJECT', properties: { titel: { type: 'STRING', description: 'Titel der Notiz (erste Zeile).' } }, required: ['titel'] },
+  },
+] as const;
+
+const argStr = (args: Record<string, unknown>, key: string): string =>
+  typeof args[key] === 'string' ? (args[key] as string).trim().toLowerCase() : '';
+
+/** Führt ein Werkzeug aus. Rein: keine Repos, keine Netzwerkzugriffe.
+ *  Unbekanntes Werkzeug → ehrliche Fehlmeldung statt Absturz. */
+export function runAssistantTool(call: ToolCall, data: ToolData): string {
+  const listName = new Map(data.lists.map((l) => [l.id, l.name]));
+  const line = (t: Task) =>
+    [
+      `[${taskHandle(t.id)}] ${t.title}`,
+      t.completedAt ? 'erledigt' : t.dueDate ? `fällig ${t.dueDate}${t.dueTime ? ` ${t.dueTime}` : ''}` : 'ohne Datum',
+      listName.get(t.listId) && t.listId !== 'default' ? `Liste „${listName.get(t.listId)}"` : '',
+      t.tags.length ? t.tags.map((x) => `#${x}`).join(' ') : '',
+      t.note ? `Notiz: ${t.note}` : '',
+      t.subtasks.length ? `Schritte: ${t.subtasks.map((x) => `${x.done ? '[x]' : '[ ]'} ${x.title}`).join('; ')}` : '',
+    ]
+      .filter(Boolean)
+      .join(' · ');
+  const wrap = (hits: Task[]) =>
+    hits.length === 0
+      ? 'Keine Treffer.'
+      : hits.slice(0, TOOL_RESULT_LIMIT).map(line).join('\n') +
+        (hits.length > TOOL_RESULT_LIMIT ? `\n… und ${hits.length - TOOL_RESULT_LIMIT} weitere` : '');
+
+  if (call.name === 'aufgaben_suchen') {
+    const text = argStr(call.args, 'text');
+    const liste = argStr(call.args, 'liste');
+    const tag = normalizeTag(argStr(call.args, 'tag'));
+    const erledigt = typeof call.args.erledigt === 'boolean' ? (call.args.erledigt as boolean) : null;
+    const listIds = new Set(data.lists.filter((l) => l.name.trim().toLowerCase() === liste).map((l) => l.id));
+    return wrap(
+      data.tasks.filter((t) => {
+        if (t.deletedAt) return false;
+        if (erledigt !== null && (t.completedAt !== null) !== erledigt) return false;
+        if (liste && !listIds.has(t.listId)) return false;
+        if (tag && !t.tags.includes(tag)) return false;
+        if (!text) return true;
+        const haystack = [t.title, t.note ?? '', t.tags.join(' '), t.subtasks.map((x) => x.title).join(' ')]
+          .join(' ')
+          .toLowerCase();
+        return haystack.includes(text);
+      }),
+    );
+  }
+
+  if (call.name === 'liste_inhalt') {
+    const name = argStr(call.args, 'name');
+    const list = data.lists.find((l) => l.name.trim().toLowerCase() === name);
+    if (!list) return `Liste „${call.args.name ?? ''}" gibt es nicht. Vorhanden: ${data.lists.map((l) => l.name).join(', ') || 'keine'}.`;
+    return wrap(data.tasks.filter((t) => t.listId === list.id && !t.deletedAt && t.completedAt === null));
+  }
+
+  if (call.name === 'notiz_lesen') {
+    const titel = argStr(call.args, 'titel');
+    const hit = data.notes.find((n) => n.deletedAt === null && noteTitle(n.body).trim().toLowerCase() === titel)
+      ?? data.notes.find((n) => n.deletedAt === null && noteTitle(n.body).toLowerCase().includes(titel) && titel.length > 0);
+    if (!hit) return `Keine Notiz mit dem Titel „${call.args.titel ?? ''}" gefunden.`;
+    return hit.body.slice(0, 4000);
+  }
+
+  return `Unbekanntes Werkzeug „${call.name}".`;
+}
+
+/** Werkzeug-Aufrufe aus einer Antwort/einem Stream-Ereignis ziehen. */
+export function extractCalls(event: unknown): ToolCall[] {
+  if (typeof event !== 'object' || event === null) return [];
+  const candidates = (event as { candidates?: unknown }).candidates;
+  if (!Array.isArray(candidates) || candidates.length === 0) return [];
+  const parts = (candidates[0] as { content?: { parts?: unknown[] } }).content?.parts;
+  if (!Array.isArray(parts)) return [];
+  const out: ToolCall[] = [];
+  for (const p of parts) {
+    const fc = (p as { functionCall?: { name?: unknown; args?: unknown } }).functionCall;
+    if (fc && typeof fc.name === 'string')
+      out.push({ name: fc.name, args: typeof fc.args === 'object' && fc.args !== null ? (fc.args as Record<string, unknown>) : {} });
+  }
+  return out;
+}
+
 /** Verlauf → Gemini-Format; Kontext wandert in die System-Instruction.
  *  Datum + Uhrzeit gehen IMMER mit — sonst rät das Modell bei „heute Abend"
  *  ein Datum aus seinen Trainingsdaten. */
@@ -545,6 +678,8 @@ export function buildRequestBody(
   context: string | null,
   now: Date = new Date(),
   memory: string | null = null,
+  /** Werkzeuge deklarieren? Nur wo der Assistent auch nachsehen DARF (Chat). */
+  withTools = false,
 ): unknown {
   const dateLine =
     `Heute ist ${now.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}, ` +
@@ -565,6 +700,7 @@ export function buildRequestBody(
       role: m.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: m.content }],
     })),
+    ...(withTools ? { tools: [{ functionDeclarations: ASSISTANT_TOOLS }] } : {}),
     generationConfig: { temperature: 0.4, maxOutputTokens: 1200 },
   };
 }
@@ -583,14 +719,18 @@ export function extractChunkText(event: unknown): string {
 /** Inkrementeller SSE-Parser: rohe Text-Chunks rein, Text-Deltas raus.
  *  Gemini sendet pro Ereignis eine Zeile `data: {json}`; Chunk-Grenzen können
  *  mitten in einer Zeile liegen — der Puffer hält den Rest bis zum nächsten Push. */
-export function createSseParser(): { push: (chunk: string) => string[]; flush: () => string[] } {
+export function createSseParser(onEvent?: (event: unknown) => void): { push: (chunk: string) => string[]; flush: () => string[] } {
   let buffer = '';
   const parseLine = (line: string): string | null => {
     if (!line.startsWith('data:')) return null;
     const payload = line.slice(5).trim();
     if (payload.length === 0 || payload === '[DONE]') return null;
     try {
-      const text = extractChunkText(JSON.parse(payload));
+      const event: unknown = JSON.parse(payload);
+      // Rohes Ereignis durchreichen: im Stream stecken neben Text auch
+      // functionCall-Teile, die der Text-Pfad nicht sehen kann.
+      onEvent?.(event);
+      const text = extractChunkText(event);
       return text.length > 0 ? text : null;
     } catch {
       return null;
@@ -710,8 +850,11 @@ async function callModel(model: string, apiKey: string, body: unknown, stream = 
 /** SSE-Antwort konsumieren: Deltas an den Aufrufer, Gesamttext zurück.
  *  Reißt der Stream ab, ist der bereits erhaltene Text die ehrlichere Antwort
  *  als ein Fehler — nur ein komplett leerer Abbruch wirft. */
-async function readSse(res: Response, onDelta: (delta: string) => void): Promise<string> {
-  const parser = createSseParser();
+async function readSse(res: Response, onDelta: (delta: string) => void, onCall?: (calls: ToolCall[]) => void): Promise<string> {
+  const parser = createSseParser((event) => {
+    const calls = extractCalls(event);
+    if (calls.length > 0) onCall?.(calls);
+  });
   let full = '';
   const emit = (deltas: string[]) => {
     for (const d of deltas) {
@@ -816,23 +959,10 @@ async function callChain(chain: string[], remembered: string | null, apiKey: str
 /** Kurze Pause, dann derselbe Aufruf nochmal — Überlast (5xx) ist meist flüchtig. */
 const RETRY_DELAY_MS = 1500;
 
-/** Eine Antwort holen. Verschwundene Modelle (404) werden über die Kandidaten-
- *  Kette und notfalls die Modell-Liste des Dienstes überbrückt; Überlast (5xx)
- *  über die Kette + einen kurzen zweiten Versuch; erschöpftes Kontingent (429)
- *  über die Lite-Kette. Wirft Error mit deutscher Meldung.
- *  Mit `onDelta` läuft die Anfrage als Stream: der Text kommt Stück für Stück
- *  beim Aufrufer an, zurückgegeben wird am Ende der Gesamttext. */
-export async function askAssistant(
-  apiKey: string,
-  messages: ChatMessage[],
-  context: string | null,
-  /** Merkzettel des Nutzers (Einstellungen). Bewusst PFLICHT-Parameter: so kann
-   *  ihn keine Aufrufstelle stillschweigend vergessen — tsc meldet es. */
-  memory: string | null,
-  onDelta?: (delta: string) => void,
-): Promise<string> {
-  const stream = onDelta !== undefined;
-  const body = buildRequestBody(messages, context, new Date(), memory);
+/** EINE Anfrage samt aller Ausweichwege: Kandidaten-Kette, Modell-Discovery bei
+ *  404, Lite-Kette bei 429/5xx und ein später Wiederholungsversuch bei Überlast.
+ *  Herausgelöst, damit die Werkzeug-Schleife jede Runde dieselben Netze bekommt. */
+async function requestWithFallbacks(apiKey: string, body: unknown, stream: boolean): Promise<Response> {
   let { res, model } = await callChain(MODEL_CHAIN, workingModel, apiKey, body, stream);
 
   // Alle bekannten IDs sind 404 → beim Dienst nachfragen, was es wirklich gibt.
@@ -871,9 +1001,63 @@ export async function askAssistant(
       workingModel = model;
     }
   }
+  return res;
+}
 
-  if (!res.ok) throw new Error(describeError(res.status));
-  const text = onDelta ? await readSse(res, onDelta) : extractText(await res.json());
-  if (!text) throw new Error('Leere Antwort erhalten — versuch es nochmal.');
-  return text;
+/** Eine Antwort holen. Verschwundene Modelle (404) werden über die Kandidaten-
+ *  Kette und notfalls die Modell-Liste des Dienstes überbrückt; Überlast (5xx)
+ *  über die Kette + einen kurzen zweiten Versuch; erschöpftes Kontingent (429)
+ *  über die Lite-Kette. Wirft Error mit deutscher Meldung.
+ *  Mit `onDelta` läuft die Anfrage als Stream: der Text kommt Stück für Stück
+ *  beim Aufrufer an, zurückgegeben wird am Ende der Gesamttext. */
+export async function askAssistant(
+  apiKey: string,
+  messages: ChatMessage[],
+  context: string | null,
+  /** Merkzettel des Nutzers (Einstellungen). Bewusst PFLICHT-Parameter: so kann
+   *  ihn keine Aufrufstelle stillschweigend vergessen — tsc meldet es. */
+  memory: string | null,
+  onDelta?: (delta: string) => void,
+  /** Daten für die (lesenden) Werkzeuge. null = keine Werkzeuge deklarieren,
+   *  d. h. exakt das Verhalten von vorher — so bleibt der Braindump unberührt. */
+  toolData?: ToolData | null,
+): Promise<string> {
+  const stream = onDelta !== undefined;
+  const base = buildRequestBody(messages, context, new Date(), memory, !!toolData) as Record<string, unknown>;
+  const baseContents = base.contents as unknown[];
+  // Zusatz-Runden: der Modell-Zug (functionCall) und unsere Antwort darauf.
+  const extra: unknown[] = [];
+
+  for (let round = 0; ; round += 1) {
+    const body = { ...base, contents: [...baseContents, ...extra] };
+    const res = await requestWithFallbacks(apiKey, body, stream);
+    if (!res.ok) throw new Error(describeError(res.status));
+
+    const calls: ToolCall[] = [];
+    let text: string;
+    if (onDelta) {
+      text = await readSse(res, onDelta, (c) => calls.push(...c));
+    } else {
+      const json: unknown = await res.json();
+      calls.push(...extractCalls(json));
+      text = extractText(json) ?? '';
+    }
+
+    // Keine Werkzeug-Wünsche (oder Runden aufgebraucht) → das ist die Antwort.
+    const weiter = calls.length > 0 && toolData && round < MAX_TOOL_ROUNDS;
+    if (!weiter) {
+      if (!text) throw new Error('Leere Antwort erhalten — versuch es nochmal.');
+      return text;
+    }
+
+    extra.push(
+      { role: 'model', parts: calls.map((c) => ({ functionCall: { name: c.name, args: c.args } })) },
+      {
+        role: 'user',
+        parts: calls.map((c) => ({
+          functionResponse: { name: c.name, response: { result: runAssistantTool(c, toolData) } },
+        })),
+      },
+    );
+  }
 }

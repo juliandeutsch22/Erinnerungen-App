@@ -1,7 +1,7 @@
 // assistant.test.ts — Prompt-Bau, Antwort-Extraktion, Fehlertexte.
 import type { ChatMessage, Task } from '@/data/types';
 
-import { buildAppContext,  buildBraindumpContext, buildRequestBody, createSseParser, describeError, describeSchritte, extractActions, extractChunkText, extractText, pickModelsFromList, promptChips, resolveListId, sanitizeChatTitle, SYSTEM_PROMPT, subtasksFromSchritte, describeExtras, describeAenderung, MEMORY_LIMIT, resolveTaskHandle, taskHandle } from './assistant';
+import { buildAppContext,  buildBraindumpContext, buildRequestBody, createSseParser, describeError, describeSchritte, extractActions, extractChunkText, extractText, pickModelsFromList, promptChips, resolveListId, sanitizeChatTitle, SYSTEM_PROMPT, subtasksFromSchritte, describeExtras, describeAenderung, MEMORY_LIMIT, resolveTaskHandle, taskHandle, ASSISTANT_TOOLS, extractCalls, runAssistantTool, type ToolData, MAX_TOOL_ROUNDS } from './assistant';
 
 const msg = (role: 'user' | 'assistant', content: string, at: string): ChatMessage => ({
   id: `m-${at}`, chatId: 'c1', role, content, createdAt: at,
@@ -423,5 +423,83 @@ describe('Änderungen an bestehenden Aufgaben', () => {
       events: [], tasks: [t('aaaaaaaa111111', 'Müll')], lists: [], notes: [], today: '2026-07-27',
     });
     expect(ctx).toContain(`[${taskHandle('aaaaaaaa111111')}] Müll`);
+  });
+});
+
+describe('Werkzeuge (Function Calling)', () => {
+  const t = (o: Partial<Task> & { id: string; title: string }): Task => ({
+    listId: 'default', note: null, dueDate: null, dueTime: null, rrule: null, flagged: false,
+    eventId: null, completedAt: null, notificationId: null, tags: [], subtasks: [],
+    createdAt: '2026-07-01T08:00:00.000Z', sort: 1, ...o,
+  });
+  const data: ToolData = {
+    today: '2026-07-27',
+    lists: [
+      { id: 'default', name: 'Erinnerungen', icon: 'inbox', color: '#2B5FA6', goal: null, deadline: null, sort: 0, createdAt: '2026-07-01T08:00:00.000Z' },
+      { id: 'p1', name: 'Umzug', icon: 'inbox', color: '#2B5FA6', goal: null, deadline: null, sort: 1, createdAt: '2026-07-01T08:00:00.000Z' },
+    ],
+    tasks: [
+      t({ id: 'aaaa111111', title: 'Kaution zurückfordern', listId: 'p1', tags: ['umzug'] }),
+      t({ id: 'bbbb222222', title: 'Kartons kaufen', listId: 'p1', completedAt: '2026-07-20T10:00:00.000Z' }),
+      t({ id: 'cccc333333', title: 'Zahnarzt anrufen' }),
+    ],
+    notes: [
+      { id: 'n1', body: 'Umzugsplan\nSchlüssel am 30. abgeben', taskId: null, eventId: null, pinned: false, deletedAt: null, createdAt: '', updatedAt: '' },
+    ],
+  };
+
+  it('die Werkzeuge sind ausschließlich LESEND — nichts darf still schreiben', () => {
+    const namen = ASSISTANT_TOOLS.map((x) => x.name);
+    expect(namen).toEqual(['aufgaben_suchen', 'liste_inhalt', 'notiz_lesen']);
+    expect(namen.some((n) => /anleg|erstell|lösch|ändern|schreib/i.test(n))).toBe(false);
+  });
+
+  it('die Abendbetrachtung ist strukturell unerreichbar', () => {
+    // Kein Werkzeug dafür, und ToolData hat gar kein Journal-Feld.
+    expect(JSON.stringify(ASSISTANT_TOOLS).toLowerCase()).not.toContain('journal');
+    expect(JSON.stringify(ASSISTANT_TOOLS).toLowerCase()).not.toContain('betrachtung');
+    expect(Object.keys(data)).not.toContain('journal');
+  });
+
+  it('findet auch Erledigtes — das steht im Überblick gar nicht', () => {
+    const alle = runAssistantTool({ name: 'aufgaben_suchen', args: { text: 'karton' } }, data);
+    expect(alle).toContain('Kartons kaufen');
+    expect(alle).toContain('erledigt');
+    const nurOffen = runAssistantTool({ name: 'aufgaben_suchen', args: { erledigt: false } }, data);
+    expect(nurOffen).not.toContain('Kartons kaufen');
+  });
+
+  it('filtert nach Liste und Tag', () => {
+    expect(runAssistantTool({ name: 'aufgaben_suchen', args: { tag: '#Umzug' } }, data)).toContain('Kaution');
+    expect(runAssistantTool({ name: 'liste_inhalt', args: { name: 'umzug' } }, data)).not.toContain('Zahnarzt');
+  });
+
+  it('liest den Notiz-INHALT, den der Überblick nie zeigt', () => {
+    expect(runAssistantTool({ name: 'notiz_lesen', args: { titel: 'Umzugsplan' } }, data)).toContain('Schlüssel am 30.');
+  });
+
+  it('antwortet ehrlich statt zu raten', () => {
+    expect(runAssistantTool({ name: 'liste_inhalt', args: { name: 'Gibtsnicht' } }, data)).toContain('gibt es nicht');
+    expect(runAssistantTool({ name: 'notiz_lesen', args: { titel: 'Fehlt' } }, data)).toContain('Keine Notiz');
+    expect(runAssistantTool({ name: 'zaubern', args: {} }, data)).toContain('Unbekanntes Werkzeug');
+  });
+
+  it('erkennt Werkzeug-Aufrufe in der Antwort', () => {
+    const calls = extractCalls({ candidates: [{ content: { parts: [{ functionCall: { name: 'notiz_lesen', args: { titel: 'X' } } }] } }] });
+    expect(calls).toEqual([{ name: 'notiz_lesen', args: { titel: 'X' } }]);
+    expect(extractCalls({ candidates: [{ content: { parts: [{ text: 'nur Text' }] } }] })).toEqual([]);
+    expect(extractCalls(null)).toEqual([]);
+  });
+
+  it('deklariert Werkzeuge NUR, wenn sie erlaubt sind', () => {
+    const ohne = buildRequestBody([msg('user', 'Hi', '1')], null, new Date(), null, false) as Record<string, unknown>;
+    expect(ohne.tools).toBeUndefined();
+    const mit = buildRequestBody([msg('user', 'Hi', '1')], null, new Date(), null, true) as Record<string, unknown>;
+    expect(mit.tools).toBeDefined();
+  });
+
+  it('die Runden sind gedeckelt', () => {
+    expect(MAX_TOOL_ROUNDS).toBeGreaterThan(0);
+    expect(MAX_TOOL_ROUNDS).toBeLessThanOrEqual(4);
   });
 });

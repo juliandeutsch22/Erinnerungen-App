@@ -366,6 +366,28 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
     Die Aktionskarte zeigt jede Änderung im Klartext („umbenennen in … · auf
     Mo 3.8.") und ein unbekanntes Handle als „Nicht mehr gefunden".
 
+20. **Werkzeuge / Function Calling** (v1.37.0) — der Assistent kann NACHSEHEN
+    statt nur einen Datenabzug zu bekommen: `aufgaben_suchen` (auch Erledigtes,
+    auch außerhalb der 40er-Kappung), `liste_inhalt`, `notiz_lesen` (der
+    Überblick zeigt nur Notiz-TITEL). Regeln:
+    · **Streng lesend.** Alles Schreibende bleibt im Aktions-Block mit
+      Bestätigungskarte. Ein Werkzeug, das still etwas verändert, gibt es nicht
+      und soll es nicht geben — ein Test hält die Werkzeugliste fest.
+    · **Die Abendbetrachtung ist strukturell unerreichbar**: kein Werkzeug dafür
+      und kein Journal-Feld in `ToolData`. Auch das ist getestet.
+    · **Am selben Schalter wie der Überblick**: `assistantContextEnabled` aus →
+      `toolData` null → gar keine Werkzeug-Deklaration. Sonst wäre die
+      Einstellung eine Lüge.
+    · Höchstens `MAX_TOOL_ROUNDS` (3) Runden, dann MUSS eine Antwort kommen —
+      deckelt Kosten, Wartezeit und Endlosschleifen.
+    · Nur der Chat übergibt `toolData`; Braindump/Sprach-Sheet bleiben ohne
+      (`toolData` weglassen = exakt das Verhalten vor v1.37.0).
+    · `requestWithFallbacks` ist aus `askAssistant` herausgelöst — die
+      Werkzeug-Schleife bekommt so pro Runde dieselben Netze (Modell-Kette,
+      Discovery, Lite-Kette, Überlast-Wiederholung).
+    · Im Stream stecken functionCall-Teile neben dem Text: `createSseParser`
+      reicht deshalb optional die ROHEN Ereignisse durch (`onEvent`).
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

@@ -30,7 +30,7 @@ import { useAppendMessage, useChatMessages, useChats, useUpdateChat } from '@/da
 import { useCreateNote, useNotes, useUpdateNote } from '@/data/noteQueries';
 import { useCompleteTask, useCreateList, useCreateTask, useDeleteTask, useLists, useTasks, useUpdateTask } from '@/data/queries';
 import type { Chat, ChatMessage, Task } from '@/data/types';
-import { askAssistant, type AssistantAction, buildAppContext, buildNoteContext, buildTaskContext, type ChatLink, describeAenderung, describeExtras, describeSchritte, extractActions, generateChatTitle, promptChips, resolveListId, resolveTaskHandle, subtasksFromSchritte } from '@/lib/assistant';
+import { askAssistant, type AssistantAction, buildAppContext, buildNoteContext, buildTaskContext, type ChatLink, describeAenderung, describeExtras, describeSchritte, extractActions, generateChatTitle, promptChips, resolveListId, resolveTaskHandle, subtasksFromSchritte, type ToolData } from '@/lib/assistant';
 import { addDays, formatDueDate, toDateStr, todayStr } from '@/lib/dates';
 import { hasCalendarPermission } from '@/lib/deviceCalendar';
 import { noteTitle } from '@/lib/noteLogic';
@@ -497,11 +497,23 @@ export default function ChatScreen() {
           })
         : null;
       const combined = [effectiveContext, appContext].filter(Boolean).join('\n\n') || null;
-      const answer = await askAssistant(apiKey, history, combined, memory, (delta) => {
-        streamRef.current += delta;
-        setStreamText(streamRef.current);
-        scrollRef.current?.scrollToEnd({ animated: false });
-      });
+      // Werkzeuge hängen am SELBEN Schalter wie der Überblick: Wer „App-Überblick
+      // aus" wählt, will nicht, dass der Assistent stattdessen nachschlägt.
+      const toolData: ToolData | null = assistantContextEnabled
+        ? { tasks: tasks ?? [], lists: lists ?? [], notes: notes ?? [], today }
+        : null;
+      const answer = await askAssistant(
+        apiKey,
+        history,
+        combined,
+        memory,
+        (delta) => {
+          streamRef.current += delta;
+          setStreamText(streamRef.current);
+          scrollRef.current?.scrollToEnd({ animated: false });
+        },
+        toolData,
+      );
       const saved = await appendMessage.mutateAsync({ chatId: id, role: 'assistant', content: answer });
       clearOnMessageId.current = saved.id;
       hapticSuccess();
