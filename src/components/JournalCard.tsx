@@ -11,9 +11,11 @@ import { KeyboardDoneBar, keyboardDoneProps } from '@/components/KeyboardDone';
 import { PressableScale } from '@/components/PressableScale';
 import { Type } from '@/components/Type';
 import { useJournal, useSaveJournal } from '@/data/journalQueries';
+import { hapticSelect } from '@/lib/haptics';
 import { journalStreak } from '@/lib/journalLogic';
 import { webNoOutline } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
+import { useSettings } from '@/theme/settings.store';
 import { R, Spacing, T } from '@/theme/theme.tokens';
 
 export const JOURNAL_PROMPT = 'Was lief heute gut? Was habe ich gelernt?';
@@ -23,6 +25,9 @@ export function JournalCard({ today, onFocusInput }: { today: string; onFocusInp
   const router = useRouter();
   const { data: entries } = useJournal();
   const save = useSaveJournal();
+  // Die Ausrichtung des Morgens — der Abend weiß davon (der Bogen).
+  const intention = useSettings((st) => st.dayIntentions[today]);
+  const toggleIntentionDone = useSettings((st) => st.toggleDayIntentionDone);
 
   const todayEntry = useMemo(() => (entries ?? []).find((e) => e.date === today), [entries, today]);
   // null = Bestand noch nicht geladen — erst dann das Feld füllen, damit
@@ -73,6 +78,26 @@ export function JournalCard({ today, onFocusInput }: { today: string; onFocusInp
           <Type variant="caption" tone="teal" tabular>{streak} Abende in Folge</Type>
         )}
       </View>
+      {/* Der Bogen — Abendseite: die EINE Zeile, die den Morgen erinnert.
+          Tippen quittiert sie still („— erledigt."); wir behaupten das nie von
+          selbst, weil ein freier Satz sich nicht automatisch prüfen lässt. */}
+      {intention && (
+        <PressableScale
+          accessibilityLabel={
+            intention.done ? 'Ausrichtung wieder offen lassen' : 'Ausrichtung als erledigt quittieren'
+          }
+          onPress={() => {
+            hapticSelect();
+            toggleIntentionDone(today);
+          }}
+          pressedScale={0.99}
+          style={{ marginTop: Spacing.sm }}
+        >
+          <Type variant="caption" tone={intention.done ? 'teal' : 'text2'} style={{ fontStyle: 'italic' }}>
+            Du wolltest: {intention.text}{intention.done ? ' — erledigt.' : ''}
+          </Type>
+        </PressableScale>
+      )}
       <Type variant="caption" tone="text3" style={{ marginTop: Spacing.xs }}>{JOURNAL_PROMPT}</Type>
       <TextInput
         accessibilityLabel="Abendbetrachtung schreiben"

@@ -40,6 +40,9 @@ type SettingsState = {
   /** Assistent bekommt bei jedem Senden den App-Überblick mit
    *  (Termine/Aufgaben/Listen/Notiz-Titel — nie das Journal). */
   assistantContextEnabled: boolean;
+  /** Der Satz des Tages („Ausrichtung"), je Datum ('YYYY-MM-DD').
+   *  Wird auf die letzten 30 Tage gekappt — ein Tagesgedanke, kein Archiv. */
+  dayIntentions: Record<string, { text: string; done: boolean }>;
   /** true, sobald der persistierte Zustand geladen wurde (verhindert Flash). */
   _hasHydrated: boolean;
   setThemePref: (p: ThemePref) => void;
@@ -62,6 +65,10 @@ type SettingsState = {
   setJournalReminderTime: (t: string) => void;
   setAssistantContextEnabled: (v: boolean) => void;
   setHasHydrated: (v: boolean) => void;
+  /** Der Satz des Tages („Ausrichtung"), je Datum. Bewusst hier statt in einem
+   *  eigenen Repository: eine Zeile pro Tag, kurzlebig, kein eigenes Silo. */
+  setDayIntention: (date: string, text: string) => void;
+  toggleDayIntentionDone: (date: string) => void;
 };
 
 export const useSettings = create<SettingsState>()(
@@ -82,6 +89,7 @@ export const useSettings = create<SettingsState>()(
       journalReminderEnabled: false,
       journalReminderTime: '21:00',
       assistantContextEnabled: true,
+      dayIntentions: {},
       _hasHydrated: false,
       setThemePref: (themePref) => set({ themePref }),
       setMotionPref: (motionPref) => set({ motionPref }),
@@ -110,6 +118,22 @@ export const useSettings = create<SettingsState>()(
       setJournalReminderTime: (journalReminderTime) => set({ journalReminderTime }),
       setAssistantContextEnabled: (assistantContextEnabled) => set({ assistantContextEnabled }),
       setHasHydrated: (_hasHydrated) => set({ _hasHydrated }),
+      setDayIntention: (date, text) =>
+        set((s) => {
+          const t = text.trim();
+          const next = { ...s.dayIntentions };
+          if (t.length === 0) delete next[date];
+          else next[date] = { text: t, done: next[date]?.done ?? false };
+          // Still auf die letzten 30 Tage kappen — das ist kein Archiv.
+          const keys = Object.keys(next).sort().slice(-30);
+          return { dayIntentions: Object.fromEntries(keys.map((k) => [k, next[k]])) };
+        }),
+      toggleDayIntentionDone: (date) =>
+        set((s) => {
+          const cur = s.dayIntentions[date];
+          if (!cur) return {};
+          return { dayIntentions: { ...s.dayIntentions, [date]: { ...cur, done: !cur.done } } };
+        }),
     }),
     {
       name: 'stille.settings',
@@ -130,6 +154,7 @@ export const useSettings = create<SettingsState>()(
         journalReminderEnabled: s.journalReminderEnabled,
         journalReminderTime: s.journalReminderTime,
         assistantContextEnabled: s.assistantContextEnabled,
+        dayIntentions: s.dayIntentions,
         // geminiApiKey bewusst NICHT persistieren — Quelle ist die Keychain.
       }),
       // state ist der rehydrierte Store inkl. Actions → kein Bezug auf useSettings

@@ -27,17 +27,18 @@ Das einzige Feature, das aus der Werkzeug-Sammlung eine **Praxis** macht — und
 das niemand kopieren kann, weil es aus dem Namen kommt. Nutzt fast nur
 Vorhandenes. **Kein Streak, kein Zähler, keine Schuld.** **NEU**
 
-- **Ausrichtung am Morgen** `[JS · mittel]` — eine Zeile auf Heute: worauf es
-  heute ankommt. Der Assistent schlägt aus echten Terminen/Aufgaben eine
-  Reihenfolge vor (kann er schon, ist nur nirgends verankert).
-- **Betrachtung am Abend** `[JS · mittel]` — die bestehende Abendbetrachtung
-  weiß, was du dir vorgenommen hattest, und zeigt still, was daraus wurde
-  (erledigt / verschoben / dazugekommen). Dann *eine* Frage.
-  ⚠️ Der Assistent sieht dabei **nur Aufgaben/Termine, nie den Journaltext** —
-  die Abendbetrachtung verlässt das Gerät nie unaufgefordert.
+~~**Ausrichtung am Morgen** + **Betrachtung am Abend**~~ — umgesetzt in v1.29.0,
+bewusst in der **schlanken** Fassung: KEINE neuen Flächen. Der Morgen lebt in der
+dritten Kopfzeile von „Heute" (vor 11 Uhr die Einladung, sonst die Zusammenfassung),
+der Abend in der bestehenden Abendkarte als EINE Zeile („Du wolltest: …"), per Tipp
+still quittierbar. Ein erster, größerer Entwurf mit drei eigenen Panels wurde als zu
+überladen verworfen — das ist hier die richtige Lehre: der Kern des Bogens ist ein
+Satz, keine Oberfläche.
+
 - **Der Wochenbogen** `[JS · mittel]` — derselbe Rhythmus eine Ebene höher:
-  ruhiger Rückblick + Ausblick, sonntags. (Ersetzt die alte Idee
-  „KI-Wochenreflexion" und „Abend-Abschluss & Wochenrückblick".)
+  ruhiger Rückblick + Ausblick, sonntags. **Bewusst zurückgestellt**, bis sich der
+  tägliche Bogen im Alltag bewährt hat — eine dritte Oberfläche wäre sonst genau
+  die Überladung, die wir vermieden haben.
 
 ## 3. Vernetzungen — das größte ungehobene Potenzial
 

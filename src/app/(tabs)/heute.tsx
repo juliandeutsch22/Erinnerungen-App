@@ -5,13 +5,14 @@
 import { useRouter } from 'expo-router';
 import { CalendarCheck, Mic, Plus, Settings, Sparkles, Sun } from 'lucide-react-native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View } from 'react-native';
+import { TextInput, View } from 'react-native';
 
 import { DisclosureChevron } from '@/components/DisclosureChevron';
 import { EventEditorSheet } from '@/components/EventEditorSheet';
 import { EventRow } from '@/components/EventRow';
 import { GlassPanel } from '@/components/GlassPanel';
 import { JournalCard } from '@/components/JournalCard';
+import { keyboardDoneProps } from '@/components/KeyboardDone';
 import { PressableScale } from '@/components/PressableScale';
 import { ProgressLine } from '@/components/ProgressLine';
 import { PulseDot } from '@/components/PulseDot';
@@ -26,6 +27,8 @@ import { TaskQuickSheet } from '@/components/TaskQuickSheet';
 import { TaskRow } from '@/components/TaskRow';
 import { Type } from '@/components/Type';
 import { WelcomeCard } from '@/components/WelcomeCard';
+import { BottomSheet } from '@/components/BottomSheet';
+import { GlassButton } from '@/components/GlassButton';
 import { QuickVoiceSheet } from '@/components/QuickVoiceSheet';
 import { useDeviceCalendars, useDeviceEvents } from '@/data/calendarQueries';
 import { useJournal } from '@/data/journalQueries';
@@ -39,10 +42,10 @@ import { type DeviceEvent, hasCalendarPermission } from '@/lib/deviceCalendar';
 import { groupToday, groupUpcomingDays } from '@/lib/taskLogic';
 import { dictationAvailable } from '@/lib/dictation';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
-import { TAB_BAR_SAFE_BOTTOM } from '@/theme/layout';
+import { TAB_BAR_SAFE_BOTTOM, webNoOutline } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
 import { useSettings } from '@/theme/settings.store';
-import { Spacing } from '@/theme/theme.tokens';
+import { R, Spacing, T } from '@/theme/theme.tokens';
 
 export default function HeuteScreen() {
   const colors = useColors();
@@ -78,6 +81,11 @@ export default function HeuteScreen() {
   }, []);
 
   const today = todayStr();
+  // Ausrichtung des Tages (der Bogen) — ein Satz, im Settings-Store je Datum.
+  const intention = useSettings((st) => st.dayIntentions[today]);
+  const setDayIntention = useSettings((st) => st.setDayIntention);
+  const [intentionSheet, setIntentionSheet] = useState(false);
+  const [intentionDraft, setIntentionDraft] = useState('');
   const listById = useMemo(() => new Map((lists ?? []).map((l) => [l.id, l])), [lists]);
 
   // Termine (heute + nächste 6 Tage) aus dem Gerätekalender.
@@ -387,7 +395,29 @@ export default function HeuteScreen() {
           <View style={{ gap: Spacing.xs, flex: 1, paddingRight: Spacing.sm }}>
             <Type variant="eyebrow" tone="text3">{dateLine}</Type>
             <Type variant="title" numberOfLines={1} adjustsFontSizeToFit>{greeting}</Type>
-            <Type variant="caption" tone={allDone ? 'teal' : 'text3'} tabular>{summary}</Type>
+            {/* Der Bogen — Morgenseite: DIESELBE dritte Zeile trägt entweder den
+                gesetzten Satz, morgens die Einladung, sonst die Zusammenfassung.
+                Keine zusätzliche Fläche, der Screen wird kein Stück länger.
+                (Der Abend antwortet ab 18 Uhr in der Abendkarte.) */}
+            {intention || hour < 11 ? (
+              <PressableScale
+                accessibilityLabel={intention ? 'Ausrichtung ändern' : 'Ausrichtung für heute setzen'}
+                onPress={() => {
+                  hapticSelect();
+                  setIntentionDraft(intention?.text ?? '');
+                  setIntentionSheet(true);
+                }}
+                pressedScale={0.99}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
+              >
+                <Sun size={12} color={colors.indigo} strokeWidth={2} />
+                <Type variant="caption" tone={intention ? 'indigo' : 'text3'} numberOfLines={1} style={{ flex: 1 }}>
+                  {intention ? intention.text : 'Worauf kommt es heute an?'}
+                </Type>
+              </PressableScale>
+            ) : (
+              <Type variant="caption" tone={allDone ? 'teal' : 'text3'} tabular>{summary}</Type>
+            )}
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             {apiKey.length > 0 && dictationAvailable && (
@@ -547,6 +577,40 @@ export default function HeuteScreen() {
     {/* Quick-Add klebt über der Tab-Bar — Gedanke rein, Kopf frei (§1). */}
     <QuickAdd />
     <QuickVoiceSheet visible={voiceOpen} onClose={() => setVoiceOpen(false)} apiKey={apiKey} />
+    <BottomSheet
+      visible={intentionSheet}
+      onClose={() => setIntentionSheet(false)}
+      title="Ausrichtung"
+      footer={
+        <GlassButton
+          accessibilityLabel="Ausrichtung sichern"
+          onPress={() => {
+            hapticSuccess();
+            setDayIntention(today, intentionDraft);
+            setIntentionSheet(false);
+          }}
+        >
+          <Type variant="label" style={{ color: '#FFFFFF' }}>Sichern</Type>
+        </GlassButton>
+      }
+    >
+      <Type variant="caption" tone="text3" style={{ marginBottom: Spacing.sm }}>
+        Worauf kommt es heute an? Ein Satz genügt — leer lassen löscht ihn wieder.
+      </Type>
+      <TextInput
+        value={intentionDraft}
+        onChangeText={setIntentionDraft}
+        placeholder="Den Vertrag zu Ende lesen."
+        placeholderTextColor={colors.text3}
+        accessibilityLabel="Ausrichtung für heute"
+        multiline
+        {...keyboardDoneProps}
+        style={[
+          { minHeight: 64, padding: Spacing.md, borderRadius: R.md, backgroundColor: colors.chip, color: colors.text, fontSize: T.md, lineHeight: 22, textAlignVertical: 'top' },
+          webNoOutline,
+        ]}
+      />
+    </BottomSheet>
     </View>
   );
 }
