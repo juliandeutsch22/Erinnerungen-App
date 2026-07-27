@@ -84,7 +84,22 @@ meisten Wirkung pro Zeile Code. Alle **NEU**, sofern nicht anders vermerkt.
 - **Teilen an Stoa, Stufe 2** `[NATIV]` — echte Share-Extension statt
   Kurzbefehl (Stufe 1 läuft seit v1.26.1). Siehe §6.
 
+- **Vorlagen für wiederkehrende Vorhaben** `[JS · mittel]` — Wiederholungen
+  bringen eine Aufgabe zurück, aber kein BÜNDEL. „Reise packen",
+  „Quartalsabschluss" sind jedes Mal dieselben zwölf Aufgaben. `duplicateList`
+  existiert schon, von dort ist es nicht weit. Unspektakulär, aber vermutlich
+  das im Alltag meistgenutzte Stück der Liste. **NEU**
+
 **Rhythmus & Praxis**
+- **Das Maß des Tages** `[JS · mittel]` — die App weiß nie, ob der Tag
+  überhaupt hineinpasst. Wenn sieben Aufgaben und drei Termine rechnerisch elf
+  Stunden brauchen, darf sie das ruhig sagen — MORGENS, nicht abends als
+  Vorwurf. Ein Satz in der Kopfzeile, wie der Bogen; kein Zähler, keine
+  Mahnung. Das ist das Gegenteil von Druck, es verhindert ihn. Infrastruktur
+  (`timeboxing.ts`, `dayTimeline.ts`) liegt vollständig. **NEU**
+- **Ruhezeiten** `[JS · klein]` — Fenster in den Einstellungen, alles außerhalb
+  rutscht auf die nächste Grenze. Eine App namens Stoa, die um 6:40 klingelt,
+  widerspricht sich selbst. **NEU**
 - **Routinen / „Säulen"** `[JS · groß]` — sanfte wiederkehrende Praktiken.
   ⚠️ Aus dem alten Backlog übernommen, aber **ohne Streak-Mechanik** — eine
   volle Woche darf eine Säule wachsen lassen, ein Aussetzer darf **nichts**
@@ -95,6 +110,19 @@ meisten Wirkung pro Zeile Code. Alle **NEU**, sofern nicht anders vermerkt.
   auf Heute. Klein, aber maximal markengerecht.
 
 **Verstehen & Rückschau**
+- **Der Spiegel** `[JS · groß]` — ⚠️ *vom Nutzer vorerst zurückgestellt, hier
+  nur als Merkposten.* Das Protokoll der App ist rein schreibend: Erledigtes,
+  Betrachtungen, Tages-Sätze werden nie zurückgelesen. Der Spiegel liest sie und
+  sagt SELTEN einen Satz — keine Statistik, keine Prozente, sondern
+  Beobachtungen („diese drei Aufgaben hast du je fünfmal verschoben"; „das
+  Projekt ‚Keller' liegt seit neun Wochen still"). Harte Bedingung: jede
+  Beobachtung ist handelbar ODER entlastend, nie bewertend — sonst wird daraus
+  eine Schuldmaschine und die Leitplanke „kein Druck" ist verletzt.
+  **Voraussetzung:** ein winziges lokales Ereignis-Protokoll (angelegt /
+  verschoben / erledigt, je ein Zeitstempel). Beim Verschieben wird heute
+  `dueDate` überschrieben — dass verschoben wurde, ist danach weg. Das Protokoll
+  hat erst nach Monaten etwas zu erzählen, deshalb müsste es FRÜH kommen, lange
+  bevor man den Spiegel selbst baut. **NEU**
 - **Countdown-Momente** `[JS · klein]` — große Ereignisse als ruhige Kachel,
   optional mit Termin-Foto.
 - **Projekt-Archiv** `[JS · klein]` — abgeschlossene Projekte archivieren statt
@@ -122,6 +150,12 @@ ausliefern, einzeln am Gerät bestätigen** — nie gebündelt.
 
 - **Home-Screen-Widget** — heutige Aufgaben + nächster Termin. Größter
   Alltagsgewinn der nativen Gruppe.
+- **Orts-Erinnerungen** — „wenn ich beim Baumarkt bin". Über
+  `expo-location`-Geofencing, bleibt vollständig lokal und kostenlos. Die
+  einzige Art von Erinnerung, die wir gar nicht abbilden — und eine ruhigere als
+  jede Uhrzeit, weil sie genau dann kommt, wenn sie nützt. **NEU**
+- **Volltextsuche mit OCR über die Fotos** — „wo war der Beleg?". Über Vision,
+  komplett offline. Im alten Backlog unterschätzt. **NEU**
 - **Siri / App Intents** — „Erinnere mich an …", ohne die App zu öffnen.
 - **Share-Extension** — Text/Links direkt aus jeder App.
 - **Live Activity / Dynamic Island** — nächster Termin mit Countdown.
