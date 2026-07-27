@@ -388,6 +388,20 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
     · Im Stream stecken functionCall-Teile neben dem Text: `createSseParser`
       reicht deshalb optional die ROHEN Ereignisse durch (`onEvent`).
 
+21. **Stille Lücken der Aktions-Sprache** (Fehlersuche v1.38.0) — vier Fälle,
+    die alle NICHT abgestürzt sind, sondern leise das Falsche getan hätten:
+    · **Wiederholung ohne Datum lief nie an.** `resolveCompletion` verlangt
+      rrule UND dueDate; sonst wird die Aufgabe einmalig abgehakt, obwohl sie
+      sichtbar „Wöchentlich" trägt. Der Editor verankert deshalb längst auf
+      heute — `actionDueDate` tut jetzt dasselbe für den Assistenten.
+    · **Doppelte Projekte.** `listen` legte auch dann an, wenn es die Liste
+      schon gab. Jetzt wird eine vorhandene wiederverwendet.
+    · **Toter Vorschlag im Braindump.** Ein Block aus NUR `aenderungen` ist
+      dort nicht anwendbar (kein Überblick → keine Handles) und ergab eine
+      Karte ohne Zeilen mit deaktiviertem Knopf. `hasCapturableActions` wertet
+      ihn als leer.
+    · **Ungedeckelte Checkliste** — `SCHRITTE_LIMIT` (50).
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

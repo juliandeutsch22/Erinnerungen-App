@@ -22,7 +22,7 @@ import { useCreateAssistantEvents } from '@/data/calendarQueries';
 import { useCreateNote } from '@/data/noteQueries';
 import { useCreateList, useCreateTask, useLists } from '@/data/queries';
 import type { ChatMessage } from '@/data/types';
-import { askAssistant, buildBraindumpContext, describeExtras, describeSchritte, extractActions, resolveListId, subtasksFromSchritte, type AssistantAction } from '@/lib/assistant';
+import { askAssistant, buildBraindumpContext, actionDueDate, describeExtras, describeSchritte, extractActions, hasCapturableActions, resolveListId, subtasksFromSchritte, type AssistantAction } from '@/lib/assistant';
 import { formatDueDate, parseDateStr, todayStr } from '@/lib/dates';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { webNoOutline } from '@/theme/layout';
@@ -102,9 +102,14 @@ export default function BraindumpScreen() {
       });
       let parsed = extractActions(answer).actions;
       // Manche Modelle vergessen den Block — EIN strikter Zweitversuch, der ihn erzwingt.
+      // „aenderungen" kann hier niemand anwenden (kein App-Überblick, keine
+      // Handles) — ein Block, der NUR daraus besteht, zählt als leer, sonst
+      // stünde da eine Vorschlagskarte ohne Zeilen mit totem Knopf.
+      if (parsed && !hasCapturableActions(parsed)) parsed = null;
       if (!parsed) {
         const retry = await askAssistant(apiKey, [msg], buildBraindumpContext(dateLabel, true, listNames), memory);
-        parsed = extractActions(retry).actions;
+        const zweiter = extractActions(retry).actions;
+        parsed = zweiter && hasCapturableActions(zweiter) ? zweiter : null;
       }
       if (!parsed) {
         // Auch der Zweitversuch scheiterte → die Roh-Antwort zeigen statt Sackgasse,
@@ -145,6 +150,14 @@ export default function BraindumpScreen() {
     for (let i = 0; i < actions.listen.length; i += 1) {
       if (deselected.has(`l${i}`)) continue;
       const l = actions.listen[i];
+      // Befund aus der Fehlersuche: Gibt es die Liste schon, wird sie
+      // WIEDERVERWENDET statt ein zweites Mal angelegt. Das Modell soll laut
+      // Prompt nur neue vorschlagen, hält sich aber nicht immer daran.
+      const bestehend = resolveListId(l.name, lists ?? [], '');
+      if (bestehend) {
+        frisch.push({ id: bestehend, name: l.name });
+        continue;
+      }
       const created = await createList.mutateAsync({
         name: l.name,
         icon: 'inbox',
@@ -162,7 +175,7 @@ export default function BraindumpScreen() {
         listId: resolveListId(a.liste, alleListen),
         title: a.titel,
         note: a.notiz ?? null,
-        dueDate: a.datum ?? null,
+        dueDate: actionDueDate(a, today),
         dueTime: a.zeit ?? null,
         rrule: a.wiederholung ?? null,
         tags: a.tags ?? [],

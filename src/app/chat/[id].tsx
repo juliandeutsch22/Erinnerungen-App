@@ -30,7 +30,7 @@ import { useAppendMessage, useChatMessages, useChats, useUpdateChat } from '@/da
 import { useCreateNote, useNotes, useUpdateNote } from '@/data/noteQueries';
 import { useCompleteTask, useCreateList, useCreateTask, useDeleteTask, useLists, useTasks, useUpdateTask } from '@/data/queries';
 import type { Chat, ChatMessage, Task } from '@/data/types';
-import { askAssistant, type AssistantAction, buildAppContext, buildNoteContext, buildTaskContext, type ChatLink, describeAenderung, describeExtras, describeSchritte, extractActions, generateChatTitle, promptChips, resolveListId, resolveTaskHandle, subtasksFromSchritte, type ToolData } from '@/lib/assistant';
+import { askAssistant, type AssistantAction, buildAppContext, buildNoteContext, buildTaskContext, type ChatLink, actionDueDate, describeAenderung, describeExtras, describeSchritte, extractActions, generateChatTitle, promptChips, resolveListId, resolveTaskHandle, subtasksFromSchritte, type ToolData } from '@/lib/assistant';
 import { addDays, formatDueDate, toDateStr, todayStr } from '@/lib/dates';
 import { hasCalendarPermission } from '@/lib/deviceCalendar';
 import { noteTitle } from '@/lib/noteLogic';
@@ -418,6 +418,14 @@ export default function ChatScreen() {
     // Projekte zuerst — danach kann „liste" einer Aufgabe darauf zeigen.
     const frisch: { id: string; name: string }[] = [];
     for (const l of selected.listen) {
+      // Befund aus der Fehlersuche: Gibt es die Liste schon, wird sie
+      // WIEDERVERWENDET statt ein zweites Mal angelegt. Das Modell soll laut
+      // Prompt nur neue vorschlagen, hält sich aber nicht immer daran.
+      const bestehend = resolveListId(l.name, lists ?? [], '');
+      if (bestehend) {
+        frisch.push({ id: bestehend, name: l.name });
+        continue;
+      }
       const created = await createList.mutateAsync({
         name: l.name,
         icon: 'inbox',
@@ -455,7 +463,7 @@ export default function ChatScreen() {
         listId: resolveListId(a.liste, alleListen),
         title: a.titel,
         note: a.notiz ?? null,
-        dueDate: a.datum ?? null,
+        dueDate: actionDueDate(a, today),
         dueTime: a.zeit ?? null,
         rrule: a.wiederholung ?? null,
         tags: a.tags ?? [],

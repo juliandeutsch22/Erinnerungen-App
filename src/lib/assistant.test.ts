@@ -1,7 +1,7 @@
 // assistant.test.ts — Prompt-Bau, Antwort-Extraktion, Fehlertexte.
 import type { ChatMessage, Task } from '@/data/types';
 
-import { buildAppContext,  buildBraindumpContext, buildRequestBody, createSseParser, describeError, describeSchritte, extractActions, extractChunkText, extractText, pickModelsFromList, promptChips, resolveListId, sanitizeChatTitle, SYSTEM_PROMPT, subtasksFromSchritte, describeExtras, describeAenderung, MEMORY_LIMIT, resolveTaskHandle, taskHandle, ASSISTANT_TOOLS, extractCalls, runAssistantTool, type ToolData, MAX_TOOL_ROUNDS } from './assistant';
+import { buildAppContext,  buildBraindumpContext, buildRequestBody, createSseParser, describeError, describeSchritte, extractActions, extractChunkText, extractText, pickModelsFromList, promptChips, resolveListId, sanitizeChatTitle, SYSTEM_PROMPT, subtasksFromSchritte, describeExtras, describeAenderung, MEMORY_LIMIT, resolveTaskHandle, taskHandle, ASSISTANT_TOOLS, extractCalls, runAssistantTool, type ToolData, MAX_TOOL_ROUNDS, actionDueDate, hasCapturableActions, SCHRITTE_LIMIT } from './assistant';
 
 const msg = (role: 'user' | 'assistant', content: string, at: string): ChatMessage => ({
   id: `m-${at}`, chatId: 'c1', role, content, createdAt: at,
@@ -501,5 +501,32 @@ describe('Werkzeuge (Function Calling)', () => {
   it('die Runden sind gedeckelt', () => {
     expect(MAX_TOOL_ROUNDS).toBeGreaterThan(0);
     expect(MAX_TOOL_ROUNDS).toBeLessThanOrEqual(4);
+  });
+});
+
+describe('Fehlersuche v1.38.0 — stille Lücken der Aktions-Sprache', () => {
+  it('eine Wiederholung ohne Datum wird auf heute verankert, sonst kehrt sie nie zurück', () => {
+    // resolveCompletion braucht rrule UND dueDate; ohne Datum würde die Aufgabe
+    // trotz sichtbarem „Wöchentlich" einmalig abgehakt und wäre weg.
+    expect(actionDueDate({ wiederholung: 'weekly' }, '2026-07-27')).toBe('2026-07-27');
+    expect(actionDueDate({ datum: '2026-08-03', wiederholung: 'weekly' }, '2026-07-27')).toBe('2026-08-03');
+    // Ohne Wiederholung bleibt „kein Datum" auch kein Datum.
+    expect(actionDueDate({}, '2026-07-27')).toBeNull();
+  });
+
+  it('ein Block aus NUR Änderungen ist für Braindump/Sprach-Sheet leer', () => {
+    const nurAenderung = extractActions('```stoa-aktionen\n{"aenderungen":[{"handle":"a1","erledigt":true}]}\n```').actions!;
+    expect(nurAenderung).not.toBeNull();
+    expect(hasCapturableActions(nurAenderung)).toBe(false);
+    const mitAufgabe = extractActions('```stoa-aktionen\n{"aufgaben":[{"titel":"X"}]}\n```').actions!;
+    expect(hasCapturableActions(mitAufgabe)).toBe(true);
+  });
+
+  it('die Checkliste ist gedeckelt — kein entgleistes Modell mit 300 Schritten', () => {
+    const viele = Array.from({ length: 300 }, (_, i) => `Ding ${i}`);
+    const { actions } = extractActions(
+      '```stoa-aktionen\n' + JSON.stringify({ aufgaben: [{ titel: 'X', schritte: viele }] }) + '\n```',
+    );
+    expect(actions!.aufgaben[0].schritte).toHaveLength(SCHRITTE_LIMIT);
   });
 });

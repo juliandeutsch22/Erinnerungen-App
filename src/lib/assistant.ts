@@ -25,6 +25,8 @@ const endpoint = (model: string, stream: boolean) =>
 const HISTORY_LIMIT = 24;
 /** Obergrenze für den Merkzettel — er geht bei JEDEM Aufruf mit. */
 export const MEMORY_LIMIT = 800;
+/** Obergrenze für die Checkliste einer Aktions-Aufgabe. */
+export const SCHRITTE_LIMIT = 50;
 
 export const SYSTEM_PROMPT =
   'Du bist der Assistent der App „Stoa" — einer ruhigen deutschen Erinnerungs-, ' +
@@ -167,6 +169,28 @@ export function resolveListId(
   return exact ? exact.id : fallback;
 }
 
+/**
+ * Fälligkeit einer Aktions-Aufgabe. Eine Wiederholung OHNE Datum läuft NIE an:
+ * `resolveCompletion` verlangt rrule UND dueDate, sonst hakt es die Aufgabe
+ * einmalig ab. Der Editor verankert deshalb auf heute
+ * (`dueDate ?? (validTime || rrule ? today : null)`) — der Assistent muss
+ * dasselbe tun, sonst trägt die Aufgabe sichtbar „Wöchentlich" und kehrt nie
+ * zurück.
+ */
+export function actionDueDate(a: { datum?: string; wiederholung?: Rrule }, today: string): string | null {
+  return a.datum ?? (a.wiederholung ? today : null);
+}
+
+/**
+ * Enthält der Block etwas, das ERFASST werden kann? Braindump und Sprach-Sheet
+ * haben keinen App-Überblick, also keine Handles, also können sie
+ * „aenderungen" nicht anwenden. Ein Block, der NUR daraus besteht, wäre dort
+ * eine Vorschlagskarte ohne Zeilen mit totem Knopf.
+ */
+export function hasCapturableActions(a: AssistantAction): boolean {
+  return a.aufgaben.length + a.termine.length + a.listen.length + a.notizen.length > 0;
+}
+
 /** Schritte einer Aktions-Aufgabe → echte Unteraufgaben. An EINER Stelle, damit
  *  Chat, Braindump und Sprach-Sheet dieselbe Checkliste anlegen. */
 export function subtasksFromSchritte(schritte: string[] | undefined): Subtask[] {
@@ -233,7 +257,11 @@ function parseSchritte(raw: unknown): string[] | undefined {
     : typeof raw === 'string'
       ? raw.split(/\r?\n|[;,]/)
       : [];
-  const out = items.map((s) => s.replace(/^[-*•\s]*(\[[ xX]\])?\s*/, '').trim()).filter((s) => s.length > 0);
+  // Gedeckelt: ein entgleistes Modell soll keine 300 Unteraufgaben anlegen.
+  const out = items
+    .map((s) => s.replace(/^[-*•\s]*(\[[ xX]\])?\s*/, '').trim())
+    .filter((s) => s.length > 0)
+    .slice(0, SCHRITTE_LIMIT);
   return out.length > 0 ? out : undefined;
 }
 
