@@ -26,7 +26,9 @@ export const lightColors = {
   teal: ACCENT_A,
   indigo: ACCENT_B,
   bg: '#F4F1E8',
-  bg2: '#FDFBF4',
+  // bg2 = Steinton. Bleibt eine Spur HELLER als die Marmor-Kachel (Mittelwert
+  // ~#F7F3E8), damit eingebettete Felder auf einer Steintafel noch abheben.
+  bg2: '#FBF7EC',
   bg3: '#EFEBDF',
   bg4: '#E5E0D1',
   // Chip = ruhige Stein-Well auf der Marmor-Tafel (solide, kein Alpha-Weiß).
@@ -51,7 +53,8 @@ export const darkColors: typeof lightColors = {
   teal: '#7BA7DC',
   indigo: '#9DAF7E',
   bg: '#0B0E13',
-  bg2: '#131820',
+  // s. Light: eine Spur heller als die dunkle Marmor-Kachel (~#151922).
+  bg2: '#1A1F28',
   bg3: '#1A2029',
   bg4: '#222A34',
   chip: 'rgba(255,255,255,0.07)',

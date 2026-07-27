@@ -295,6 +295,23 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
    Eingabe → URL-encoden → diesen Deep-Link öffnen). REIN JS, kein nativer
    Eingriff. Stufe 2 (echte native Share-Extension mit App Group) ist bewusst als
    eigener, sorgfältig zu verifizierender Build-Schritt geparkt.
+14. **Steintextur (`assets/images/marble-*.jpg`, v1.32.0):** Zwei Fallen, beide
+    kosten sonst einen halben Nachmittag.
+    · `resizeMode="repeat"` KACHELT IM WEB NICHT — react-native-web legt genau
+      EINE Kachel an, der Rest der Fläche bleibt leer. Am Gerät kachelt es
+      korrekt, d. h. die Web-Verifikation zeigt etwas anderes als das iPhone.
+      Deshalb bleibt es bei `cover`.
+    · Weil `cover` das Blatt auf die Panelgröße skaliert, muss die Textur KLEIN
+      (400x300) und die Körnung KRÄFTIG (stddev ≈ 4) angelegt sein. Die erste
+      Fassung war 800x600 mit stddev 1,1 — beim Herunterskalieren blieb davon
+      nichts als Papierweiß übrig, deshalb wirkten die Tafeln jahrelang wie
+      Papier statt wie Stein. Erzeugt wird sie mit PIL (Zahn = Gauß-Rauschen,
+      Patina = hochskaliertes Grobraster), rein tonal — Farbrauschen sieht nach
+      Digital-Dreck aus, nicht nach Stein.
+    · Der Steinton darf NICHT beliebig dunkler werden: der Backdrop-Verlauf hat
+      einen hellen Ast (`#F6F3EA`), und eine Tafel unterhalb davon verschwindet
+      im Grund. Der Backdrop ist tabu (AGENTS.md), also trägt die Kante die
+      Plastizität, nicht der Kontrast.
 
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 

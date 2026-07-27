@@ -1,10 +1,18 @@
 // Glass.tsx — Steintafel (Marmor-Design „Antikes Griechenland"): matte,
 // gealterte Marmorfläche statt Liquid Glass. Drei Zutaten:
 //  1. Stein-Grund   — solide Fläche aus den Tokens (nie reines Weiß).
-//  2. Marmor-Textur — gebackenes fraktales Rauschen (assets/images/marble-*.jpg,
-//     erzeugt via SVG-feTurbulence): Wolken, Patina, Körnung. Ein Bild statt
-//     gezeichneter Linien — wirkt wie fotografierter Stein, kostet ~30 KB.
-//  3. Meißel-Kante  — Lichtgrat oben, Schattengrat unten: behauene Platte.
+//  2. Marmor-Textur — assets/images/marble-*.jpg (400x300): feiner Zahn +
+//     zarte Patina, rein tonal (Farbrauschen sähe nach Digital-Dreck aus, nicht
+//     nach Stein). Zwei Fallstricke, beide teuer gelernt:
+//     · Das Blatt muss KLEIN sein. `cover` legt es damit auf einer typischen
+//       Karte fast 1:1 an, das Korn überlebt die Skalierung. Die erste Fassung
+//       war 800x600 mit stddev 1,1 — beim Herunterskalieren blieb davon nichts
+//       als Papierweiß übrig.
+//     · KEIN `resizeMode="repeat"`: react-native-web kachelt damit nicht (es
+//       legt genau EINE Kachel an, der Rest bleibt leer) — die Web-Verifikation
+//       zeigte dann etwas anderes als das Gerät.
+//  3. Meißel-Kante  — Lichtgrat oben, Schattengrat unten, zarte Fasen an den
+//     Seiten: eine behauene Platte, kein gezeichnetes Rechteck.
 // Karten, Tab-Bar und Pills tragen dieselbe Steinsorte; getönte Flächen (CTA)
 // bleiben glatt, damit Handlung heraussticht. Die Glas-Props (intensity,
 // sheenTop, …) bleiben aus Kompatibilität erhalten, sind aber ohne Wirkung.
@@ -72,8 +80,8 @@ export function Glass({ variant = 'card', radius, tint, style, contentStyle, chi
               top: 0,
               left: inset,
               right: inset,
-              height: 2,
-              backgroundColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.9)',
+              height: 3,
+              backgroundColor: isDark ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,1)',
             }}
           />
           <View
@@ -83,8 +91,33 @@ export function Glass({ variant = 'card', radius, tint, style, contentStyle, chi
               bottom: 0,
               left: inset,
               right: inset,
-              height: 2,
-              backgroundColor: isDark ? 'rgba(0,0,0,0.5)' : 'rgba(60,55,40,0.10)',
+              height: 3,
+              backgroundColor: isDark ? 'rgba(0,0,0,0.7)' : 'rgba(60,55,40,0.16)',
+            }}
+          />
+          {/* Seitliche Fasen — sehr schwach dosiert: sie sollen die Dicke der
+              Platte andeuten, nicht als Umrandung gelesen werden. Licht kommt
+              wie im Backdrop von links oben. */}
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: inset,
+              bottom: inset,
+              left: 0,
+              width: 2,
+              backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.55)',
+            }}
+          />
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: inset,
+              bottom: inset,
+              right: 0,
+              width: 2,
+              backgroundColor: isDark ? 'rgba(0,0,0,0.35)' : 'rgba(60,55,40,0.07)',
             }}
           />
         </>

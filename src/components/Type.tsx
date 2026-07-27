@@ -5,7 +5,7 @@
 import React from 'react';
 import { StyleProp, Text as RNText, TextProps as RNTextProps, TextStyle } from 'react-native';
 
-import { useColors } from '@/theme/ThemeProvider';
+import { useColors, useScheme } from '@/theme/ThemeProvider';
 import { ColorToken, T } from '@/theme/theme.tokens';
 
 type Variant = 'hero' | 'title' | 'heading' | 'body' | 'label' | 'caption' | 'eyebrow';
@@ -16,6 +16,8 @@ export type TypeProps = RNTextProps & {
   tone?: Tone;
   /** tabular-nums für tickende Zahlen (Counter, Metriken, Timer). */
   tabular?: boolean;
+  /** Meißel-Relief abschalten — für helle Schrift auf getönter Fläche (CTA). */
+  chisel?: boolean;
   style?: StyleProp<TextStyle>;
 };
 
@@ -36,14 +38,40 @@ const VARIANT_STYLE: Record<Variant, TextStyle> = {
   eyebrow: { fontSize: T.xs, lineHeight: T.xs * 1.4, fontWeight: '700', letterSpacing: 2.6, textTransform: 'uppercase' },
 };
 
-export function Type({ variant = 'body', tone = 'text', tabular = false, style, ...rest }: TypeProps) {
+// Meißel-Relief: Die Antiqua-Überschriften sollen in den Stein GESCHNITTEN
+// wirken, nicht daraufliegen. Dafür genügt ein hauchfeiner Lichtgrat direkt
+// UNTER der Glyphe — so wie Tageslicht auf der unteren Schnittfläche einer
+// Inschrift liegt. Deshalb Versatz von nur 1 px und ein Radius unter 1: ein
+// weicher Schlagschatten würde die Letter heben statt sie zu vertiefen.
+// Dark trägt den Effekt bewusst schwächer — auf dunklem Stein gibt es kaum
+// Streulicht, und ein heller Grat unter heller Schrift würde nur verwaschen.
+type Chisel = { light: number; dark: number; dy: number };
+const CHISEL: Partial<Record<Variant, Chisel>> = {
+  hero: { light: 0.9, dark: 0.16, dy: 1 },
+  title: { light: 0.9, dark: 0.16, dy: 1 },
+  heading: { light: 0.9, dark: 0.16, dy: 1 },
+  // Eyebrows sind klein: halbe Dosis, halber Versatz — sonst verschwimmt die
+  // Sperrung der Tempel-Inschrift.
+  eyebrow: { light: 0.45, dark: 0.1, dy: 0.5 },
+};
+
+export function Type({ variant = 'body', tone = 'text', tabular = false, chisel = true, style, ...rest }: TypeProps) {
   const colors = useColors();
+  const isDark = useScheme() === 'dark';
   const toneColor = colors[tone];
+  const cut = chisel ? CHISEL[variant] : undefined;
   return (
     <RNText
       style={[
         VARIANT_STYLE[variant],
         { color: toneColor },
+        cut
+          ? {
+              textShadowColor: `rgba(255,255,255,${isDark ? cut.dark : cut.light})`,
+              textShadowOffset: { width: 0, height: cut.dy },
+              textShadowRadius: 0.6,
+            }
+          : null,
         tabular ? { fontVariant: ['tabular-nums'] } : null,
         style,
       ]}
