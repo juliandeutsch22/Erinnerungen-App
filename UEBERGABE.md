@@ -402,6 +402,22 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
       ihn als leer.
     · **Ungedeckelte Checkliste** — `SCHRITTE_LIMIT` (50).
 
+22. **Bildkanal** (`assistantImage.ts`, v1.39.0) — ein Foto (Zettel, Aushang,
+    Brief, Whiteboard) wird im Braindump zu Aufgaben/Terminen. Punkte, die man
+    nicht wieder auflösen sollte:
+    · **Das Bild wird NICHT gespeichert.** Der Picker liefert die Base64-Daten
+      direkt (`base64: true`), sie leben genau eine Anfrage lang. Kein
+      Dateisystem, kein Backup, keine Spur zum Aufräumen. Termin-Fotos
+      (`PhotoRepository`) sind etwas ANDERES und bleiben davon unberührt.
+    · `IMAGE_LIMIT` (3) und `quality: 0.5` — Bilder kosten auf dem eigenen
+      Schlüssel ein Vielfaches von Text.
+    · Bilder hängen an der LETZTEN Nutzer-Nachricht, nicht am ganzen Verlauf.
+    · `assistantImagesAvailable` ist bewusst AUCH im Web true (Datei-Dialog):
+      nur so ist der Bildweg überhaupt per Playwright prüfbar. Die Kamera
+      (`assistantCameraAvailable`) bleibt nativ.
+    · Nur im Braindump. Der Chat müsste Bilder am Nachrichtenverlauf
+      speichern — das ist ein eigener Schritt, kein Nebenbei.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

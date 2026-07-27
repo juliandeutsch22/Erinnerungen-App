@@ -4,9 +4,9 @@
 // übernimmt — nichts wird ohne Bestätigung angelegt. Der Braindump ist
 // bewusst KEIN Chat: einmal rein, sortiert, fertig.
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { BrainCircuit, CalendarDays, Check, ChevronLeft, NotebookPen } from 'lucide-react-native';
+import { BrainCircuit, Camera, CalendarDays, Check, ChevronLeft, Image as ImageIcon, NotebookPen, X } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Backdrop } from '@/components/Backdrop';
@@ -22,7 +22,8 @@ import { useCreateAssistantEvents } from '@/data/calendarQueries';
 import { useCreateNote } from '@/data/noteQueries';
 import { useCreateList, useCreateTask, useLists } from '@/data/queries';
 import type { ChatMessage } from '@/data/types';
-import { askAssistant, buildBraindumpContext, actionDueDate, describeExtras, describeSchritte, extractActions, hasCapturableActions, resolveListId, subtasksFromSchritte, type AssistantAction } from '@/lib/assistant';
+import { askAssistant, type AssistantImage, buildBraindumpContext, IMAGE_LIMIT, actionDueDate, describeExtras, describeSchritte, extractActions, hasCapturableActions, resolveListId, subtasksFromSchritte, type AssistantAction } from '@/lib/assistant';
+import { assistantCameraAvailable, assistantImagesAvailable, captureAssistantImage, pickAssistantImages } from '@/lib/assistantImage';
 import { formatDueDate, parseDateStr, todayStr } from '@/lib/dates';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { webNoOutline } from '@/theme/layout';
@@ -57,6 +58,8 @@ export default function BraindumpScreen() {
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 250);
     }
   }, [sharedText]);
+  // Bilder leben nur bis zum nächsten Sortieren — sie werden nirgends abgelegt.
+  const [images, setImages] = useState<AssistantImage[]>([]);
   const dictBaseRef = useRef('');
   const [dictating, setDictating] = useState(false);
   const [pending, setPending] = useState(false);
@@ -82,9 +85,17 @@ export default function BraindumpScreen() {
     setDone('Als Notiz mit Link gesichert.');
   };
 
+  const addImages = async (neu: Promise<AssistantImage[]>) => {
+    const got = await neu;
+    if (got.length === 0) return;
+    hapticSelect();
+    setImages((prev) => [...prev, ...got].slice(0, IMAGE_LIMIT));
+  };
+
   const sort = async () => {
     const dump = text.trim();
-    if (!dump || pending) return;
+    // Ein Foto allein genügt — der Zettel IST die Eingabe.
+    if ((!dump && images.length === 0) || pending) return;
     setPending(true);
     setError(null);
     setActions(null);
@@ -94,12 +105,26 @@ export default function BraindumpScreen() {
     try {
       const listNames = (lists ?? []).filter((l) => !l.deletedAt).map((l) => l.name);
       const dateLabel = `${parseDateStr(today).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} (${today})`;
-      const msg: ChatMessage = { id: 'dump', chatId: 'dump', role: 'user', content: dump, createdAt: new Date().toISOString() };
+      const msg: ChatMessage = {
+        id: 'dump',
+        chatId: 'dump',
+        role: 'user',
+        content: dump || 'Lies das Foto und mach daraus Aufgaben, Termine und Notizen.',
+        createdAt: new Date().toISOString(),
+      };
       let acc = '';
-      const answer = await askAssistant(apiKey, [msg], buildBraindumpContext(dateLabel, false, listNames), memory, (delta) => {
-        acc += delta;
-        setStream(acc);
-      });
+      const answer = await askAssistant(
+        apiKey,
+        [msg],
+        buildBraindumpContext(dateLabel, false, listNames),
+        memory,
+        (delta) => {
+          acc += delta;
+          setStream(acc);
+        },
+        null,
+        images,
+      );
       let parsed = extractActions(answer).actions;
       // Manche Modelle vergessen den Block — EIN strikter Zweitversuch, der ihn erzwingt.
       // „aenderungen" kann hier niemand anwenden (kein App-Überblick, keine
@@ -107,7 +132,7 @@ export default function BraindumpScreen() {
       // stünde da eine Vorschlagskarte ohne Zeilen mit totem Knopf.
       if (parsed && !hasCapturableActions(parsed)) parsed = null;
       if (!parsed) {
-        const retry = await askAssistant(apiKey, [msg], buildBraindumpContext(dateLabel, true, listNames), memory);
+        const retry = await askAssistant(apiKey, [msg], buildBraindumpContext(dateLabel, true, listNames), memory, undefined, null, images);
         const zweiter = extractActions(retry).actions;
         parsed = zweiter && hasCapturableActions(zweiter) ? zweiter : null;
       }
@@ -192,6 +217,7 @@ export default function BraindumpScreen() {
     const events = termine.length > 0 ? await createEvents(termine) : 0;
     setActions(null);
     setText('');
+    setImages([]);
     setDoneEvents(events);
     const parts = [
       ...(frisch.length > 0 ? [`${frisch.length} ${frisch.length === 1 ? 'Projekt' : 'Projekte'}`] : []),
@@ -220,6 +246,29 @@ export default function BraindumpScreen() {
               <Type variant="heading">Braindump</Type>
             </View>
           </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
+            {/* Foto: der Zettel IST die Eingabe. Kamera zuerst — das ist der
+                häufigere Fall („liegt vor mir") als die Mediathek. */}
+            {!pending && assistantImagesAvailable && images.length < IMAGE_LIMIT && (
+              <>
+                {assistantCameraAvailable && (
+                <PressableScale
+                  accessibilityLabel="Zettel abfotografieren"
+                  onPress={() => void addImages(captureAssistantImage())}
+                  style={{ padding: Spacing.sm }}
+                >
+                  <Camera size={20} color={colors.text2} strokeWidth={2} />
+                </PressableScale>
+                )}
+                <PressableScale
+                  accessibilityLabel="Foto aus der Mediathek"
+                  onPress={() => void addImages(pickAssistantImages(IMAGE_LIMIT - images.length))}
+                  style={{ padding: Spacing.sm }}
+                >
+                  <ImageIcon size={20} color={colors.text2} strokeWidth={2} />
+                </PressableScale>
+              </>
+            )}
           {/* Diktat: gesprochenes direkt ins Feld (On-Device). */}
           {!pending && (
             <MicButton
@@ -232,6 +281,7 @@ export default function BraindumpScreen() {
               onListeningChange={setDictating}
             />
           )}
+          </View>
         </View>
 
         <ScrollView
@@ -270,6 +320,35 @@ export default function BraindumpScreen() {
             />
           </View>
 
+          {/* Angehängte Bilder: sichtbar und einzeln wieder abnehmbar. Sie
+              werden NICHT gespeichert — nur zu dieser einen Anfrage geschickt. */}
+          {images.length > 0 && (
+            <View style={{ gap: Spacing.xs }}>
+              <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+                {images.map((img, i) => (
+                  <View key={i} style={{ width: 72, height: 72, borderRadius: R.md, overflow: 'hidden' }}>
+                    <Image
+                      source={{ uri: `data:${img.mimeType};base64,${img.data}` }}
+                      style={{ width: '100%', height: '100%' }}
+                      resizeMode="cover"
+                    />
+                    <PressableScale
+                      accessibilityLabel={`Bild ${i + 1} entfernen`}
+                      onPress={() => setImages((prev) => prev.filter((_, k) => k !== i))}
+                      style={{ position: 'absolute', top: 2, right: 2, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 999, padding: 3 }}
+                    >
+                      <X size={12} color="#FFFFFF" strokeWidth={2.6} />
+                    </PressableScale>
+                  </View>
+                ))}
+              </View>
+              <Type variant="caption" tone="text3">
+                {images.length === 1 ? 'Ein Bild geht mit' : `${images.length} Bilder gehen mit`} — sie werden
+                nur für diese Anfrage gelesen und nicht gespeichert.
+              </Type>
+            </View>
+          )}
+
           {/* Ist der Wurf genau ein Link, geht er auch ohne Assistent als Notiz. */}
           {isBareUrl && !pending && !actions && (
             <PressableScale
@@ -287,7 +366,7 @@ export default function BraindumpScreen() {
               Für den Braindump brauchst du den Assistenten — Schlüssel unter Einstellungen → Assistent.
             </Type>
           ) : (
-            <GlassButton accessibilityLabel="Sortieren lassen" onPress={() => void sort()} disabled={text.trim().length === 0 || pending}>
+            <GlassButton accessibilityLabel="Sortieren lassen" onPress={() => void sort()} disabled={(text.trim().length === 0 && images.length === 0) || pending}>
               <BrainCircuit size={17} color="#FFFFFF" strokeWidth={2.2} />
               <Type variant="label" style={{ color: '#FFFFFF' }}>Sortieren lassen</Type>
             </GlassButton>

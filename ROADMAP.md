@@ -81,6 +81,9 @@ meisten Wirkung pro Zeile Code. Alle **NEU**, sofern nicht anders vermerkt.
   echte Veranstaltungen/Fakten → direkt zu Terminen/Aufgaben. Quellen müssen
   angezeigt werden; geerdete Anfragen kosten auf deinem Schlüssel extra, und es
   ist langsamer. **NEU**
+- ~~**Foto → Aufgaben**~~ — umgesetzt in v1.39.0: Zettel/Aushang/Brief im
+  Braindump abfotografieren, der Assistent liest ihn. Offen geblieben: Bilder
+  auch im CHAT anhängen (bräuchte Bild-Ablage am Nachrichtenverlauf).
 - **Teilen an Stoa, Stufe 2** `[NATIV]` — echte Share-Extension statt
   Kurzbefehl (Stufe 1 läuft seit v1.26.1). Siehe §6.
 

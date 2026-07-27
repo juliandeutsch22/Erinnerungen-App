@@ -1,7 +1,7 @@
 // assistant.test.ts — Prompt-Bau, Antwort-Extraktion, Fehlertexte.
 import type { ChatMessage, Task } from '@/data/types';
 
-import { buildAppContext,  buildBraindumpContext, buildRequestBody, createSseParser, describeError, describeSchritte, extractActions, extractChunkText, extractText, pickModelsFromList, promptChips, resolveListId, sanitizeChatTitle, SYSTEM_PROMPT, subtasksFromSchritte, describeExtras, describeAenderung, MEMORY_LIMIT, resolveTaskHandle, taskHandle, ASSISTANT_TOOLS, extractCalls, runAssistantTool, type ToolData, MAX_TOOL_ROUNDS, actionDueDate, hasCapturableActions, SCHRITTE_LIMIT } from './assistant';
+import { buildAppContext,  buildBraindumpContext, buildRequestBody, createSseParser, describeError, describeSchritte, extractActions, extractChunkText, extractText, pickModelsFromList, promptChips, resolveListId, sanitizeChatTitle, SYSTEM_PROMPT, subtasksFromSchritte, describeExtras, describeAenderung, MEMORY_LIMIT, resolveTaskHandle, taskHandle, ASSISTANT_TOOLS, extractCalls, runAssistantTool, type ToolData, MAX_TOOL_ROUNDS, actionDueDate, hasCapturableActions, SCHRITTE_LIMIT, IMAGE_LIMIT, type AssistantImage } from './assistant';
 
 const msg = (role: 'user' | 'assistant', content: string, at: string): ChatMessage => ({
   id: `m-${at}`, chatId: 'c1', role, content, createdAt: at,
@@ -528,5 +528,41 @@ describe('Fehlersuche v1.38.0 — stille Lücken der Aktions-Sprache', () => {
       '```stoa-aktionen\n' + JSON.stringify({ aufgaben: [{ titel: 'X', schritte: viele }] }) + '\n```',
     );
     expect(actions!.aufgaben[0].schritte).toHaveLength(SCHRITTE_LIMIT);
+  });
+});
+
+describe('Bildkanal', () => {
+  const bild = (n: string): AssistantImage => ({ mimeType: 'image/jpeg', data: `DATEN-${n}` });
+  const parts = (images: AssistantImage[], msgs = [msg('user', 'Was steht drauf?', '1')]) =>
+    (buildRequestBody(msgs, null, new Date('2026-07-27T09:00:00'), null, false, images) as {
+      contents: { role: string; parts: unknown[] }[];
+    }).contents;
+
+  it('hängt Bilder als inlineData an die Nachricht', () => {
+    const c = parts([bild('a')]);
+    expect(c[0].parts).toEqual([
+      { text: 'Was steht drauf?' },
+      { inlineData: { mimeType: 'image/jpeg', data: 'DATEN-a' } },
+    ]);
+  });
+
+  it('ohne Bilder bleibt der Aufbau exakt wie vorher', () => {
+    expect(parts([])[0].parts).toEqual([{ text: 'Was steht drauf?' }]);
+  });
+
+  it('hängt sie an die LETZTE Nutzer-Nachricht, nicht an die erste', () => {
+    const c = parts([bild('a')], [msg('user', 'alt', '1'), msg('assistant', 'ok', '2'), msg('user', 'neu', '3')]);
+    expect(c[0].parts).toHaveLength(1);
+    expect(c[2].parts).toHaveLength(2);
+  });
+
+  it('deckelt die Anzahl — Bilder kosten ein Vielfaches von Text', () => {
+    const viele = Array.from({ length: 10 }, (_, i) => bild(String(i)));
+    expect(parts(viele)[0].parts).toHaveLength(1 + IMAGE_LIMIT);
+  });
+
+  it('der Prompt sagt, dass nichts dazugeraten werden darf', () => {
+    expect(SYSTEM_PROMPT).toContain('BILDER');
+    expect(SYSTEM_PROMPT).toContain('rate nichts dazu');
   });
 });

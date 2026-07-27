@@ -27,6 +27,13 @@ const HISTORY_LIMIT = 24;
 export const MEMORY_LIMIT = 800;
 /** Obergrenze für die Checkliste einer Aktions-Aufgabe. */
 export const SCHRITTE_LIMIT = 50;
+/** Wie viele Bilder höchstens mit einer Anfrage gehen — Bilder kosten auf dem
+ *  eigenen Schlüssel ein Vielfaches von Text. */
+export const IMAGE_LIMIT = 3;
+
+/** Ein Bild für den Assistenten: Base64 + MIME-Typ, wie Gemini es erwartet.
+ *  Wird NICHT gespeichert — es lebt genau eine Anfrage lang. */
+export type AssistantImage = { mimeType: string; data: string };
 
 export const SYSTEM_PROMPT =
   'Du bist der Assistent der App „Stoa" — einer ruhigen deutschen Erinnerungs-, ' +
@@ -60,6 +67,11 @@ export const SYSTEM_PROMPT =
   'Im Zweifel: fester Zeitpunkt/Verabredung → Termin, etwas zu TUN → Aufgabe. ' +
   '„checkliste" nur, wenn der Chat zu einer Notiz gehört; ' +
   '„notizen" für Gedanken/Ideen ohne Handlung (erste Zeile wird der Titel). ' +
+  'BILDER: Ist ein Bild dabei, LIES es — abfotografierte Zettel, Einkaufslisten, Aushänge, ' +
+  'Briefe, Whiteboards. Übernimm nur, was wirklich draufsteht, und rate nichts dazu; ' +
+  'was du nicht entziffern kannst, lässt du weg oder sagst es. Aus dem Gelesenen werden ' +
+  'wie sonst auch Aufgaben, Termine und Notizen — eine abfotografierte Einkaufsliste ist ' +
+  'EINE Aufgabe mit „schritte". ' +
   'NACHSEHEN: Reicht der App-Überblick nicht, benutze die Werkzeuge statt zu raten — ' +
   'aufgaben_suchen (auch erledigte, auch außerhalb des Überblicks), liste_inhalt (eine Liste ' +
   'vollständig), notiz_lesen (der Überblick zeigt nur Notiz-TITEL, nie den Inhalt). ' +
@@ -708,6 +720,8 @@ export function buildRequestBody(
   memory: string | null = null,
   /** Werkzeuge deklarieren? Nur wo der Assistent auch nachsehen DARF (Chat). */
   withTools = false,
+  /** Bilder zur LETZTEN Nutzer-Nachricht (Zettel abfotografieren). */
+  images: AssistantImage[] = [],
 ): unknown {
   const dateLine =
     `Heute ist ${now.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}, ` +
@@ -722,12 +736,21 @@ export function buildRequestBody(
     `${SYSTEM_PROMPT}\n\n${dateLine}` +
     (note ? `\n\nMERKZETTEL des Nutzers — seine festen Vorgaben, immer beachten:\n${note}` : '') +
     (context ? `\n\nKontext aus der App:\n${context}` : '');
+  const contents = messages.slice(-HISTORY_LIMIT).map((m) => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.content }] as unknown[],
+  }));
+  // Bilder gehören an die LETZTE Nutzer-Nachricht — sie sind das, worüber
+  // gerade gesprochen wird, nicht Kontext des ganzen Verlaufs.
+  const bilder = images.slice(0, IMAGE_LIMIT);
+  if (bilder.length > 0) {
+    const last = [...contents].reverse().find((c) => c.role === 'user');
+    if (last) last.parts.push(...bilder.map((b) => ({ inlineData: { mimeType: b.mimeType, data: b.data } })));
+  }
+
   return {
     systemInstruction: { parts: [{ text: system }] },
-    contents: messages.slice(-HISTORY_LIMIT).map((m) => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content }],
-    })),
+    contents,
     ...(withTools ? { tools: [{ functionDeclarations: ASSISTANT_TOOLS }] } : {}),
     generationConfig: { temperature: 0.4, maxOutputTokens: 1200 },
   };
@@ -1049,9 +1072,11 @@ export async function askAssistant(
   /** Daten für die (lesenden) Werkzeuge. null = keine Werkzeuge deklarieren,
    *  d. h. exakt das Verhalten von vorher — so bleibt der Braindump unberührt. */
   toolData?: ToolData | null,
+  /** Bilder zur aktuellen Nachricht (Zettel/Aushang abfotografieren). */
+  images?: AssistantImage[],
 ): Promise<string> {
   const stream = onDelta !== undefined;
-  const base = buildRequestBody(messages, context, new Date(), memory, !!toolData) as Record<string, unknown>;
+  const base = buildRequestBody(messages, context, new Date(), memory, !!toolData, images ?? []) as Record<string, unknown>;
   const baseContents = base.contents as unknown[];
   // Zusatz-Runden: der Modell-Zug (functionCall) und unsere Antwort darauf.
   const extra: unknown[] = [];
