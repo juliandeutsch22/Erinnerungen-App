@@ -41,7 +41,7 @@ function task(overrides: Partial<Task>): Task {
   };
 }
 
-const noPhotos = { savedFilters: [] as SavedFilter[], dayIntentions: {} };
+const noPhotos = { savedFilters: [] as SavedFilter[], dayIntentions: {}, assistantMemory: '' };
 
 describe('Backup', () => {
   beforeEach(() => {
@@ -157,7 +157,7 @@ describe('Backup', () => {
     const bytes: Record<string, string> = { 'file:///old/a.png': 'AAAA', 'file:///old/b.jpg': 'BBBB' };
     const written: { ext: string; data: string }[] = [];
     const json = await exportToJsonString(
-      { savedFilters: [filter], dayIntentions: {}, readPhotoBase64: async (uri) => bytes[uri] ?? null, extFromUri: (uri) => uri.split('.').pop()! },
+      { savedFilters: [filter], dayIntentions: {}, assistantMemory: '', readPhotoBase64: async (uri) => bytes[uri] ?? null, extFromUri: (uri) => uri.split('.').pop()! },
       new Date('2026-07-03T12:00:00.000Z'),
     );
 
@@ -199,7 +199,7 @@ describe('Backup', () => {
     // Fake-IO: das große Dokument liefert null (Limit) → nur Verknüpfung im Export.
     const bytes: Record<string, string | null> = { 'file:///old/t.pdf': 'PDFDATA', 'file:///old/big.zip': null };
     const json = await exportToJsonString(
-      { savedFilters: [], dayIntentions: {}, readDocumentBase64: async (uri) => bytes[uri] ?? null, extFromUri: (uri) => uri.split('.').pop()! },
+      { savedFilters: [], dayIntentions: {}, assistantMemory: '', readDocumentBase64: async (uri) => bytes[uri] ?? null, extFromUri: (uri) => uri.split('.').pop()! },
       new Date('2026-07-03T12:00:00.000Z'),
     );
 
@@ -227,7 +227,7 @@ describe('Backup', () => {
     await getPhotoRepository().restore([
       { id: 'p1', eventId: 'ev-9', uri: 'file:///old/a.png', addedAt: '2026-07-02T10:00:00.000Z' },
     ]);
-    const json = await exportToJsonString({ savedFilters: [], dayIntentions: {}, readPhotoBase64: async () => 'AAAA' });
+    const json = await exportToJsonString({ savedFilters: [], dayIntentions: {}, assistantMemory: '', readPhotoBase64: async () => 'AAAA' });
 
     __setPhotoRepositoryForTests(new InMemoryPhotoRepository());
     const result = await importBackup(json); // keine Senken
@@ -291,6 +291,7 @@ describe('Papierkorb im Backup', () => {
     const json = await exportToJsonString({
       savedFilters: [],
       dayIntentions: { '2026-07-27': { text: 'Ruhig bleiben', done: true }, '2026-07-26': { text: 'Zuhören', done: false } },
+      assistantMemory: '',
     });
     expect(JSON.parse(json).dayIntentions['2026-07-27'].text).toBe('Ruhig bleiben');
 
@@ -309,6 +310,17 @@ describe('Papierkorb im Backup', () => {
     let restored: Record<string, { text: string; done: boolean }> | null = null;
     await importBackup(JSON.stringify(stripped), { setDayIntentions: (v) => { restored = v; } });
     expect(restored).toEqual({});
+  });
+
+  it('Roundtrip: der Merkzettel des Assistenten wird gesichert', async () => {
+    const json = await exportToJsonString({
+      savedFilters: [],
+      dayIntentions: {},
+      assistantMemory: 'Besorgungen kommen in die Liste Erledigungen.',
+    });
+    let restored: string | null = null;
+    await importBackup(json, { setAssistantMemory: (v) => { restored = v; } });
+    expect(restored).toBe('Besorgungen kommen in die Liste Erledigungen.');
   });
 
   it('alte Backups ohne deletedAt bleiben aktiv', async () => {
@@ -340,6 +352,7 @@ describe('summarizeBundle / describeSummary — ehrlicher Bericht', () => {
     const json = await exportToJsonString({
       savedFilters: [],
       dayIntentions: {},
+      assistantMemory: '',
       // Reader vorhanden, liefert aber null → „zu groß/nicht lesbar".
       readDocumentBase64: async () => null,
     });

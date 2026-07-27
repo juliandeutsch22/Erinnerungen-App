@@ -22,14 +22,15 @@ import { MarkdownText } from '@/components/MarkdownText';
 import { MicButton } from '@/components/MicButton';
 import { PressableScale } from '@/components/PressableScale';
 import { Type } from '@/components/Type';
+import { LIST_COLORS } from '@/components/listMeta';
 import * as Clipboard from 'expo-clipboard';
 
 import { useCreateAssistantEvents, useDeviceEvents } from '@/data/calendarQueries';
 import { useAppendMessage, useChatMessages, useChats, useUpdateChat } from '@/data/chatQueries';
 import { useCreateNote, useNotes, useUpdateNote } from '@/data/noteQueries';
-import { useCreateTask, useLists, useTasks } from '@/data/queries';
+import { useCreateList, useCreateTask, useLists, useTasks } from '@/data/queries';
 import type { Chat, ChatMessage } from '@/data/types';
-import { askAssistant, type AssistantAction, buildAppContext, buildNoteContext, buildTaskContext, type ChatLink, describeSchritte, extractActions, generateChatTitle, promptChips, subtasksFromSchritte } from '@/lib/assistant';
+import { askAssistant, type AssistantAction, buildAppContext, buildNoteContext, buildTaskContext, type ChatLink, describeExtras, describeSchritte, extractActions, generateChatTitle, promptChips, resolveListId, subtasksFromSchritte } from '@/lib/assistant';
 import { addDays, formatDueDate, toDateStr, todayStr } from '@/lib/dates';
 import { hasCalendarPermission } from '@/lib/deviceCalendar';
 import { noteTitle } from '@/lib/noteLogic';
@@ -133,11 +134,13 @@ function ActionCard({
 
   const selected: AssistantAction = {
     aufgaben: actions.aufgaben.filter((_, i) => included(`a${i}`)),
+    listen: actions.listen.filter((_, i) => included(`l${i}`)),
     termine: actions.termine.filter((_, i) => included(`t${i}`)),
     checkliste: actions.checkliste.filter((_, i) => included(`c${i}`)),
     notizen: actions.notizen.filter((_, i) => included(`n${i}`)),
   };
-  const count = selected.aufgaben.length + selected.termine.length + selected.checkliste.length + selected.notizen.length;
+  const count =
+    selected.listen.length + selected.aufgaben.length + selected.termine.length + selected.checkliste.length + selected.notizen.length;
 
   const row = (key: string, label: string, sub: string | null) => {
     const on = included(key);
@@ -189,12 +192,15 @@ function ActionCard({
       }}
     >
       <Type variant="eyebrow" tone="text3" style={{ marginBottom: Spacing.xs }}>Vorschläge</Type>
+      {actions.listen.map((l, i) =>
+        row(`l${i}`, l.name, ['Projekt', l.ziel ?? '', l.deadline ? `bis ${formatDueDate(l.deadline, today)}` : ''].filter(Boolean).join(' · ')),
+      )}
       {actions.aufgaben.map((a, i) => {
         const wann = a.datum ? `${formatDueDate(a.datum, today)}${a.zeit ? ` · ${a.zeit} Uhr` : ''}` : a.zeit ? `${a.zeit} Uhr` : null;
         // Schritte mit anzeigen — sonst sieht man der Zeile nicht an, dass eine
         // Aufgabe MIT Checkliste entsteht statt vieler einzelner.
         const schritte = describeSchritte(a.schritte);
-        return row(`a${i}`, a.titel, [wann, schritte].filter(Boolean).join(' · ') || null);
+        return row(`a${i}`, a.titel, [wann, schritte, describeExtras(a)].filter(Boolean).join(' · ') || null);
       })}
       {actions.termine.map((t, i) =>
         row(
@@ -293,6 +299,7 @@ export default function ChatScreen() {
   const appendMessage = useAppendMessage();
   const updateChat = useUpdateChat();
   const apiKey = useSettings((s) => s.geminiApiKey);
+  const memory = useSettings((s) => s.assistantMemory);
 
   const chat = (chats ?? []).find((c) => c.id === id);
 
@@ -342,6 +349,7 @@ export default function ChatScreen() {
   const [appliedActionIds, setAppliedActionIds] = useState<Set<string>>(new Set());
   const createNote = useCreateNote();
   const createTask = useCreateTask();
+  const createList = useCreateList();
   const createEvents = useCreateAssistantEvents();
   const updateNote = useUpdateNote();
   const scrollRef = useRef<ScrollView>(null);
@@ -383,12 +391,28 @@ export default function ChatScreen() {
    *  anlegen (nichts geht verloren). */
   const applyActions = async (m: ChatMessage, selected: AssistantAction) => {
     hapticSuccess();
+    // Projekte zuerst — danach kann „liste" einer Aufgabe darauf zeigen.
+    const frisch: { id: string; name: string }[] = [];
+    for (const l of selected.listen) {
+      const created = await createList.mutateAsync({
+        name: l.name,
+        icon: 'inbox',
+        color: LIST_COLORS[((lists?.length ?? 0) + frisch.length) % LIST_COLORS.length],
+        goal: l.ziel ?? null,
+        deadline: l.deadline ?? null,
+      });
+      frisch.push({ id: created.id, name: created.name });
+    }
+    const alleListen = [...(lists ?? []), ...frisch];
     for (const a of selected.aufgaben) {
       await createTask.mutateAsync({
-        listId: 'default',
+        listId: resolveListId(a.liste, alleListen),
         title: a.titel,
+        note: a.notiz ?? null,
         dueDate: a.datum ?? null,
         dueTime: a.zeit ?? null,
+        rrule: a.wiederholung ?? null,
+        tags: a.tags ?? [],
         eventId: chat?.eventId ?? null,
         subtasks: subtasksFromSchritte(a.schritte),
       });
@@ -427,7 +451,7 @@ export default function ChatScreen() {
           })
         : null;
       const combined = [effectiveContext, appContext].filter(Boolean).join('\n\n') || null;
-      const answer = await askAssistant(apiKey, history, combined, (delta) => {
+      const answer = await askAssistant(apiKey, history, combined, memory, (delta) => {
         streamRef.current += delta;
         setStreamText(streamRef.current);
         scrollRef.current?.scrollToEnd({ animated: false });

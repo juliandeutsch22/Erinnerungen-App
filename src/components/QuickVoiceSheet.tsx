@@ -21,13 +21,15 @@ import { PressableScale } from '@/components/PressableScale';
 import { Type } from '@/components/Type';
 import { useCreateAssistantEvents } from '@/data/calendarQueries';
 import { useCreateNote } from '@/data/noteQueries';
-import { useCreateTask, useLists } from '@/data/queries';
+import { useCreateList, useCreateTask, useLists } from '@/data/queries';
 import type { ChatMessage } from '@/data/types';
-import { type AssistantAction, askAssistant, buildBraindumpContext, describeSchritte, extractActions, resolveListId, subtasksFromSchritte } from '@/lib/assistant';
+import { type AssistantAction, askAssistant, buildBraindumpContext, describeExtras, describeSchritte, extractActions, resolveListId, subtasksFromSchritte } from '@/lib/assistant';
 import { formatDueDate, parseDateStr, todayStr } from '@/lib/dates';
 import { useDictation } from '@/lib/dictation';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { useColors, useReducedMotion } from '@/theme/ThemeProvider';
+import { useSettings } from '@/theme/settings.store';
+import { LIST_COLORS } from '@/components/listMeta';
 import { R, Spacing } from '@/theme/theme.tokens';
 
 export type QuickVoicePhase = 'listening' | 'thinking' | 'result' | 'error' | 'done';
@@ -200,14 +202,20 @@ export function QuickVoiceView({
   }
 
   // result
-  const items: { key: string; title: string; sub?: string; kind: 'Aufgabe' | 'Termin' | 'Notiz' }[] = [
+  const items: { key: string; title: string; sub?: string; kind: 'Aufgabe' | 'Termin' | 'Notiz' | 'Projekt' }[] = [
+    ...(actions?.listen ?? []).map((l, i) => ({
+      key: `l${i}`,
+      title: l.name,
+      sub: [l.ziel ?? '', l.deadline ? `bis ${formatDueDate(l.deadline, today)}` : ''].filter(Boolean).join(' · ') || undefined,
+      kind: 'Projekt' as const,
+    })),
     ...(actions?.aufgaben ?? []).map((a, i) => ({
       key: `a${i}`,
       title: a.titel,
       // Datum/Zeit und — wenn der Assistent eine Liste vorschlägt — auch das
       // Ziel zeigen: du siehst vor dem Bestätigen, wo es landet.
       sub:
-        [a.datum ? formatDueDate(a.datum, today) : '', a.zeit ?? '', a.liste ? `→ ${a.liste}` : '', describeSchritte(a.schritte) ?? '']
+        [a.datum ? formatDueDate(a.datum, today) : '', a.zeit ?? '', a.liste ? `→ ${a.liste}` : '', describeSchritte(a.schritte) ?? '', describeExtras(a) ?? '']
           .filter(Boolean)
           .join(' · ') || undefined,
       kind: 'Aufgabe' as const,
@@ -287,8 +295,10 @@ export function QuickVoiceView({
 }
 
 export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean; onClose: () => void; apiKey: string }) {
+  const memory = useSettings((s) => s.assistantMemory);
   const router = useRouter();
   const createTask = useCreateTask();
+  const createList = useCreateList();
   const createNote = useCreateNote();
   const createEvents = useCreateAssistantEvents();
   const { data: lists } = useLists();
@@ -326,13 +336,13 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
       const listNames = (lists ?? []).filter((l) => !l.deletedAt).map((l) => l.name);
       const msg: ChatMessage = { id: 'qv', chatId: 'qv', role: 'user', content: dump, createdAt: new Date().toISOString() };
       let acc = '';
-      const answer = await askAssistant(apiKey, [msg], buildBraindumpContext(dateLabel, false, listNames), (delta) => {
+      const answer = await askAssistant(apiKey, [msg], buildBraindumpContext(dateLabel, false, listNames), memory, (delta) => {
         acc += delta;
         setStream(acc);
       });
       let parsed = extractActions(answer).actions;
       if (!parsed) {
-        const retry = await askAssistant(apiKey, [msg], buildBraindumpContext(dateLabel, true, listNames));
+        const retry = await askAssistant(apiKey, [msg], buildBraindumpContext(dateLabel, true, listNames), memory);
         parsed = extractActions(retry).actions;
       }
       if (!parsed) {
@@ -442,7 +452,7 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
   }, [visible, denied, phase, listening]);
 
   const selectedCount = actions
-    ? actions.aufgaben.length + actions.termine.length + actions.notizen.length - deselected.size
+    ? actions.listen.length + actions.aufgaben.length + actions.termine.length + actions.notizen.length - deselected.size
     : 0;
 
   const confirm = async () => {
@@ -450,14 +460,32 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
     hapticSuccess();
     let tasks = 0;
     let notes = 0;
+    // Projekte zuerst, damit „liste" einer Aufgabe darauf zeigen kann.
+    const frisch: { id: string; name: string }[] = [];
+    for (let i = 0; i < actions.listen.length; i += 1) {
+      if (deselected.has(`l${i}`)) continue;
+      const l = actions.listen[i];
+      const created = await createList.mutateAsync({
+        name: l.name,
+        icon: 'inbox',
+        color: LIST_COLORS[((lists?.length ?? 0) + i) % LIST_COLORS.length],
+        goal: l.ziel ?? null,
+        deadline: l.deadline ?? null,
+      });
+      frisch.push({ id: created.id, name: created.name });
+    }
+    const alleListen = [...(lists ?? []), ...frisch];
     for (let i = 0; i < actions.aufgaben.length; i += 1) {
       if (deselected.has(`a${i}`)) continue;
       const a = actions.aufgaben[i];
       await createTask.mutateAsync({
-        listId: resolveListId(a.liste, lists ?? []),
+        listId: resolveListId(a.liste, alleListen),
         title: a.titel,
+        note: a.notiz ?? null,
         dueDate: a.datum ?? null,
         dueTime: a.zeit ?? null,
+        rrule: a.wiederholung ?? null,
+        tags: a.tags ?? [],
         subtasks: subtasksFromSchritte(a.schritte),
       });
       tasks += 1;
@@ -470,6 +498,7 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
     const termine = actions.termine.filter((_, i) => !deselected.has(`t${i}`));
     const events = termine.length > 0 ? await createEvents(termine) : 0;
     const parts: string[] = [];
+    if (frisch.length > 0) parts.push(`${frisch.length} ${frisch.length === 1 ? 'Projekt' : 'Projekte'}`);
     if (tasks > 0) parts.push(`${tasks} ${tasks === 1 ? 'Aufgabe' : 'Aufgaben'}`);
     if (events > 0) parts.push(`${events} ${events === 1 ? 'Termin im Kalender' : 'Termine im Kalender'}`);
     if (notes > 0) parts.push(`${notes} ${notes === 1 ? 'Notiz' : 'Notizen'}`);

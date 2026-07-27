@@ -1,7 +1,7 @@
 // assistant.test.ts — Prompt-Bau, Antwort-Extraktion, Fehlertexte.
 import type { ChatMessage } from '@/data/types';
 
-import { buildAppContext,  buildBraindumpContext, buildRequestBody, createSseParser, describeError, describeSchritte, extractActions, extractChunkText, extractText, pickModelsFromList, promptChips, resolveListId, sanitizeChatTitle, SYSTEM_PROMPT, subtasksFromSchritte } from './assistant';
+import { buildAppContext,  buildBraindumpContext, buildRequestBody, createSseParser, describeError, describeSchritte, extractActions, extractChunkText, extractText, pickModelsFromList, promptChips, resolveListId, sanitizeChatTitle, SYSTEM_PROMPT, subtasksFromSchritte, describeExtras, MEMORY_LIMIT } from './assistant';
 
 const msg = (role: 'user' | 'assistant', content: string, at: string): ChatMessage => ({
   id: `m-${at}`, chatId: 'c1', role, content, createdAt: at,
@@ -305,5 +305,63 @@ describe('Schritte → Unteraufgaben', () => {
     expect(SYSTEM_PROMPT).toContain('schritte');
     expect(SYSTEM_PROMPT).toContain('NICHT viele Aufgaben');
     expect(buildBraindumpContext('Montag, 27. Juli 2026 (2026-07-27)')).toContain('BÜNDELN statt zerstückeln');
+  });
+});
+
+describe('Aktions-Sprache: Wiederholung, Tags, Notiz, Projekte', () => {
+  it('übernimmt eine gültige Wiederholung und verwirft erfundene Formen', () => {
+    const ok = extractActions('```stoa-aktionen\n{"aufgaben":[{"titel":"Müll","wiederholung":"every:2w"}]}\n```');
+    expect(ok.actions!.aufgaben[0].wiederholung).toBe('every:2w');
+    // „jeden zweiten Montag" kann die App nicht abbilden — dann lieber einmalig
+    // als mit einer kaputten Regel.
+    const bad = extractActions('```stoa-aktionen\n{"aufgaben":[{"titel":"X","wiederholung":"jeden 2. Montag"}]}\n```');
+    expect(bad.actions!.aufgaben[0].wiederholung).toBeUndefined();
+  });
+
+  it('normalisiert Tags wie die App und nimmt auch einen Komma-String', () => {
+    const a = extractActions('```stoa-aktionen\n{"aufgaben":[{"titel":"X","tags":["#Arbeit"," Neues Projekt ","arbeit"]}]}\n```');
+    expect(a.actions!.aufgaben[0].tags).toEqual(['arbeit', 'neues-projekt']);
+    const b = extractActions('```stoa-aktionen\n{"aufgaben":[{"titel":"X","tags":"haus, garten"}]}\n```');
+    expect(b.actions!.aufgaben[0].tags).toEqual(['haus', 'garten']);
+  });
+
+  it('liest Projekte mit Ziel und Deadline', () => {
+    const { actions } = extractActions(
+      '```stoa-aktionen\n{"listen":[{"name":"Umzug","ziel":"Bis Ende August raus","deadline":"2026-08-31"}]}\n```',
+    );
+    expect(actions!.listen).toEqual([{ name: 'Umzug', ziel: 'Bis Ende August raus', deadline: '2026-08-31' }]);
+  });
+
+  it('ein Block mit NUR einem Projekt ist trotzdem gültig', () => {
+    expect(extractActions('```stoa-aktionen\n{"listen":[{"name":"Umzug"}]}\n```').actions).not.toBeNull();
+  });
+
+  it('beschreibt Wiederholung und Tags für die Bestätigungskarte', () => {
+    expect(describeExtras({})).toBeNull();
+    expect(describeExtras({ wiederholung: 'weekly', tags: ['haus'] })).toBe('Wöchentlich · #haus');
+  });
+});
+
+describe('Merkzettel', () => {
+  const body = (memory: string | null) =>
+    (buildRequestBody([msg('user', 'Hi', '1')], 'Kontext', new Date('2026-07-27T09:00:00'), memory) as {
+      systemInstruction: { parts: { text: string }[] };
+    }).systemInstruction.parts[0].text;
+
+  it('steht vor dem Datenkontext und ist als Vorgabe des Nutzers ausgewiesen', () => {
+    const text = body('Besorgungen kommen in die Liste Erledigungen.');
+    expect(text).toContain('MERKZETTEL');
+    expect(text).toContain('Besorgungen kommen in die Liste Erledigungen.');
+    expect(text.indexOf('MERKZETTEL')).toBeLessThan(text.indexOf('Kontext aus der App'));
+  });
+
+  it('ohne Merkzettel bleibt die Instruktion unverändert', () => {
+    expect(body(null)).not.toContain('MERKZETTEL');
+    expect(body('   ')).not.toContain('MERKZETTEL');
+  });
+
+  it('deckelt die Länge — er geht bei JEDEM Aufruf mit', () => {
+    expect(body('x'.repeat(5000))).toContain('x'.repeat(MEMORY_LIMIT));
+    expect(body('x'.repeat(5000))).not.toContain('x'.repeat(MEMORY_LIMIT + 1));
   });
 });

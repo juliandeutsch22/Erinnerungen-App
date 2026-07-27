@@ -16,12 +16,13 @@ import { KeyboardDoneBar, keyboardDoneProps } from '@/components/KeyboardDone';
 import { MicButton } from '@/components/MicButton';
 import { PressableScale } from '@/components/PressableScale';
 import { LoadingState } from '@/components/StateView';
+import { LIST_COLORS } from '@/components/listMeta';
 import { Type } from '@/components/Type';
 import { useCreateAssistantEvents } from '@/data/calendarQueries';
 import { useCreateNote } from '@/data/noteQueries';
-import { useCreateTask, useLists } from '@/data/queries';
+import { useCreateList, useCreateTask, useLists } from '@/data/queries';
 import type { ChatMessage } from '@/data/types';
-import { askAssistant, buildBraindumpContext, extractActions, describeSchritte, resolveListId, subtasksFromSchritte, type AssistantAction } from '@/lib/assistant';
+import { askAssistant, buildBraindumpContext, describeExtras, describeSchritte, extractActions, resolveListId, subtasksFromSchritte, type AssistantAction } from '@/lib/assistant';
 import { formatDueDate, parseDateStr, todayStr } from '@/lib/dates';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { webNoOutline } from '@/theme/layout';
@@ -34,7 +35,9 @@ export default function BraindumpScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const apiKey = useSettings((s) => s.geminiApiKey);
+  const memory = useSettings((s) => s.assistantMemory);
   const createTask = useCreateTask();
+  const createList = useCreateList();
   const createNote = useCreateNote();
   const createEvents = useCreateAssistantEvents();
   const { data: lists } = useLists();
@@ -93,14 +96,14 @@ export default function BraindumpScreen() {
       const dateLabel = `${parseDateStr(today).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} (${today})`;
       const msg: ChatMessage = { id: 'dump', chatId: 'dump', role: 'user', content: dump, createdAt: new Date().toISOString() };
       let acc = '';
-      const answer = await askAssistant(apiKey, [msg], buildBraindumpContext(dateLabel, false, listNames), (delta) => {
+      const answer = await askAssistant(apiKey, [msg], buildBraindumpContext(dateLabel, false, listNames), memory, (delta) => {
         acc += delta;
         setStream(acc);
       });
       let parsed = extractActions(answer).actions;
       // Manche Modelle vergessen den Block — EIN strikter Zweitversuch, der ihn erzwingt.
       if (!parsed) {
-        const retry = await askAssistant(apiKey, [msg], buildBraindumpContext(dateLabel, true, listNames));
+        const retry = await askAssistant(apiKey, [msg], buildBraindumpContext(dateLabel, true, listNames), memory);
         parsed = extractActions(retry).actions;
       }
       if (!parsed) {
@@ -136,14 +139,33 @@ export default function BraindumpScreen() {
     hapticSuccess();
     let tasks = 0;
     let notes = 0;
+    // Projekte ZUERST — damit „liste" einer Aufgabe auf ein frisch angelegtes
+    // Projekt zeigen kann und nicht im Eingang landet.
+    const frisch: { id: string; name: string }[] = [];
+    for (let i = 0; i < actions.listen.length; i += 1) {
+      if (deselected.has(`l${i}`)) continue;
+      const l = actions.listen[i];
+      const created = await createList.mutateAsync({
+        name: l.name,
+        icon: 'inbox',
+        color: LIST_COLORS[((lists?.length ?? 0) + i) % LIST_COLORS.length],
+        goal: l.ziel ?? null,
+        deadline: l.deadline ?? null,
+      });
+      frisch.push({ id: created.id, name: created.name });
+    }
+    const alleListen = [...(lists ?? []), ...frisch];
     for (let i = 0; i < actions.aufgaben.length; i += 1) {
       if (deselected.has(`a${i}`)) continue;
       const a = actions.aufgaben[i];
       await createTask.mutateAsync({
-        listId: resolveListId(a.liste, lists ?? []),
+        listId: resolveListId(a.liste, alleListen),
         title: a.titel,
+        note: a.notiz ?? null,
         dueDate: a.datum ?? null,
         dueTime: a.zeit ?? null,
+        rrule: a.wiederholung ?? null,
+        tags: a.tags ?? [],
         subtasks: subtasksFromSchritte(a.schritte),
       });
       tasks += 1;
@@ -159,6 +181,7 @@ export default function BraindumpScreen() {
     setText('');
     setDoneEvents(events);
     const parts = [
+      ...(frisch.length > 0 ? [`${frisch.length} ${frisch.length === 1 ? 'Projekt' : 'Projekte'}`] : []),
       `${tasks} ${tasks === 1 ? 'Aufgabe' : 'Aufgaben'}`,
       ...(events > 0 ? [`${events} ${events === 1 ? 'Termin im Kalender' : 'Termine im Kalender'}`] : []),
       `${notes} ${notes === 1 ? 'Notiz' : 'Notizen'}`,
@@ -167,7 +190,7 @@ export default function BraindumpScreen() {
   };
 
   const selectedCount = actions
-    ? actions.aufgaben.length + actions.termine.length + actions.notizen.length - deselected.size
+    ? actions.listen.length + actions.aufgaben.length + actions.termine.length + actions.notizen.length - deselected.size
     : 0;
 
   return (
@@ -286,6 +309,32 @@ export default function BraindumpScreen() {
             <GlassPanel>
               <Type variant="eyebrow" tone="teal">Vorschläge — antippen wählt ab</Type>
               <View style={{ marginTop: Spacing.sm, gap: 2 }}>
+                {/* Projekte stehen oben — sie sind das Dach, unter dem die
+                    Aufgaben darunter einsortiert werden. */}
+                {actions.listen.map((l, i) => {
+                  const off = deselected.has(`l${i}`);
+                  return (
+                    <PressableScale
+                      key={`l${i}`}
+                      accessibilityLabel={`Projekt ${l.name} ${off ? 'wieder auswählen' : 'abwählen'}`}
+                      onPress={() => toggle(`l${i}`)}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.xs + 1, opacity: off ? 0.4 : 1 }}
+                    >
+                      <View style={{ width: 18, height: 18, borderRadius: 5, borderWidth: 1.5, borderColor: off ? colors.border3 : colors.teal, backgroundColor: off ? 'transparent' : colors.teal, alignItems: 'center', justifyContent: 'center' }}>
+                        {!off && <Check size={12} color="#FFFFFF" strokeWidth={3} />}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Type variant="body" numberOfLines={1}>{l.name}</Type>
+                        {(l.ziel || l.deadline) && (
+                          <Type variant="caption" tone="text3" numberOfLines={1}>
+                            {[l.ziel ?? '', l.deadline ? `bis ${formatDueDate(l.deadline, today)}` : ''].filter(Boolean).join(' · ')}
+                          </Type>
+                        )}
+                      </View>
+                      <Type variant="caption" tone="text3">Projekt</Type>
+                    </PressableScale>
+                  );
+                })}
                 {actions.aufgaben.map((a, i) => {
                   const off = deselected.has(`a${i}`);
                   return (
@@ -311,6 +360,9 @@ export default function BraindumpScreen() {
                             Übernehmen sehen, dass EINE Aufgabe entsteht. */}
                         {describeSchritte(a.schritte) && (
                           <Type variant="caption" tone="text3" numberOfLines={2}>{describeSchritte(a.schritte)}</Type>
+                        )}
+                        {describeExtras(a) && (
+                          <Type variant="caption" tone="text3" numberOfLines={1}>{describeExtras(a)}</Type>
                         )}
                       </View>
                       <Type variant="caption" tone="text3">Aufgabe</Type>

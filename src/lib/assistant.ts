@@ -2,7 +2,8 @@
 // Bewusst OHNE eigenen Server: das Gerät spricht die API direkt an — keine
 // laufenden Kosten, kein Mittelsmann. Reine Logik testbar (Prompt-Bau,
 // Antwort-Extraktion); der fetch selbst wird im Test nicht ausgeführt.
-import { type ChatMessage, type List, type Note, newId, type Subtask, type Task } from '@/data/types';
+import { type ChatMessage, type List, type Note, newId, normalizeTag, type Rrule, type Subtask, type Task } from '@/data/types';
+import { isRrule, rruleLabel } from '@/lib/dates';
 import { noteTitle } from '@/lib/noteLogic';
 import type { DeviceEvent } from '@/lib/deviceCalendar';
 
@@ -22,6 +23,8 @@ const endpoint = (model: string, stream: boolean) =>
 
 /** Wie viele Verlaufs-Nachrichten mitgeschickt werden (Kosten-/Limit-Schutz). */
 const HISTORY_LIMIT = 24;
+/** Obergrenze für den Merkzettel — er geht bei JEDEM Aufruf mit. */
+export const MEMORY_LIMIT = 800;
 
 export const SYSTEM_PROMPT =
   'Du bist der Assistent der App „Stoa" — einer ruhigen deutschen Erinnerungs-, ' +
@@ -36,8 +39,14 @@ export const SYSTEM_PROMPT =
   'AKTIONEN: Wenn der Nutzer dich bittet, Aufgaben/Erinnerungen, Termine oder eine Checkliste ' +
   'ANZULEGEN (z. B. „mach mir daraus Aufgaben", „trag das als Termin ein", „erstelle eine Packliste"), ' +
   'hänge ans ENDE deiner Antwort GENAU EINEN Block in diesem Format an:\n' +
-  '```stoa-aktionen\n{"aufgaben":[{"titel":"…","datum":"YYYY-MM-DD","zeit":"HH:MM","schritte":["…"]}],"termine":[{"titel":"…","datum":"YYYY-MM-DD","start":"HH:MM","ende":"HH:MM"}],"checkliste":["…"],"notizen":["…"]}\n```\n' +
+  '```stoa-aktionen\n{"aufgaben":[{"titel":"…","datum":"YYYY-MM-DD","zeit":"HH:MM","schritte":["…"],"wiederholung":"weekly","tags":["…"],"notiz":"…"}],"termine":[{"titel":"…","datum":"YYYY-MM-DD","start":"HH:MM","ende":"HH:MM","notiz":"…"}],"listen":[{"name":"…","ziel":"…","deadline":"YYYY-MM-DD"}],"checkliste":["…"],"notizen":["…"]}\n```\n' +
   '„aufgaben" sind zu ERLEDIGENDE Handlungen (anrufen, kaufen, vorbereiten), datum/zeit optional. ' +
+  '„wiederholung" nur bei ausdrücklich wiederkehrenden Dingen: "daily", "weekly", "monthly", "yearly", ' +
+  'oder mit Abstand "every:2w" (alle 2 Wochen; d=Tage, w=Wochen, m=Monate, y=Jahre), ' +
+  'oder ab Erledigung gerechnet "after:3d" („3 Tage nachdem ich es erledigt habe"). ' +
+  '„tags" sind kurze Schlagworte ohne #; „notiz" ist Zusatzkontext an der Aufgabe (Nummern, Adressen, Details). ' +
+  '„listen" legt ein neues Projekt an — NUR wenn der Nutzer ein größeres Vorhaben beschreibt und ' +
+  'keine passende Liste existiert. Aufgaben dazu bekommen dann "liste" mit genau diesem Namen. ' +
   'WICHTIG — „schritte": Wenn viele Einzelteile zu EINEM Gang oder EINER Handlung gehören, ' +
   'ist das EINE Aufgabe mit „schritte", NICHT viele Aufgaben. Eine Einkaufsliste ' +
   '(„Milch, Brot, Butter, Äpfel") ist EINE Aufgabe „Einkaufen" mit den Dingen als schritte — ' +
@@ -67,6 +76,11 @@ export function buildBraindumpContext(todayLabel: string, strict = false, listen
     'Eine eingefügte Einkaufsliste („Milch, Brot, Butter") wird EINE Aufgabe „Einkaufen" mit den ' +
     'Dingen als schritte. Dasselbe gilt für Packlisten, Zutaten und Besorgungen an einem Ort. ' +
     'Getrennte Aufgaben nur bei wirklich unabhängigen Dingen (anderer Ort, anderer Tag, anderer Anlass). ' +
+    'Erkennbar Wiederkehrendes („jeden Dienstag", „alle zwei Wochen") bekommt "wiederholung" ' +
+    '("daily"/"weekly"/"monthly"/"yearly", "every:2w", "after:3d") statt vieler Einzeltermine. ' +
+    'Zusatzkontext (Nummern, Adressen, Details) gehört als "notiz" an die Aufgabe, nicht in den Titel. ' +
+    'Beschreibt der Wurf ein größeres Vorhaben, für das keine Liste existiert, lege über "listen" ' +
+    'ein Projekt an und setze bei den zugehörigen Aufgaben "liste" auf genau diesen Namen. ' +
     'Keine "checkliste". Antworte mit maximal einem kurzen Satz plus dem Block — nichts darf verloren gehen. ' +
     // Der Nutzer hat Listen/Projekte — Aufgaben sollen dort landen, wo sie
     // hingehören, statt pauschal im Eingang. Unsicher → Feld weglassen.
@@ -98,9 +112,17 @@ export type AssistantAction = {
     /** Checkliste INNERHALB der Aufgabe (Einkaufsliste, Packliste, Teilschritte).
      *  Wird zu `Task.subtasks` — nicht zu eigenen Aufgaben. */
     schritte?: string[];
+    /** Wiederholung als Rrule ('weekly', 'every:2w', 'after:3d') — geprüft über isRrule. */
+    wiederholung?: Rrule;
+    tags?: string[];
+    /** Zusatzkontext an der Aufgabe (Nummern, Adressen) statt im Titel. */
+    notiz?: string;
   }[];
   /** Feste Verabredungen → Gerätekalender. datum Pflicht; ohne start = ganztägig. */
-  termine: { titel: string; datum: string; start?: string; ende?: string }[];
+  termine: { titel: string; datum: string; start?: string; ende?: string; notiz?: string }[];
+  /** Neue Projekte/Listen. Werden VOR den Aufgaben angelegt, damit deren
+   *  „liste" auf die frische Liste zeigen kann. */
+  listen: { name: string; ziel?: string; deadline?: string }[];
   checkliste: string[];
   notizen: string[];
 };
@@ -126,6 +148,26 @@ export function resolveListId(
  *  Chat, Braindump und Sprach-Sheet dieselbe Checkliste anlegen. */
 export function subtasksFromSchritte(schritte: string[] | undefined): Subtask[] {
   return (schritte ?? []).map((title) => ({ id: newId(), title, done: false }));
+}
+
+/** Tags robust lesen: Array oder ein String mit Kommas; normalisiert wie in der
+ *  App (klein, ohne #, keine Leerzeichen) und auf 6 gedeckelt. */
+function parseTags(raw: unknown): string[] | undefined {
+  const items = Array.isArray(raw)
+    ? raw.filter((t): t is string => typeof t === 'string')
+    : typeof raw === 'string'
+      ? raw.split(',')
+      : [];
+  const out = [...new Set(items.map(normalizeTag).filter((t) => t.length > 0))].slice(0, 6);
+  return out.length > 0 ? out : undefined;
+}
+
+/** Zusatz-Merkmale einer Aktions-Aufgabe für die Bestätigungskarte
+ *  (Wiederholung, Tags) — sichtbar, BEVOR etwas angelegt wird. */
+export function describeExtras(a: { wiederholung?: Rrule; tags?: string[] }): string | null {
+  const parts = [a.wiederholung ? rruleLabel(a.wiederholung) : '', (a.tags ?? []).map((t) => `#${t}`).join(' ')];
+  const text = parts.filter(Boolean).join(' · ');
+  return text.length > 0 ? text : null;
 }
 
 /** Kurzfassung der Schritte für die Bestätigungskarte — du sollst VOR dem
@@ -185,6 +227,11 @@ export function extractActions(text: string): { clean: string; actions: Assistan
             // Manche Modelle liefern die Schritte als einzelnen String statt als
             // Array — beides annehmen, sonst geht die Einkaufsliste verloren.
             schritte: parseSchritte(a.schritte),
+            // Nur echte Rrules übernehmen; erfundene Formen ('jeden 2. Montag')
+            // fallen still weg, die Aufgabe bleibt einmalig statt kaputt.
+            wiederholung: isRrule(a.wiederholung) ? a.wiederholung : undefined,
+            tags: parseTags(a.tags),
+            notiz: typeof a.notiz === 'string' && a.notiz.trim().length > 0 ? a.notiz.trim() : undefined,
           }))
       : [];
     const termine = Array.isArray(raw.termine)
@@ -202,6 +249,17 @@ export function extractActions(text: string): { clean: string; actions: Assistan
             datum: t.datum as string,
             start: typeof t.start === 'string' && /^\d{2}:\d{2}$/.test(t.start) ? (t.start as string) : undefined,
             ende: typeof t.ende === 'string' && /^\d{2}:\d{2}$/.test(t.ende) ? (t.ende as string) : undefined,
+            notiz: typeof t.notiz === 'string' && (t.notiz as string).trim().length > 0 ? (t.notiz as string).trim() : undefined,
+          }))
+      : [];
+    const listen = Array.isArray(raw.listen)
+      ? raw.listen
+          .filter((l): l is Record<string, unknown> => typeof l === 'object' && l !== null)
+          .filter((l) => typeof l.name === 'string' && (l.name as string).trim().length > 0)
+          .map((l) => ({
+            name: (l.name as string).trim(),
+            ziel: typeof l.ziel === 'string' && (l.ziel as string).trim().length > 0 ? (l.ziel as string).trim() : undefined,
+            deadline: typeof l.deadline === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(l.deadline as string) ? (l.deadline as string) : undefined,
           }))
       : [];
     const checkliste = Array.isArray(raw.checkliste)
@@ -210,9 +268,9 @@ export function extractActions(text: string): { clean: string; actions: Assistan
     const notizen = Array.isArray(raw.notizen)
       ? raw.notizen.filter((n): n is string => typeof n === 'string' && n.trim().length > 0).map((n) => n.trim())
       : [];
-    if (aufgaben.length === 0 && termine.length === 0 && checkliste.length === 0 && notizen.length === 0)
+    if (aufgaben.length === 0 && termine.length === 0 && listen.length === 0 && checkliste.length === 0 && notizen.length === 0)
       return { clean, actions: null };
-    return { clean, actions: { aufgaben, termine, checkliste, notizen } };
+    return { clean, actions: { aufgaben, termine, listen, checkliste, notizen } };
   } catch {
     return { clean, actions: null };
   }
@@ -400,14 +458,24 @@ export function buildAppContext(input: {
 /** Verlauf → Gemini-Format; Kontext wandert in die System-Instruction.
  *  Datum + Uhrzeit gehen IMMER mit — sonst rät das Modell bei „heute Abend"
  *  ein Datum aus seinen Trainingsdaten. */
-export function buildRequestBody(messages: ChatMessage[], context: string | null, now: Date = new Date()): unknown {
+export function buildRequestBody(
+  messages: ChatMessage[],
+  context: string | null,
+  now: Date = new Date(),
+  memory: string | null = null,
+): unknown {
   const dateLine =
     `Heute ist ${now.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}, ` +
     `${now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr ` +
     `(ISO: ${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}). ` +
     'Relative Angaben wie „heute", „morgen" oder „nächste Woche" beziehen sich hierauf.';
+  // Der Merkzettel steht NACH den Regeln und VOR dem Datenkontext: er ist eine
+  // Vorgabe des Nutzers, kein Datenpunkt. Gedeckelt, damit ein versehentlich
+  // eingefügter Roman nicht jeden Aufruf verteuert.
+  const note = memory?.trim().slice(0, MEMORY_LIMIT) ?? '';
   const system =
     `${SYSTEM_PROMPT}\n\n${dateLine}` +
+    (note ? `\n\nMERKZETTEL des Nutzers — seine festen Vorgaben, immer beachten:\n${note}` : '') +
     (context ? `\n\nKontext aus der App:\n${context}` : '');
   return {
     systemInstruction: { parts: [{ text: system }] },
@@ -676,10 +744,13 @@ export async function askAssistant(
   apiKey: string,
   messages: ChatMessage[],
   context: string | null,
+  /** Merkzettel des Nutzers (Einstellungen). Bewusst PFLICHT-Parameter: so kann
+   *  ihn keine Aufrufstelle stillschweigend vergessen — tsc meldet es. */
+  memory: string | null,
   onDelta?: (delta: string) => void,
 ): Promise<string> {
   const stream = onDelta !== undefined;
-  const body = buildRequestBody(messages, context);
+  const body = buildRequestBody(messages, context, new Date(), memory);
   let { res, model } = await callChain(MODEL_CHAIN, workingModel, apiKey, body, stream);
 
   // Alle bekannten IDs sind 404 → beim Dienst nachfragen, was es wirklich gibt.

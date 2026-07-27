@@ -333,6 +333,21 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
     Braindump und Sprach-Sheet gemeinsam benutzt; `parseSchritte` nimmt auch
     einen einzelnen String mit Zeilenumbrüchen, weil Modelle das liefern.
 
+17. **Aktions-Sprache = Werkzeugkasten des Assistenten** (v1.35.0). Sie war
+    lange schmaler als das Datenmodell, in das sie schreibt — daher Fehler wie
+    „Einkaufsliste → sechs Aufgaben". Eine Aktions-Aufgabe kann jetzt
+    `schritte`, `wiederholung` (Rrule), `tags`, `notiz` und über `listen` sogar
+    ein Projekt anlegen (Projekte werden VOR den Aufgaben erzeugt, damit `liste`
+    darauf zeigen kann). **Regel für die Zukunft: Wenn Task/List ein Feld
+    bekommt, gehört es hier mit hinein** — sonst drückt das Modell es falsch aus.
+    Ungültige Wiederholungen werden verworfen (lieber einmalig als kaputt).
+18. **Merkzettel** (`assistantMemory`, v1.35.0) — vom NUTZER geschriebene
+    Vorgaben, die in jede System-Instruction wandern (vor dem Datenkontext,
+    gedeckelt auf `MEMORY_LIMIT`). Bewusst KEIN Lernen der App über den Nutzer;
+    das war die verworfene „Spiegel"-Idee. `askAssistant` nimmt den Merkzettel
+    als PFLICHT-Parameter — so kann ihn keine Aufrufstelle stillschweigend
+    vergessen, tsc meldet es.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

@@ -12,6 +12,7 @@ import { DisclosureChevron } from '@/components/DisclosureChevron';
 import { authenticateAppLock, canUseAppLock } from '@/lib/appLock';
 import { GlassButton } from '@/components/GlassButton';
 import { ImportRemindersSheet } from '@/components/ImportRemindersSheet';
+import { KeyboardDoneBar, keyboardDoneProps } from '@/components/KeyboardDone';
 import { PasteNoteSheet } from '@/components/PasteNoteSheet';
 import { GlassPanel } from '@/components/GlassPanel';
 import { PressableScale } from '@/components/PressableScale';
@@ -20,6 +21,7 @@ import { Screen } from '@/components/Screen';
 import { Seam } from '@/components/Seam';
 import { Type } from '@/components/Type';
 import { type BackupBundle, describeSummary, exportToJsonString, importBackup, shareBackup, summarizeBundle } from '@/data/backup';
+import { MEMORY_LIMIT } from '@/lib/assistant';
 import {
   extFromUri,
   fileBackupAvailable,
@@ -84,6 +86,8 @@ export default function EinstellungenScreen() {
   const setAssistantContextEnabled = useSettings((s) => s.setAssistantContextEnabled);
   const setSavedFilters = useSettings((s) => s.setSavedFilters);
   const setDayIntentions = useSettings((s) => s.setDayIntentions);
+  const assistantMemory = useSettings((s) => s.assistantMemory);
+  const setAssistantMemory = useSettings((s) => s.setAssistantMemory);
   const appLockEnabled = useSettings((s) => s.appLockEnabled);
   const setAppLockEnabled = useSettings((s) => s.setAppLockEnabled);
 
@@ -159,6 +163,7 @@ export default function EinstellungenScreen() {
       const { lists, tasks, filters, photos, documents } = await importBackup(json, {
         setSavedFilters,
         setDayIntentions,
+        setAssistantMemory,
         writePhotoFromBase64,
         writeDocumentFromBase64,
       });
@@ -564,6 +569,42 @@ export default function EinstellungenScreen() {
                   onPress={() => setAssistantContextEnabled(!assistantContextEnabled)}
                 />
               </View>
+
+              <Seam />
+              <Type variant="heading" style={sectionStyle}>Merkzettel</Type>
+              <Type variant="caption" tone="text3" style={{ marginTop: 2 }}>
+                Feste Vorgaben, die bei jeder Anfrage mitgehen — deine Regeln, von dir geschrieben.
+                Die App lernt hier nichts von selbst. Zum Beispiel: „Besorgungen kommen in die Liste
+                Erledigungen." · „Termine bitte nie vor 9 Uhr." · „Sport heißt bei mir dienstags abends."
+              </Type>
+              <TextInput
+                value={assistantMemory}
+                onChangeText={(v) => setAssistantMemory(v.slice(0, MEMORY_LIMIT))}
+                placeholder="Eine Vorgabe pro Zeile…"
+                placeholderTextColor={colors.text3}
+                multiline
+                accessibilityLabel="Merkzettel für den Assistenten"
+                {...keyboardDoneProps}
+                style={[
+                  {
+                    marginTop: Spacing.sm,
+                    borderRadius: R.md,
+                    borderWidth: 1,
+                    borderColor: colors.chipBorder,
+                    backgroundColor: colors.chip,
+                    padding: Spacing.sm,
+                    minHeight: 96,
+                    fontSize: T.sm,
+                    lineHeight: T.sm * 1.45,
+                    color: colors.text,
+                    textAlignVertical: 'top',
+                  },
+                  webNoOutline,
+                ]}
+              />
+              <Type variant="caption" tone="text3" style={{ marginTop: Spacing.xs }} tabular>
+                {assistantMemory.trim().length} / {MEMORY_LIMIT} Zeichen
+              </Type>
             </>
           )}
         </GlassPanel>
@@ -574,6 +615,7 @@ export default function EinstellungenScreen() {
           Stoa · Version {appVersion}
         </Type>
       </Reveal>
+      <KeyboardDoneBar />
 
       {showReminderImport && <ImportRemindersSheet onClose={() => setShowReminderImport(false)} />}
       {showPasteNote && <PasteNoteSheet onClose={() => setShowPasteNote(false)} />}

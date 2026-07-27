@@ -59,6 +59,7 @@ export type BackupBundle = {
   documents: BackupDocument[];
   journal: JournalEntry[];
   dayIntentions: BackupDayIntentions;
+  assistantMemory: string;
 };
 
 /**
@@ -71,6 +72,8 @@ export type BackupBundle = {
 export type BackupStoreSlice = {
   savedFilters: SavedFilter[];
   dayIntentions: BackupDayIntentions;
+  /** Merkzettel für den Assistenten — vom Nutzer geschrieben, also seine Daten. */
+  assistantMemory: string;
 };
 
 /** Quellen, die nur zur Laufzeit verfügbar sind (Store, Datei-IO). */
@@ -121,6 +124,7 @@ export async function buildBackup(sources: BackupSources, now: Date = new Date()
     documents,
     journal,
     dayIntentions: sources.dayIntentions,
+    assistantMemory: sources.assistantMemory,
   };
 }
 
@@ -240,6 +244,7 @@ function parseDayIntentions(raw: unknown): BackupDayIntentions {
 export type ImportSinks = {
   setSavedFilters?: (filters: SavedFilter[]) => void;
   setDayIntentions?: (intentions: BackupDayIntentions) => void;
+  setAssistantMemory?: (memory: string) => void;
   /** Schreibt Base64-Bilddaten als Datei und gibt die neue URI zurück (nativ). */
   writePhotoFromBase64?: (ext: string, base64: string) => Promise<string | null>;
   /** Schreibt Base64-Dokumentdaten als Datei und gibt die neue URI zurück (nativ). */
@@ -443,6 +448,7 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
   for (const j of journal) await journalRepo.upsert(j);
   sinks.setSavedFilters?.(filters);
   sinks.setDayIntentions?.(parseDayIntentions(parsed.dayIntentions));
+  sinks.setAssistantMemory?.(str(parsed.assistantMemory) ? parsed.assistantMemory.trim() : '');
 
   return { lists: lists.length, tasks: tasks.length, notes: notes.length, filters: filters.length, photos: photos.length, chats: chats.length, documents: documents.length, journal: journal.length };
 }

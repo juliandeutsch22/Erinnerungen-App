@@ -44,6 +44,10 @@ type SettingsState = {
   /** Der Satz des Tages („Ausrichtung"), je Datum ('YYYY-MM-DD').
    *  Wird auf die letzten 30 Tage gekappt — ein Tagesgedanke, kein Archiv. */
   dayIntentions: Record<string, { text: string; done: boolean }>;
+  /** Merkzettel für den Assistenten: feste Vorgaben, die der NUTZER schreibt
+   *  („Besorgungen kommen in die Liste Erledigungen"). Geht bei jedem Aufruf
+   *  mit. Die App lernt hier NICHTS von selbst — das ist der Unterschied. */
+  assistantMemory: string;
   /** true, sobald der persistierte Zustand geladen wurde (verhindert Flash). */
   _hasHydrated: boolean;
   setThemePref: (p: ThemePref) => void;
@@ -72,6 +76,7 @@ type SettingsState = {
   toggleDayIntentionDone: (date: string) => void;
   /** Ersetzt alle Tages-Sätze am Stück — nur für die Wiederherstellung. */
   setDayIntentions: (dayIntentions: Record<string, { text: string; done: boolean }>) => void;
+  setAssistantMemory: (v: string) => void;
 };
 
 export const useSettings = create<SettingsState>()(
@@ -93,6 +98,7 @@ export const useSettings = create<SettingsState>()(
       journalReminderTime: '21:00',
       assistantContextEnabled: true,
       dayIntentions: {},
+      assistantMemory: '',
       _hasHydrated: false,
       setThemePref: (themePref) => set({ themePref }),
       setMotionPref: (motionPref) => set({ motionPref }),
@@ -138,6 +144,7 @@ export const useSettings = create<SettingsState>()(
           return { dayIntentions: { ...s.dayIntentions, [date]: { ...cur, done: !cur.done } } };
         }),
       setDayIntentions: (dayIntentions) => set({ dayIntentions }),
+      setAssistantMemory: (assistantMemory) => set({ assistantMemory }),
     }),
     {
       name: 'stille.settings',
@@ -159,6 +166,7 @@ export const useSettings = create<SettingsState>()(
         journalReminderTime: s.journalReminderTime,
         assistantContextEnabled: s.assistantContextEnabled,
         dayIntentions: s.dayIntentions,
+        assistantMemory: s.assistantMemory,
         // geminiApiKey bewusst NICHT persistieren — Quelle ist die Keychain.
       }),
       // state ist der rehydrierte Store inkl. Actions → kein Bezug auf useSettings
@@ -175,5 +183,5 @@ export const useSettings = create<SettingsState>()(
  */
 export function backupSlice(): BackupStoreSlice {
   const s = useSettings.getState();
-  return { savedFilters: s.savedFilters, dayIntentions: s.dayIntentions };
+  return { savedFilters: s.savedFilters, dayIntentions: s.dayIntentions, assistantMemory: s.assistantMemory };
 }

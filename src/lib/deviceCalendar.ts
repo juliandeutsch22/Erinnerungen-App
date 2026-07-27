@@ -132,7 +132,7 @@ export async function createDeviceEvent(calendarId: string, draft: EventDraft): 
 }
 
 // ——— Termin aus einer Assistenten-Aktion (Sprach-Sheet, Chat, Braindump). ———
-export type AssistantEventInput = { titel: string; datum: string; start?: string; ende?: string };
+export type AssistantEventInput = { titel: string; datum: string; start?: string; ende?: string; notiz?: string };
 
 /** Baut aus {datum, start, ende} einen EventDraft — rein & testbar (lokale Zeit,
  *  KEIN UTC). Ohne start: ganztägig. Ende ≤ Start oder fehlend → eine Stunde. */
@@ -141,7 +141,7 @@ export function buildEventDraft(input: AssistantEventInput): EventDraft {
   if (!input.start) {
     const end = new Date(base);
     end.setDate(end.getDate() + 1);
-    return { title: input.titel, notes: null, allDay: true, start: base, end };
+    return { title: input.titel, notes: input.notiz ?? null, allDay: true, start: base, end };
   }
   const [sh, sm] = input.start.split(':').map(Number);
   const start = new Date(base);
@@ -155,7 +155,7 @@ export function buildEventDraft(input: AssistantEventInput): EventDraft {
     end = new Date(start.getTime() + 60 * 60 * 1000);
   }
   if (end.getTime() <= start.getTime()) end = new Date(start.getTime() + 60 * 60 * 1000);
-  return { title: input.titel, notes: null, allDay: false, start, end };
+  return { title: input.titel, notes: input.notiz ?? null, allDay: false, start, end };
 }
 
 /** Legt einen Termin im Standard-Kalender an. Kümmert sich um Berechtigung und
