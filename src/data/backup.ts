@@ -42,6 +42,9 @@ export type BackupDocument = {
   data: string | null;
 };
 
+/** Der Satz des Tages je Datum ('YYYY-MM-DD') — der Morgen des Bogens. */
+export type BackupDayIntentions = Record<string, { text: string; done: boolean }>;
+
 export type BackupBundle = {
   app: 'stille';
   schemaVersion: 3;
@@ -55,11 +58,23 @@ export type BackupBundle = {
   chatMessages: ChatMessage[];
   documents: BackupDocument[];
   journal: JournalEntry[];
+  dayIntentions: BackupDayIntentions;
+};
+
+/**
+ * Die Teile des Einstellungs-Stores, die ins Backup gehören — bewusst EIN
+ * Objekt statt Einzelparameter: Was hier dazukommt, nimmt danach jeder Aufrufer
+ * automatisch mit. `dayIntentions` hatte genau diese Lücke (v1.29.0 angelegt,
+ * bis v1.33.0 nie gesichert), weil es als zweiter Parameter hätte nachgezogen
+ * werden müssen und an vier Stellen vergessen wurde.
+ */
+export type BackupStoreSlice = {
+  savedFilters: SavedFilter[];
+  dayIntentions: BackupDayIntentions;
 };
 
 /** Quellen, die nur zur Laufzeit verfügbar sind (Store, Datei-IO). */
-export type BackupSources = {
-  savedFilters: SavedFilter[];
+export type BackupSources = BackupStoreSlice & {
   /** Liest eine Foto-Datei als Base64 (nativ). Fehlt/liefert null → Foto als reine Verknüpfung. */
   readPhotoBase64?: (uri: string) => Promise<string | null>;
   extFromUri?: (uri: string) => string;
@@ -105,6 +120,7 @@ export async function buildBackup(sources: BackupSources, now: Date = new Date()
     chatMessages,
     documents,
     journal,
+    dayIntentions: sources.dayIntentions,
   };
 }
 
@@ -205,9 +221,25 @@ function parseSavedFilters(raw: unknown): SavedFilter[] {
   return out;
 }
 
+/** Liest die Tages-Sätze tolerant zurück — ältere Backups haben sie nicht. */
+function parseDayIntentions(raw: unknown): BackupDayIntentions {
+  if (!isRecord(raw)) return {};
+  const out: BackupDayIntentions = {};
+  for (const [date, v] of Object.entries(raw)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !isRecord(v) || !str(v.text)) continue;
+    const text = v.text.trim();
+    if (text.length === 0) continue;
+    out[date] = { text, done: v.done === true };
+  }
+  // Wie im Store: nur die letzten 30 Tage — ein Tagesgedanke, kein Archiv.
+  const keys = Object.keys(out).sort().slice(-30);
+  return Object.fromEntries(keys.map((k) => [k, out[k]]));
+}
+
 /** Senken für nur zur Laufzeit verfügbare Ziele (Store, Datei-IO). */
 export type ImportSinks = {
   setSavedFilters?: (filters: SavedFilter[]) => void;
+  setDayIntentions?: (intentions: BackupDayIntentions) => void;
   /** Schreibt Base64-Bilddaten als Datei und gibt die neue URI zurück (nativ). */
   writePhotoFromBase64?: (ext: string, base64: string) => Promise<string | null>;
   /** Schreibt Base64-Dokumentdaten als Datei und gibt die neue URI zurück (nativ). */
@@ -410,6 +442,7 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
   await docRepo.restore(documents);
   for (const j of journal) await journalRepo.upsert(j);
   sinks.setSavedFilters?.(filters);
+  sinks.setDayIntentions?.(parseDayIntentions(parsed.dayIntentions));
 
   return { lists: lists.length, tasks: tasks.length, notes: notes.length, filters: filters.length, photos: photos.length, chats: chats.length, documents: documents.length, journal: journal.length };
 }

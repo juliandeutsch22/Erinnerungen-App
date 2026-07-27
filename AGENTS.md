@@ -24,14 +24,19 @@ Achterbahn. Konkret:
   (`CormorantGaramond_700Bold`) mit POSITIVEM Tracking (Inschriften sind
   gesperrt, nie eng); Body bleibt System-Font. Eyebrows = Tempel-Inschrift
   (Uppercase, weites Tracking). Immer über `<Type variant=…>`.
-- **Meißel:** Überschriften und Eyebrows tragen ein Relief — ein hauchfeiner
-  Lichtgrat UNTER der Glyphe (`Type.tsx`, Konstante `CHISEL`), damit die Letter
-  in den Stein geschnitten wirkt. Kein weicher Schlagschatten: der würde sie
-  heben statt vertiefen. Für helle Schrift auf getönter Fläche `chisel={false}`.
+- **Meißel:** Überschriften und Eyebrows tragen ein Relief (`Type.tsx`,
+  Konstante `CHISEL`) — und es KIPPT zwischen den Themes, weil die Physik
+  kippt: In Light ist die dunkle Letter auf hellem Stein *eingeschnitten*
+  (Lichtgrat unter der Glyphe), in Dark ist die helle Letter auf dunklem Stein
+  *erhaben* (Schattengrat unter der Glyphe) — eine vertiefte Letter wäre dort
+  dunkler als der Stein, nicht heller. Beide Male Versatz 1 px, Radius unter 1:
+  ein weicher Schlagschatten ließe sie schweben. Für helle Schrift auf getönter
+  Fläche `chisel={false}`.
 - **Flächen:** `GlassPanel`/`Glass` (Steinton + Marmor-Textur) statt nackter
   Views; tonale Flächen statt Strichlinien/Umrandungen; flache, weiche
   Schatten. Die Platte trägt Lichtgrat oben, Schattengrat unten und zarte
-  Fasen an den Seiten — sie ist behauen, nicht gezeichnet.
+  Fasen an den Seiten — sie ist behauen, nicht gezeichnet, und trägt deshalb
+  KEINE Umrandung. Die Haarlinie bleibt nur getönten Flächen und Pills.
 - **Seams:** Trennung innerhalb eines Panels über `<Seam>`; der Mäander
   (`variant="ornament"`) maximal EINMAL pro Panel — er ist Schmuck, kein Raster.
 - **Backdrop:** Der Tempel-Hintergrund (Backdrop.tsx) bleibt unangetastet.

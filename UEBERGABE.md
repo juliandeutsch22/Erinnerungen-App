@@ -313,6 +313,16 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
       im Grund. Der Backdrop ist tabu (AGENTS.md), also trägt die Kante die
       Plastizität, nicht der Kontrast.
 
+15. **Was in den Einstellungs-Store wandert, gehört ins Backup — und wird dort
+    vergessen.** `dayIntentions` (der Morgensatz des Bogens, v1.29.0) lag vier
+    Releases lang außerhalb des Backups, weil `exportToJsonString` und
+    `runAutoBackup` die Store-Felder EINZELN entgegennahmen und an vier
+    Aufrufstellen hätten nachgezogen werden müssen. Seit v1.33.0 gibt es
+    `BackupStoreSlice` (data/backup.ts) und `backupSlice()` (settings.store.ts):
+    Ein neues Feld dort eintragen genügt, alle Aufrufer nehmen es automatisch
+    mit, und tsc meldet jede Stelle, die noch fehlt. Beim nächsten persistierten
+    Store-Feld also: erst `BackupStoreSlice` erweitern, dann alles andere.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

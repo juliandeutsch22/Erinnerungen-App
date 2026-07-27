@@ -38,21 +38,26 @@ const VARIANT_STYLE: Record<Variant, TextStyle> = {
   eyebrow: { fontSize: T.xs, lineHeight: T.xs * 1.4, fontWeight: '700', letterSpacing: 2.6, textTransform: 'uppercase' },
 };
 
-// Meißel-Relief: Die Antiqua-Überschriften sollen in den Stein GESCHNITTEN
-// wirken, nicht daraufliegen. Dafür genügt ein hauchfeiner Lichtgrat direkt
-// UNTER der Glyphe — so wie Tageslicht auf der unteren Schnittfläche einer
-// Inschrift liegt. Deshalb Versatz von nur 1 px und ein Radius unter 1: ein
-// weicher Schlagschatten würde die Letter heben statt sie zu vertiefen.
-// Dark trägt den Effekt bewusst schwächer — auf dunklem Stein gibt es kaum
-// Streulicht, und ein heller Grat unter heller Schrift würde nur verwaschen.
+// Meißel-Relief — und es dreht sich zwischen den Themes um, weil die Physik
+// sich umdreht:
+//  LIGHT: dunkle Schrift auf hellem Stein = die Letter ist EINGESCHNITTEN. Der
+//    Lichtgrat liegt unter der Glyphe, so wie Tageslicht auf der unteren
+//    Schnittfläche einer Inschrift steht.
+//  DARK: helle Schrift auf dunklem Stein heißt physikalisch das Gegenteil —
+//    eine vertiefte Letter wäre dunkler als der Stein, nicht heller. Nachts
+//    liest man einen Fries am Streiflicht der ERHABENEN Kante, also wirft die
+//    Letter hier einen Schattengrat auf den Stein darunter. Ein heller Grat
+//    unter weißer Schrift wäre ohnehin unsichtbar gewesen.
+// Beide Male derselbe Versatz von 1 px, nur die Farbe kippt. Radius bleibt
+// unter 1: ein weicher Schlagschatten ließe die Letter schweben statt sitzen.
 type Chisel = { light: number; dark: number; dy: number };
 const CHISEL: Partial<Record<Variant, Chisel>> = {
-  hero: { light: 0.9, dark: 0.16, dy: 1 },
-  title: { light: 0.9, dark: 0.16, dy: 1 },
-  heading: { light: 0.9, dark: 0.16, dy: 1 },
+  hero: { light: 0.9, dark: 0.55, dy: 1 },
+  title: { light: 0.9, dark: 0.55, dy: 1 },
+  heading: { light: 0.9, dark: 0.55, dy: 1 },
   // Eyebrows sind klein: halbe Dosis, halber Versatz — sonst verschwimmt die
   // Sperrung der Tempel-Inschrift.
-  eyebrow: { light: 0.45, dark: 0.1, dy: 0.5 },
+  eyebrow: { light: 0.45, dark: 0.3, dy: 0.5 },
 };
 
 export function Type({ variant = 'body', tone = 'text', tabular = false, chisel = true, style, ...rest }: TypeProps) {
@@ -67,7 +72,7 @@ export function Type({ variant = 'body', tone = 'text', tabular = false, chisel 
         { color: toneColor },
         cut
           ? {
-              textShadowColor: `rgba(255,255,255,${isDark ? cut.dark : cut.light})`,
+              textShadowColor: isDark ? `rgba(0,0,0,${cut.dark})` : `rgba(255,255,255,${cut.light})`,
               textShadowOffset: { width: 0, height: cut.dy },
               textShadowRadius: 0.6,
             }

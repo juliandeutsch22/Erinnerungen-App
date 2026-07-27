@@ -22,7 +22,7 @@ import {
   rescheduleJournalReminder,
   useNotificationResponses,
 } from '@/lib/notifications';
-import { useSettings } from '@/theme/settings.store';
+import { backupSlice, useSettings } from '@/theme/settings.store';
 import { ThemeProvider, useColors, useScheme } from '@/theme/ThemeProvider';
 
 function RootStack() {
@@ -65,7 +65,7 @@ function RootStack() {
 
       // Stilles Wochen-Backup in den Dateien-Ordner (nur nativ).
       if (isAutoBackupDue(state.lastAutoBackupAt)) {
-        const name = await runAutoBackup(state.savedFilters);
+        const name = await runAutoBackup(backupSlice());
         if (name) useSettings.getState().setLastAutoBackupAt(new Date().toISOString());
       }
 

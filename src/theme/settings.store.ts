@@ -4,6 +4,7 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
+import type { BackupStoreSlice } from '@/data/backup';
 import { kvStorage } from '@/data/kvStorage';
 import type { SavedFilter } from '@/lib/taskFilters';
 
@@ -69,6 +70,8 @@ type SettingsState = {
    *  eigenen Repository: eine Zeile pro Tag, kurzlebig, kein eigenes Silo. */
   setDayIntention: (date: string, text: string) => void;
   toggleDayIntentionDone: (date: string) => void;
+  /** Ersetzt alle Tages-Sätze am Stück — nur für die Wiederherstellung. */
+  setDayIntentions: (dayIntentions: Record<string, { text: string; done: boolean }>) => void;
 };
 
 export const useSettings = create<SettingsState>()(
@@ -134,6 +137,7 @@ export const useSettings = create<SettingsState>()(
           if (!cur) return {};
           return { dayIntentions: { ...s.dayIntentions, [date]: { ...cur, done: !cur.done } } };
         }),
+      setDayIntentions: (dayIntentions) => set({ dayIntentions }),
     }),
     {
       name: 'stille.settings',
@@ -163,3 +167,13 @@ export const useSettings = create<SettingsState>()(
     },
   ),
 );
+
+/**
+ * Die Store-Teile, die ins Backup gehören — an EINER Stelle, damit ein neu
+ * dazugekommenes Feld nicht wieder an drei Aufrufstellen vergessen wird
+ * (siehe `BackupStoreSlice` in data/backup.ts).
+ */
+export function backupSlice(): BackupStoreSlice {
+  const s = useSettings.getState();
+  return { savedFilters: s.savedFilters, dayIntentions: s.dayIntentions };
+}

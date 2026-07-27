@@ -37,7 +37,7 @@ import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { setSecureKey } from '@/lib/secureKey';
 import { webNoOutline } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
-import { MotionPref, ThemePref, useSettings } from '@/theme/settings.store';
+import { backupSlice, MotionPref, ThemePref, useSettings } from '@/theme/settings.store';
 import { R, Spacing, T } from '@/theme/theme.tokens';
 
 const THEMES: { value: ThemePref; label: string }[] = [
@@ -83,6 +83,7 @@ export default function EinstellungenScreen() {
   const assistantContextEnabled = useSettings((s) => s.assistantContextEnabled);
   const setAssistantContextEnabled = useSettings((s) => s.setAssistantContextEnabled);
   const setSavedFilters = useSettings((s) => s.setSavedFilters);
+  const setDayIntentions = useSettings((s) => s.setDayIntentions);
   const appLockEnabled = useSettings((s) => s.appLockEnabled);
   const setAppLockEnabled = useSettings((s) => s.setAppLockEnabled);
 
@@ -119,7 +120,7 @@ export default function EinstellungenScreen() {
   })();
 
   const doAutoBackupNow = async () => {
-    const name = await runAutoBackup(useSettings.getState().savedFilters);
+    const name = await runAutoBackup(backupSlice());
     if (name) {
       setLastAutoBackupAt(new Date().toISOString());
       hapticSuccess();
@@ -131,7 +132,7 @@ export default function EinstellungenScreen() {
 
   const doExport = async () => {
     const json = await exportToJsonString({
-      savedFilters: useSettings.getState().savedFilters,
+      ...backupSlice(),
       readPhotoBase64,
       extFromUri,
       readDocumentBase64,
@@ -152,11 +153,12 @@ export default function EinstellungenScreen() {
   const runImport = async (json: string) => {
     try {
       if (fileBackupAvailable) {
-        const name = await runAutoBackup(useSettings.getState().savedFilters);
+        const name = await runAutoBackup(backupSlice());
         if (name) setLastAutoBackupAt(new Date().toISOString());
       }
       const { lists, tasks, filters, photos, documents } = await importBackup(json, {
         setSavedFilters,
+        setDayIntentions,
         writePhotoFromBase64,
         writeDocumentFromBase64,
       });

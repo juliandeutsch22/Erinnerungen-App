@@ -59,7 +59,10 @@ export function Glass({ variant = 'card', radius, tint, style, contentStyle, chi
         {
           borderRadius,
           backgroundColor,
-          borderWidth: StyleSheet.hairlineWidth,
+          // Haarlinie NUR dort, wo kein Meißel greift (getönte Flächen, Pills).
+          // Wo die Platte Grate und Fasen trägt, wäre der Strich der letzte Rest
+          // „gezeichnetes Rechteck" — die Kante ist behauen, nicht umrandet.
+          borderWidth: showChisel ? 0 : StyleSheet.hairlineWidth,
           borderColor: colors.border,
           overflow: 'hidden',
         },

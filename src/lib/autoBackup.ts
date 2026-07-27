@@ -5,10 +5,9 @@
 // erfasst. Behalten werden die letzten 4 Stände.
 import { Platform } from 'react-native';
 
-import { exportToJsonString } from '@/data/backup';
+import { type BackupStoreSlice, exportToJsonString } from '@/data/backup';
 import { extFromUri, readPhotoBase64 } from '@/lib/backupFile';
 import { readDocumentBase64 } from '@/lib/documents';
-import type { SavedFilter } from '@/lib/taskFilters';
 
 const BACKUP_DIR = 'Backups';
 const KEEP = 4;
@@ -57,14 +56,14 @@ export async function readBackup(name: string): Promise<string | null> {
 }
 
 /** Führt das Backup aus (nur nativ). Liefert den Dateinamen oder null. */
-export async function runAutoBackup(savedFilters: SavedFilter[], now: Date = new Date()): Promise<string | null> {
+export async function runAutoBackup(store: BackupStoreSlice, now: Date = new Date()): Promise<string | null> {
   if (Platform.OS === 'web') return null;
   try {
     const { Directory, File, Paths } = fs();
     const dir = new Directory(Paths.document, BACKUP_DIR);
     if (!dir.exists) dir.create();
 
-    const json = await exportToJsonString({ savedFilters, readPhotoBase64, extFromUri, readDocumentBase64 }, now);
+    const json = await exportToJsonString({ ...store, readPhotoBase64, extFromUri, readDocumentBase64 }, now);
     const name = `stoa-backup-${now.toISOString().slice(0, 10)}.json`;
     const file = new File(dir, name);
     file.write(json);
