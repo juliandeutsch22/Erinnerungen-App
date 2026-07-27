@@ -74,9 +74,6 @@ meisten Wirkung pro Zeile Code. Alle **NEU**, sofern nicht anders vermerkt.
 - **Zeit in der Suche** `[JS · mittel]` — *Suche ist rein textlich.* Zeiträume
   als Filter („letzten Monat") und daraus die Tagesseite: **„An diesem Tag"** —
   Erledigtes, Termine, Fotos, Notizen eines Tages (aus dem alten Backlog).
-- **Wiederholungen, die zum Leben passen** `[JS · mittel]` — *nur fünf starre
-  Muster.* Intervall („alle 2 Wochen"), Enddatum und vor allem
-  „*x* Tage **nach Erledigung**" (Pflanzen gießen) — löst echte Alltagsfälle.
 - **Ein Gesundheits-Blick** `[JS · klein]` — *Backup, Papierkorb und
   Speicher sind über die Einstellungen verstreut.* Eine ruhige Übersicht:
   letztes Backup, was im Papierkorb liegt, wie viel Platz Fotos brauchen.

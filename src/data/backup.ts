@@ -10,6 +10,7 @@
 // (siehe backupFile.ts, settings.store.ts), damit dieses Modul testbar bleibt.
 import { Platform, Share } from 'react-native';
 
+import { isRrule } from '@/lib/dates';
 import type { FilterRange, SavedFilter } from '@/lib/taskFilters';
 import { remapListColor } from './colorRebrand';
 import type { EventDocument } from './DocumentRepository';
@@ -175,7 +176,8 @@ export async function shareBackup(json: string, filename = 'erinnerungen-backup.
   await Share.share({ message: json });
 }
 
-const RRULES = new Set(['daily', 'weekdays', 'weekly', 'monthly', 'yearly']);
+// Wiederholungen werden über isRrule geprüft — deckt Presets UND die
+// erweiterten Formen ('every:2w', 'after:3d') ab.
 const RANGES = new Set<FilterRange>(['all', 'today', 'week', 'overdue', 'undated']);
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -268,7 +270,8 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
       note: str(t.note) ? t.note : null,
       dueDate: str(t.dueDate) ? t.dueDate : null,
       dueTime: str(t.dueTime) ? t.dueTime : null,
-      rrule: str(t.rrule) && RRULES.has(t.rrule) ? (t.rrule as Rrule) : null,
+      rrule: isRrule(t.rrule) ? t.rrule : null,
+      rruleUntil: str(t.rruleUntil) ? t.rruleUntil : null,
       flagged: t.flagged === true,
       eventId: str(t.eventId) ? t.eventId : null,
       completedAt: str(t.completedAt) ? t.completedAt : null,

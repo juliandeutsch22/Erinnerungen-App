@@ -24,7 +24,7 @@ import { Type } from '@/components/Type';
 import { useCreateTask, useDeleteTask, useLists, useTasks, useUpdateTask } from '@/data/queries';
 import type { Rrule, Subtask, Task } from '@/data/types';
 import { newId, normalizeTag } from '@/data/types';
-import { formatDueDate, todayStr } from '@/lib/dates';
+import { addMonths, formatDueDate, rruleLabel, todayStr } from '@/lib/dates';
 import { tagCounts } from '@/lib/taskFilters';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { webNoOutline } from '@/theme/layout';
@@ -32,20 +32,17 @@ import { useColors } from '@/theme/ThemeProvider';
 import { useSettings } from '@/theme/settings.store';
 import { R, Spacing, T } from '@/theme/theme.tokens';
 
-const RRULES: { value: Rrule; label: string }[] = [
-  { value: 'daily', label: 'Täglich' },
-  { value: 'weekdays', label: 'Werktags' },
-  { value: 'weekly', label: 'Wöchentlich' },
-  { value: 'monthly', label: 'Monatlich' },
-  { value: 'yearly', label: 'Jährlich' },
+// Fester Rhythmus — richtet sich nach dem Fälligkeitsdatum.
+const RRULES_FEST: Rrule[] = ['daily', 'weekdays', 'weekly', 'monthly', 'yearly', 'every:2w', 'every:3w', 'every:2m'];
+// Richtet sich danach, wann du es zuletzt getan hast.
+const RRULES_DANACH: Rrule[] = ['after:3d', 'after:7d', 'after:14d', 'after:30d'];
+// Serienende, relativ gerechnet — kein Datumswähler nötig.
+const ENDS: { label: string; months: number | null }[] = [
+  { label: 'Ohne Ende', months: null },
+  { label: 'Nach 1 Monat', months: 1 },
+  { label: 'Nach 3 Monaten', months: 3 },
+  { label: 'Nach 1 Jahr', months: 12 },
 ];
-const RRULE_LABEL: Record<Rrule, string> = {
-  daily: 'Täglich',
-  weekdays: 'Werktags',
-  weekly: 'Wöchentlich',
-  monthly: 'Monatlich',
-  yearly: 'Jährlich',
-};
 
 type Section = 'list' | 'due' | 'repeat';
 
@@ -75,6 +72,7 @@ export function TaskEditorSheet({
   const [dueDate, setDueDate] = useState<string | null>(task?.dueDate ?? defaultDueDate ?? null);
   const [dueTime, setDueTime] = useState<string | null>(task?.dueTime ?? null);
   const [rrule, setRrule] = useState<Rrule | null>(task?.rrule ?? null);
+  const [rruleUntil, setRruleUntil] = useState<string | null>(task?.rruleUntil ?? null);
   const [flagged, setFlagged] = useState(task?.flagged ?? false);
   const [tags, setTags] = useState<string[]>(task?.tags ?? []);
   const [tagDraft, setTagDraft] = useState('');
@@ -143,6 +141,7 @@ export function TaskEditorSheet({
       dueDate: finalDate,
       dueTime: finalDate ? validTime : null,
       rrule: finalDate ? rrule : null,
+      rruleUntil: finalDate && rrule ? rruleUntil : null,
       flagged,
       tags: finalTags,
       subtasks: finalSubs,
@@ -347,23 +346,53 @@ export function TaskEditorSheet({
           icon={Repeat}
           iconColor={rrule ? colors.teal : colors.text3}
           label="Wiederholung"
-          value={rrule ? RRULE_LABEL[rrule] : 'Nie'}
+          value={rrule ? rruleLabel(rrule) + (rruleUntil ? ' · endet' : '') : 'Nie'}
           valueTone={rrule ? 'teal' : 'text3'}
           expanded={section === 'repeat'}
           onPress={() => toggleSection('repeat')}
         />
         {section === 'repeat' && (
           <Expanded>
+            <Type variant="eyebrow" tone="text3" style={{ marginBottom: Spacing.xs }}>Fester Rhythmus</Type>
             <ChipWrap>
-              {RRULES.map((r) => (
+              {RRULES_FEST.map((r) => (
                 <Chip
-                  key={r.value}
-                  label={r.label}
-                  active={rrule === r.value}
-                  onPress={() => setRrule(rrule === r.value ? null : r.value)}
+                  key={r}
+                  label={rruleLabel(r)}
+                  active={rrule === r}
+                  onPress={() => setRrule(rrule === r ? null : r)}
                 />
               ))}
             </ChipWrap>
+            {/* Der wichtige Unterschied: diese hier zählen ab dem Abhaken —
+                so stapelt sich nichts als „überfällig", was gar nicht fällig war. */}
+            <Type variant="eyebrow" tone="text3" style={{ marginTop: Spacing.md, marginBottom: Spacing.xs }}>
+              Nach dem Erledigen
+            </Type>
+            <ChipWrap>
+              {RRULES_DANACH.map((r) => (
+                <Chip
+                  key={r}
+                  label={rruleLabel(r).replace(' nach Erledigen', '')}
+                  active={rrule === r}
+                  onPress={() => setRrule(rrule === r ? null : r)}
+                />
+              ))}
+            </ChipWrap>
+            {rrule && (
+              <>
+                <Type variant="eyebrow" tone="text3" style={{ marginTop: Spacing.md, marginBottom: Spacing.xs }}>Endet</Type>
+                <ChipWrap>
+                  {ENDS.map((e) => {
+                    const date = e.months === null ? null : addMonths(today, e.months);
+                    const active = e.months === null ? rruleUntil === null : rruleUntil === date;
+                    return (
+                      <Chip key={e.label} label={e.label} active={active} onPress={() => setRruleUntil(date)} />
+                    );
+                  })}
+                </ChipWrap>
+              </>
+            )}
           </Expanded>
         )}
         <RowDivider />

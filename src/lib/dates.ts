@@ -31,12 +31,78 @@ function daysInMonth(year: number, monthIndex0: number): number {
   return new Date(year, monthIndex0 + 1, 0).getDate();
 }
 
+/** Zerlegt die erweiterten Formen ('every:2w', 'after:3d'). null = festes Preset. */
+export function parseRrule(rrule: Rrule): { kind: 'every' | 'after'; n: number; unit: 'd' | 'w' | 'm' } | null {
+  const every = /^every:(\d+)([dwm])$/.exec(rrule);
+  if (every) return { kind: 'every', n: Number(every[1]), unit: every[2] as 'd' | 'w' | 'm' };
+  const after = /^after:(\d+)d$/.exec(rrule);
+  if (after) return { kind: 'after', n: Number(after[1]), unit: 'd' };
+  return null;
+}
+
+/** Gilt die Wiederholung ab dem ERLEDIGEN (statt ab dem Fälligkeitsdatum)? */
+export function isAfterCompletionRule(rrule: Rrule): boolean {
+  return parseRrule(rrule)?.kind === 'after';
+}
+
+/** Ist die Zeichenkette eine gültige Wiederholung? (Backup-/Import-Prüfung) */
+export function isRrule(v: unknown): v is Rrule {
+  if (typeof v !== 'string') return false;
+  if (['daily', 'weekdays', 'weekly', 'monthly', 'yearly'].includes(v)) return true;
+  const p = parseRrule(v as Rrule);
+  return p !== null && p.n >= 1 && p.n <= 999;
+}
+
+/** Menschliche Beschriftung — eine Quelle für Editor und Zeile. */
+export function rruleLabel(rrule: Rrule): string {
+  const p = parseRrule(rrule);
+  if (p?.kind === 'after') {
+    if (p.n === 1) return '1 Tag nach Erledigen';
+    if (p.n === 7) return '1 Woche nach Erledigen';
+    if (p.n === 30) return '1 Monat nach Erledigen';
+    return `${p.n} Tage nach Erledigen`;
+  }
+  if (p?.kind === 'every') {
+    const unit = p.unit === 'd' ? ['Tag', 'Tage'] : p.unit === 'w' ? ['Woche', 'Wochen'] : ['Monat', 'Monate'];
+    return p.n === 1 ? `Jede${p.unit === 'm' ? 'n' : ''} ${unit[0]}` : `Alle ${p.n} ${unit[1]}`;
+  }
+  switch (rrule) {
+    case 'daily':
+      return 'Täglich';
+    case 'weekdays':
+      return 'Werktags';
+    case 'weekly':
+      return 'Wöchentlich';
+    case 'monthly':
+      return 'Monatlich';
+    default:
+      return 'Jährlich';
+  }
+}
+
+/** n Monate weiter, Tag aufs Monatsende geklemmt (31.01. + 1 Monat → 28./29.02.). */
+export function addMonths(dueDate: string, n: number): string {
+  const d = parseDateStr(dueDate);
+  const day = d.getDate();
+  const target = new Date(d.getFullYear(), d.getMonth() + n, 1);
+  target.setDate(Math.min(day, daysInMonth(target.getFullYear(), target.getMonth())));
+  return toDateStr(target);
+}
+
 /**
  * Ein Wiederholungsschritt ab `dueDate`. Monat/Jahr klemmen den Tag auf das
- * Monatsende (31.01. → 28./29.02.); der Anker-Tag wird nicht gespeichert —
- * bewusste Vereinfachung (Fahrplan §5: einfaches Enum statt RRULE).
+ * Monatsende (31.01. → 28./29.02.); der Anker-Tag wird nicht gespeichert.
  */
 export function nextOccurrence(dueDate: string, rrule: Rrule): string {
+  const p = parseRrule(rrule);
+  if (p) {
+    // „nach Erledigung" hat ab einem Datum keinen eigenen Rhythmus — die
+    // Fälligkeit entsteht erst beim Abhaken (siehe resolveCompletion).
+    if (p.kind === 'after') return addDays(dueDate, p.n);
+    if (p.unit === 'd') return addDays(dueDate, p.n);
+    if (p.unit === 'w') return addDays(dueDate, p.n * 7);
+    return addMonths(dueDate, p.n);
+  }
   const d = parseDateStr(dueDate);
   switch (rrule) {
     case 'daily':
@@ -49,13 +115,11 @@ export function nextOccurrence(dueDate: string, rrule: Rrule): string {
     }
     case 'weekly':
       return addDays(dueDate, 7);
-    case 'monthly': {
-      const day = d.getDate();
-      const target = new Date(d.getFullYear(), d.getMonth() + 1, 1);
-      target.setDate(Math.min(day, daysInMonth(target.getFullYear(), target.getMonth())));
-      return toDateStr(target);
-    }
-    case 'yearly': {
+    case 'monthly':
+      return addMonths(dueDate, 1);
+    // 'yearly' als default: der Typ umfasst jetzt auch die erweiterten Formen
+    // (oben bereits behandelt), darum kein erschöpfendes switch mehr möglich.
+    default: {
       const day = d.getDate();
       const target = new Date(d.getFullYear() + 1, d.getMonth(), 1);
       target.setDate(Math.min(day, daysInMonth(target.getFullYear(), target.getMonth())));

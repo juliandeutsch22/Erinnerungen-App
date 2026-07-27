@@ -1,5 +1,5 @@
 // dates.test.ts — Wiederholungs-Berechnung + lokale Kalenderdaten (Fahrplan M1).
-import { addDays, daysBetween, deadlineLabel, formatDueDate, nextOccurrence, nextOccurrenceAfter, parseDateStr, toDateStr } from './dates';
+import { addDays, addMonths, daysBetween, deadlineLabel, formatDueDate, isRrule, nextOccurrence, nextOccurrenceAfter, parseDateStr, parseRrule, rruleLabel, toDateStr } from './dates';
 
 describe('toDateStr/parseDateStr', () => {
   it('läuft lokal rund (kein UTC-Versatz)', () => {
@@ -88,5 +88,50 @@ describe('deadlineLabel', () => {
     expect(deadlineLabel('2026-07-06', today)).toBe('noch 3 Tage');
     expect(deadlineLabel('2026-07-02', today)).toBe('1 Tag überfällig');
     expect(deadlineLabel('2026-06-30', today)).toBe('3 Tage überfällig');
+  });
+});
+
+describe('flexible Wiederholungen — Parsen & Beschriftung', () => {
+  it('erkennt Intervall- und Nach-Erledigung-Formen', () => {
+    expect(parseRrule('every:2w')).toEqual({ kind: 'every', n: 2, unit: 'w' });
+    expect(parseRrule('after:3d')).toEqual({ kind: 'after', n: 3, unit: 'd' });
+    expect(parseRrule('weekly')).toBeNull();
+  });
+
+  it('isRrule akzeptiert Presets und erweiterte Formen, verwirft Unsinn', () => {
+    expect(isRrule('weekly')).toBe(true);
+    expect(isRrule('every:2w')).toBe(true);
+    expect(isRrule('after:30d')).toBe(true);
+    expect(isRrule('every:0w')).toBe(false);
+    expect(isRrule('every:2y')).toBe(false);
+    expect(isRrule('quatsch')).toBe(false);
+    expect(isRrule(null)).toBe(false);
+  });
+
+  it('beschriftet lesbar auf Deutsch', () => {
+    expect(rruleLabel('weekly')).toBe('Wöchentlich');
+    expect(rruleLabel('every:2w')).toBe('Alle 2 Wochen');
+    expect(rruleLabel('every:2m')).toBe('Alle 2 Monate');
+    expect(rruleLabel('every:3d')).toBe('Alle 3 Tage');
+    expect(rruleLabel('every:1m')).toBe('Jeden Monat');
+    expect(rruleLabel('after:7d')).toBe('1 Woche nach Erledigen');
+    expect(rruleLabel('after:3d')).toBe('3 Tage nach Erledigen');
+  });
+
+  it('rückt Intervalle korrekt weiter (auch über Monatsenden)', () => {
+    expect(nextOccurrence('2026-07-01', 'every:2w')).toBe('2026-07-15');
+    expect(nextOccurrence('2026-07-01', 'every:3d')).toBe('2026-07-04');
+    expect(nextOccurrence('2026-01-31', 'every:1m')).toBe('2026-02-28');
+    expect(nextOccurrence('2026-07-31', 'every:2m')).toBe('2026-09-30');
+  });
+
+  it('überspringt Vergangenes auch bei Intervallen', () => {
+    // 6 Wochen überfällige 2-Wochen-Aufgabe → nächster Termin in der Zukunft.
+    expect(nextOccurrenceAfter('2026-06-01', 'every:2w', '2026-07-10')).toBe('2026-07-13');
+  });
+
+  it('addMonths klemmt den Tag aufs Monatsende', () => {
+    expect(addMonths('2026-01-31', 1)).toBe('2026-02-28');
+    expect(addMonths('2026-07-27', 3)).toBe('2026-10-27');
   });
 });

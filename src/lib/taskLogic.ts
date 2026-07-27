@@ -1,6 +1,6 @@
 // taskLogic.ts — reine Ableitungen über Aufgaben (testbar, ohne UI/DB).
 import type { Rrule, Task } from '@/data/types';
-import { addDays, nextOccurrenceAfter } from '@/lib/dates';
+import { addDays, isAfterCompletionRule, nextOccurrenceAfter, parseRrule } from '@/lib/dates';
 
 export function isOpen(t: Task): boolean {
   return t.completedAt === null;
@@ -29,12 +29,21 @@ export function recentlyCompleted(tasks: Task[], today: string): Task[] {
  * `completedAt` gesetzt.
  */
 export function resolveCompletion(
-  t: Pick<Task, 'dueDate' | 'rrule'>,
+  t: Pick<Task, 'dueDate' | 'rrule' | 'rruleUntil'>,
   today: string,
   now: Date = new Date(),
 ): Partial<Task> {
   if (t.rrule && t.dueDate) {
-    return { dueDate: nextOccurrenceAfter(t.dueDate, t.rrule as Rrule, today) };
+    const rule = t.rrule as Rrule;
+    // „x Tage nach Erledigung": die neue Fälligkeit zählt ab HEUTE (dem Tag des
+    // Abhakens), nicht ab dem alten Datum — sonst stapelt sich Überfälliges,
+    // obwohl nichts überfällig ist (Pflanzen gießen, Filter wechseln).
+    const next = isAfterCompletionRule(rule)
+      ? addDays(today, parseRrule(rule)!.n)
+      : nextOccurrenceAfter(t.dueDate, rule, today);
+    // Serienende erreicht → die Aufgabe ist endgültig fertig, statt ewig weiterzulaufen.
+    if (t.rruleUntil && next > t.rruleUntil) return { completedAt: now.toISOString() };
+    return { dueDate: next };
   }
   return { completedAt: now.toISOString() };
 }

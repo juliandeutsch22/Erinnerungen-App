@@ -4,8 +4,20 @@
 // keine UTC-Timestamps — sonst rutschen ganztägige Aufgaben bei Zeitzonen-/
 // Sommerzeitwechsel um einen Tag (Fahrplan §8.2).
 
-/** Wiederholung als einfaches Enum statt echter RRULE (deckt 95 % des Alltags ab). */
-export type Rrule = 'daily' | 'weekdays' | 'weekly' | 'monthly' | 'yearly';
+/** Die festen Rhythmen — seit jeher gespeicherte Werte, nie umbenennen. */
+export type RrulePreset = 'daily' | 'weekdays' | 'weekly' | 'monthly' | 'yearly';
+
+/**
+ * Wiederholung. Statt echter RRULE bewusst kurze, lesbare Zeichenketten —
+ * rückwärtskompatibel: alte Aufgaben tragen weiterhin nur die Presets.
+ *
+ *  - Preset            fester Rhythmus ab dem Fälligkeitsdatum
+ *  - `every:<n><d|w|m>` alle n Tage/Wochen/Monate ab dem Fälligkeitsdatum
+ *  - `after:<n>d`       n Tage NACH dem Erledigen (Pflanzen gießen, Filter
+ *                       wechseln) — richtet sich nicht nach dem Kalender,
+ *                       sondern danach, wann du es zuletzt getan hast.
+ */
+export type Rrule = RrulePreset | `every:${number}${'d' | 'w' | 'm'}` | `after:${number}d`;
 
 /** Ein Schritt innerhalb einer Aufgabe (Checkliste). */
 export type Subtask = {
@@ -39,6 +51,9 @@ export type Task = {
   dueDate: string | null; // 'YYYY-MM-DD' | null
   dueTime: string | null; // 'HH:MM' | null (nur mit dueDate)
   rrule: Rrule | null;
+  /** Ende der Serie ('YYYY-MM-DD'): rückt die Wiederholung darüber hinaus,
+   *  wird die Aufgabe endgültig erledigt. Optional — fehlend = ohne Ende. */
+  rruleUntil?: string | null;
   flagged: boolean;
   /** An einen Gerätekalender-Termin gehängt (EventKit-Event-ID), null = frei. */
   eventId: string | null;

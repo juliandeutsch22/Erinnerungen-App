@@ -153,3 +153,52 @@ describe('listProgress', () => {
     expect(listProgress([])).toEqual({ done: 0, total: 0, ratio: 0 });
   });
 });
+
+describe('resolveCompletion — flexible Wiederholungen', () => {
+  const at = new Date('2026-07-27T20:00:00.000Z');
+
+  it('„3 Tage nach Erledigen" zählt ab HEUTE, nicht ab dem alten Datum', () => {
+    // Die Aufgabe war 10 Tage überfällig — trotzdem: heute + 3.
+    const r = resolveCompletion(
+      { dueDate: '2026-07-17', rrule: 'after:3d', rruleUntil: null },
+      '2026-07-27',
+      at,
+    );
+    expect(r.dueDate).toBe('2026-07-30');
+    expect(r.completedAt).toBeUndefined();
+  });
+
+  it('fester Rhythmus bleibt am Kalender verankert', () => {
+    const r = resolveCompletion(
+      { dueDate: '2026-07-20', rrule: 'every:2w', rruleUntil: null },
+      '2026-07-27',
+      at,
+    );
+    expect(r.dueDate).toBe('2026-08-03');
+  });
+
+  it('endet die Serie, wird die Aufgabe endgültig erledigt', () => {
+    const r = resolveCompletion(
+      { dueDate: '2026-07-27', rrule: 'weekly', rruleUntil: '2026-07-30' },
+      '2026-07-27',
+      at,
+    );
+    // Nächster Termin wäre der 3.8. → nach dem Ende → fertig statt weiterlaufen.
+    expect(r.dueDate).toBeUndefined();
+    expect(r.completedAt).toBe(at.toISOString());
+  });
+
+  it('innerhalb der Serie läuft sie normal weiter', () => {
+    const r = resolveCompletion(
+      { dueDate: '2026-07-27', rrule: 'weekly', rruleUntil: '2026-12-31' },
+      '2026-07-27',
+      at,
+    );
+    expect(r.dueDate).toBe('2026-08-03');
+  });
+
+  it('ohne Wiederholung bleibt alles wie bisher', () => {
+    const r = resolveCompletion({ dueDate: '2026-07-27', rrule: null, rruleUntil: null }, '2026-07-27', at);
+    expect(r.completedAt).toBe(at.toISOString());
+  });
+});
