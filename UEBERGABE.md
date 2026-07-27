@@ -1,6 +1,6 @@
 # ÜBERGABE-PROTOKOLL — Stoa
 
-Stand: **v1.30.0 (Build 57)**, Juli 2026 · 196 Jest-Tests grün · Branch-Modell siehe §3.
+Stand: **v1.30.1 (Build 58)**, Juli 2026 · 201 Jest-Tests grün · Branch-Modell siehe §3.
 
 > ⚠️ **Native-Falle (gekostet: mehrere Fehl-Releases):** `Easing` für Reanimated
 > **immer** aus `react-native-reanimated` importieren, NIE aus `react-native`.

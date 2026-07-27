@@ -1,5 +1,5 @@
 // dates.test.ts — Wiederholungs-Berechnung + lokale Kalenderdaten (Fahrplan M1).
-import { addDays, addMonths, daysBetween, deadlineLabel, formatDueDate, isRrule, nextOccurrence, nextOccurrenceAfter, parseDateStr, parseRrule, rruleLabel, toDateStr } from './dates';
+import { addDays, addMonths, buildRrule, daysBetween, deadlineLabel, formatDueDate, isRrule, nextOccurrence, nextOccurrenceAfter, parseDateStr, parseRrule, rruleLabel, rruleParts, toDateStr } from './dates';
 
 describe('toDateStr/parseDateStr', () => {
   it('läuft lokal rund (kein UTC-Versatz)', () => {
@@ -102,8 +102,9 @@ describe('flexible Wiederholungen — Parsen & Beschriftung', () => {
     expect(isRrule('weekly')).toBe(true);
     expect(isRrule('every:2w')).toBe(true);
     expect(isRrule('after:30d')).toBe(true);
+    expect(isRrule('every:2x')).toBe(false);
     expect(isRrule('every:0w')).toBe(false);
-    expect(isRrule('every:2y')).toBe(false);
+    expect(isRrule('every:2y')).toBe(true); // Jahre sind seit dem Baukasten gültig
     expect(isRrule('quatsch')).toBe(false);
     expect(isRrule(null)).toBe(false);
   });
@@ -113,8 +114,12 @@ describe('flexible Wiederholungen — Parsen & Beschriftung', () => {
     expect(rruleLabel('every:2w')).toBe('Alle 2 Wochen');
     expect(rruleLabel('every:2m')).toBe('Alle 2 Monate');
     expect(rruleLabel('every:3d')).toBe('Alle 3 Tage');
-    expect(rruleLabel('every:1m')).toBe('Jeden Monat');
-    expect(rruleLabel('after:7d')).toBe('1 Woche nach Erledigen');
+    // n = 1 klingt weiterhin wie gewohnt, statt „Alle 1 Monat".
+    expect(rruleLabel('every:1m')).toBe('Monatlich');
+    expect(rruleLabel('every:3y')).toBe('Alle 3 Jahre');
+    expect(rruleLabel('weekdays')).toBe('Werktags');
+    expect(rruleLabel('after:7d')).toBe('7 Tage nach Erledigen');
+    expect(rruleLabel('after:1w')).toBe('1 Woche nach Erledigen');
     expect(rruleLabel('after:3d')).toBe('3 Tage nach Erledigen');
   });
 
@@ -133,5 +138,40 @@ describe('flexible Wiederholungen — Parsen & Beschriftung', () => {
   it('addMonths klemmt den Tag aufs Monatsende', () => {
     expect(addMonths('2026-01-31', 1)).toBe('2026-02-28');
     expect(addMonths('2026-07-27', 3)).toBe('2026-10-27');
+  });
+});
+
+describe('buildRrule / rruleParts — der Satzbaukasten', () => {
+  it('n = 1 ergibt das kanonische Preset (alte Werte bleiben gültig)', () => {
+    expect(buildRrule(1, 'd', false)).toBe('daily');
+    expect(buildRrule(1, 'w', false)).toBe('weekly');
+    expect(buildRrule(1, 'm', false)).toBe('monthly');
+    expect(buildRrule(1, 'y', false)).toBe('yearly');
+  });
+
+  it('n > 1 ergibt die Intervall-Form, „nach Erledigen" bleibt immer explizit', () => {
+    expect(buildRrule(5, 'w', false)).toBe('every:5w');
+    expect(buildRrule(1, 'w', true)).toBe('after:1w');
+    expect(buildRrule(10, 'd', true)).toBe('after:10d');
+  });
+
+  it('klemmt unsinnige Eingaben statt sie zu übernehmen', () => {
+    expect(buildRrule(0, 'w', false)).toBe('weekly');
+    expect(buildRrule(-3, 'd', false)).toBe('daily');
+    expect(buildRrule(5000, 'd', false)).toBe('every:999d');
+    expect(buildRrule(NaN, 'w', false)).toBe('weekly');
+  });
+
+  it('rruleParts ist die Umkehrung — der Editor findet seine Bausteine wieder', () => {
+    for (const r of ['daily', 'weekly', 'monthly', 'yearly', 'every:5w', 'after:3d', 'after:2m'] as const) {
+      const p = rruleParts(r)!;
+      expect(buildRrule(p.n, p.unit, p.after)).toBe(r);
+    }
+    expect(rruleParts('weekdays')).toBeNull();
+    expect(rruleParts(null)).toBeNull();
+  });
+
+  it('rückt Jahre korrekt weiter', () => {
+    expect(nextOccurrence('2026-07-27', 'every:3y')).toBe('2029-07-27');
   });
 });

@@ -12,12 +12,13 @@ export type RrulePreset = 'daily' | 'weekdays' | 'weekly' | 'monthly' | 'yearly'
  * rückwärtskompatibel: alte Aufgaben tragen weiterhin nur die Presets.
  *
  *  - Preset            fester Rhythmus ab dem Fälligkeitsdatum
- *  - `every:<n><d|w|m>` alle n Tage/Wochen/Monate ab dem Fälligkeitsdatum
- *  - `after:<n>d`       n Tage NACH dem Erledigen (Pflanzen gießen, Filter
+ *  - `every:<n><d|w|m|y>` alle n Tage/Wochen/Monate/Jahre ab dem Fälligkeitsdatum
+ *  - `after:<n><d|w|m|y>` n Tage/… NACH dem Erledigen (Pflanzen gießen, Filter
  *                       wechseln) — richtet sich nicht nach dem Kalender,
  *                       sondern danach, wann du es zuletzt getan hast.
  */
-export type Rrule = RrulePreset | `every:${number}${'d' | 'w' | 'm'}` | `after:${number}d`;
+export type RruleUnit = 'd' | 'w' | 'm' | 'y';
+export type Rrule = RrulePreset | `every:${number}${RruleUnit}` | `after:${number}${RruleUnit}`;
 
 /** Ein Schritt innerhalb einer Aufgabe (Checkliste). */
 export type Subtask = {

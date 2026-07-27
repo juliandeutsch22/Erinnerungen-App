@@ -1,7 +1,7 @@
 // dates.ts — reine Datums-Helfer auf LOKALEN Kalenderdaten ('YYYY-MM-DD').
 // Bewusst ohne UTC/toISOString für Kalenderdaten (Fahrplan §8.2): alle
 // Umrechnungen laufen über lokale Date-Bestandteile.
-import type { Rrule } from '@/data/types';
+import type { Rrule, RruleUnit } from '@/data/types';
 
 /** Lokales Kalenderdatum als 'YYYY-MM-DD' (NICHT toISOString — das wäre UTC). */
 export function toDateStr(d: Date): string {
@@ -32,12 +32,44 @@ function daysInMonth(year: number, monthIndex0: number): number {
 }
 
 /** Zerlegt die erweiterten Formen ('every:2w', 'after:3d'). null = festes Preset. */
-export function parseRrule(rrule: Rrule): { kind: 'every' | 'after'; n: number; unit: 'd' | 'w' | 'm' } | null {
-  const every = /^every:(\d+)([dwm])$/.exec(rrule);
-  if (every) return { kind: 'every', n: Number(every[1]), unit: every[2] as 'd' | 'w' | 'm' };
-  const after = /^after:(\d+)d$/.exec(rrule);
-  if (after) return { kind: 'after', n: Number(after[1]), unit: 'd' };
-  return null;
+export function parseRrule(rrule: Rrule): { kind: 'every' | 'after'; n: number; unit: RruleUnit } | null {
+  const m = /^(every|after):(\d+)([dwmy])$/.exec(rrule);
+  if (!m) return null;
+  return { kind: m[1] as 'every' | 'after', n: Number(m[2]), unit: m[3] as RruleUnit };
+}
+
+/**
+ * Baut eine Wiederholung aus den Bausteinen des Editors. Bei n = 1 und festem
+ * Rhythmus entsteht bewusst das PRESET ('daily' …) — so bleiben gespeicherte
+ * Werte kanonisch und alte Aufgaben unverändert lesbar.
+ */
+export function buildRrule(n: number, unit: RruleUnit, afterCompletion: boolean): Rrule {
+  const k = Math.max(1, Math.min(999, Math.round(n) || 1));
+  if (afterCompletion) return `after:${k}${unit}`;
+  if (k === 1) return unit === 'd' ? 'daily' : unit === 'w' ? 'weekly' : unit === 'm' ? 'monthly' : 'yearly';
+  return `every:${k}${unit}`;
+}
+
+/**
+ * Umkehrung für den Editor: welche Bausteine stecken in der Regel?
+ * null = lässt sich nicht als „alle n X" darstellen (nur 'weekdays').
+ */
+export function rruleParts(rrule: Rrule | null): { n: number; unit: RruleUnit; after: boolean } | null {
+  if (!rrule) return null;
+  const p = parseRrule(rrule);
+  if (p) return { n: p.n, unit: p.unit, after: p.kind === 'after' };
+  switch (rrule) {
+    case 'daily':
+      return { n: 1, unit: 'd', after: false };
+    case 'weekly':
+      return { n: 1, unit: 'w', after: false };
+    case 'monthly':
+      return { n: 1, unit: 'm', after: false };
+    case 'yearly':
+      return { n: 1, unit: 'y', after: false };
+    default:
+      return null; // 'weekdays'
+  }
 }
 
 /** Gilt die Wiederholung ab dem ERLEDIGEN (statt ab dem Fälligkeitsdatum)? */
@@ -53,31 +85,27 @@ export function isRrule(v: unknown): v is Rrule {
   return p !== null && p.n >= 1 && p.n <= 999;
 }
 
-/** Menschliche Beschriftung — eine Quelle für Editor und Zeile. */
+const UNIT_WORDS: Record<RruleUnit, [string, string]> = {
+  d: ['Tag', 'Tage'],
+  w: ['Woche', 'Wochen'],
+  m: ['Monat', 'Monate'],
+  y: ['Jahr', 'Jahre'],
+};
+
+/** „Alle 2 Wochen", „Täglich", „3 Tage nach Erledigen" — eine Quelle für alles. */
 export function rruleLabel(rrule: Rrule): string {
-  const p = parseRrule(rrule);
-  if (p?.kind === 'after') {
-    if (p.n === 1) return '1 Tag nach Erledigen';
-    if (p.n === 7) return '1 Woche nach Erledigen';
-    if (p.n === 30) return '1 Monat nach Erledigen';
-    return `${p.n} Tage nach Erledigen`;
+  if (rrule === 'weekdays') return 'Werktags';
+  const p = rruleParts(rrule);
+  if (!p) return 'Werktags';
+  const [one, many] = UNIT_WORDS[p.unit];
+  // Bei „nach Erledigen" steht die Zahl immer mit — „1 Woche nach Erledigen"
+  // liest sich rund, „Woche nach Erledigen" nicht.
+  if (p.after) return `${p.n} ${p.n === 1 ? one : many} nach Erledigen`;
+  const spanne = p.n === 1 ? one : `${p.n} ${many}`;
+  if (p.n === 1) {
+    return p.unit === 'd' ? 'Täglich' : p.unit === 'w' ? 'Wöchentlich' : p.unit === 'm' ? 'Monatlich' : 'Jährlich';
   }
-  if (p?.kind === 'every') {
-    const unit = p.unit === 'd' ? ['Tag', 'Tage'] : p.unit === 'w' ? ['Woche', 'Wochen'] : ['Monat', 'Monate'];
-    return p.n === 1 ? `Jede${p.unit === 'm' ? 'n' : ''} ${unit[0]}` : `Alle ${p.n} ${unit[1]}`;
-  }
-  switch (rrule) {
-    case 'daily':
-      return 'Täglich';
-    case 'weekdays':
-      return 'Werktags';
-    case 'weekly':
-      return 'Wöchentlich';
-    case 'monthly':
-      return 'Monatlich';
-    default:
-      return 'Jährlich';
-  }
+  return `Alle ${spanne}`;
 }
 
 /** n Monate weiter, Tag aufs Monatsende geklemmt (31.01. + 1 Monat → 28./29.02.). */
@@ -98,10 +126,10 @@ export function nextOccurrence(dueDate: string, rrule: Rrule): string {
   if (p) {
     // „nach Erledigung" hat ab einem Datum keinen eigenen Rhythmus — die
     // Fälligkeit entsteht erst beim Abhaken (siehe resolveCompletion).
-    if (p.kind === 'after') return addDays(dueDate, p.n);
     if (p.unit === 'd') return addDays(dueDate, p.n);
     if (p.unit === 'w') return addDays(dueDate, p.n * 7);
-    return addMonths(dueDate, p.n);
+    if (p.unit === 'm') return addMonths(dueDate, p.n);
+    return addMonths(dueDate, p.n * 12);
   }
   const d = parseDateStr(dueDate);
   switch (rrule) {

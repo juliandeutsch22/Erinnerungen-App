@@ -3,7 +3,7 @@
 // Detail-Zeilen (Liste / Fällig / Wiederholung / Flagge) mit aktuellem Wert,
 // die erst beim Antippen ihre Chips aufklappen — keine Chip-Wand. Der
 // Primär-Button sitzt fest im Sheet-Footer. Löschen zweistufig.
-import { CalendarDays, CalendarX2, Clock, Flag, ListChecks, type LucideIcon, Plus, Repeat, Tag as TagIcon, Trash2, X } from 'lucide-react-native';
+import { CalendarDays, CalendarX2, Clock, Flag, ListChecks, type LucideIcon, Minus, Plus, Repeat, Tag as TagIcon, Trash2, X } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
@@ -22,9 +22,9 @@ import { TaskCheck } from '@/components/TaskCheck';
 import { TimeField } from '@/components/TimeField';
 import { Type } from '@/components/Type';
 import { useCreateTask, useDeleteTask, useLists, useTasks, useUpdateTask } from '@/data/queries';
-import type { Rrule, Subtask, Task } from '@/data/types';
+import type { Rrule, RruleUnit, Subtask, Task } from '@/data/types';
 import { newId, normalizeTag } from '@/data/types';
-import { addMonths, formatDueDate, rruleLabel, todayStr } from '@/lib/dates';
+import { addMonths, buildRrule, formatDueDate, rruleLabel, rruleParts, todayStr } from '@/lib/dates';
 import { tagCounts } from '@/lib/taskFilters';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { webNoOutline } from '@/theme/layout';
@@ -32,10 +32,12 @@ import { useColors } from '@/theme/ThemeProvider';
 import { useSettings } from '@/theme/settings.store';
 import { R, Spacing, T } from '@/theme/theme.tokens';
 
-// Fester Rhythmus — richtet sich nach dem Fälligkeitsdatum.
-const RRULES_FEST: Rrule[] = ['daily', 'weekdays', 'weekly', 'monthly', 'yearly', 'every:2w', 'every:3w', 'every:2m'];
-// Richtet sich danach, wann du es zuletzt getan hast.
-const RRULES_DANACH: Rrule[] = ['after:3d', 'after:7d', 'after:14d', 'after:30d'];
+const UNITS: { value: RruleUnit; label: string }[] = [
+  { value: 'd', label: 'Tage' },
+  { value: 'w', label: 'Wochen' },
+  { value: 'm', label: 'Monate' },
+  { value: 'y', label: 'Jahre' },
+];
 // Serienende, relativ gerechnet — kein Datumswähler nötig.
 const ENDS: { label: string; months: number | null }[] = [
   { label: 'Ohne Ende', months: null },
@@ -73,6 +75,19 @@ export function TaskEditorSheet({
   const [dueTime, setDueTime] = useState<string | null>(task?.dueTime ?? null);
   const [rrule, setRrule] = useState<Rrule | null>(task?.rrule ?? null);
   const [rruleUntil, setRruleUntil] = useState<string | null>(task?.rruleUntil ?? null);
+  // Bausteine des Satzes „Alle [n] [Einheit], gezählt ab [Fälligkeit|Erledigen]".
+  // Startwerte aus einer bestehenden Regel; 'weekdays' hat keine → Vorgabe.
+  const initialParts = rruleParts(task?.rrule ?? null);
+  const [count, setCount] = useState(String(initialParts?.n ?? 1));
+  const [unit, setUnit] = useState<RruleUnit>(initialParts?.unit ?? 'w');
+  const [afterDone, setAfterDone] = useState(initialParts?.after ?? false);
+  /** Übernimmt die Bausteine in die Regel (n wird beim Bauen geklemmt). */
+  const applyParts = (n: string, u: RruleUnit, after: boolean) => {
+    setCount(n);
+    setUnit(u);
+    setAfterDone(after);
+    setRrule(buildRrule(Number(n), u, after));
+  };
   const [flagged, setFlagged] = useState(task?.flagged ?? false);
   const [tags, setTags] = useState<string[]>(task?.tags ?? []);
   const [tagDraft, setTagDraft] = useState('');
@@ -353,32 +368,74 @@ export function TaskEditorSheet({
         />
         {section === 'repeat' && (
           <Expanded>
-            <Type variant="eyebrow" tone="text3" style={{ marginBottom: Spacing.xs }}>Fester Rhythmus</Type>
+            {/* Ein Satz statt einer Chip-Liste: „Alle [n] [Einheit]" — damit ist
+                JEDER Zeitraum möglich, nicht nur vorgedachte. */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+              <Type variant="body" tone="text2">Alle</Type>
+              <PressableScale
+                accessibilityLabel="Weniger"
+                onPress={() => applyParts(String(Math.max(1, Number(count) - 1)), unit, afterDone)}
+                style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.chip, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Minus size={16} color={colors.text2} strokeWidth={2.4} />
+              </PressableScale>
+              <TextInput
+                value={count}
+                onChangeText={(t) => applyParts(t.replace(/[^0-9]/g, '').slice(0, 3), unit, afterDone)}
+                keyboardType="number-pad"
+                accessibilityLabel="Anzahl"
+                selectTextOnFocus
+                {...keyboardDoneProps}
+                style={[
+                  { width: 56, textAlign: 'center', paddingVertical: 6, borderRadius: R.md, backgroundColor: colors.chip, color: colors.text, fontSize: T.md, fontVariant: ['tabular-nums'] },
+                  webNoOutline,
+                ]}
+              />
+              <PressableScale
+                accessibilityLabel="Mehr"
+                onPress={() => applyParts(String(Math.min(999, Number(count) + 1)), unit, afterDone)}
+                style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.chip, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Plus size={16} color={colors.text2} strokeWidth={2.4} />
+              </PressableScale>
+            </View>
             <ChipWrap>
-              {RRULES_FEST.map((r) => (
+              {UNITS.map((u) => (
                 <Chip
-                  key={r}
-                  label={rruleLabel(r)}
-                  active={rrule === r}
-                  onPress={() => setRrule(rrule === r ? null : r)}
+                  key={u.value}
+                  label={u.label}
+                  active={rrule !== null && rrule !== 'weekdays' && unit === u.value}
+                  onPress={() => applyParts(count, u.value, afterDone)}
                 />
               ))}
             </ChipWrap>
-            {/* Der wichtige Unterschied: diese hier zählen ab dem Abhaken —
-                so stapelt sich nichts als „überfällig", was gar nicht fällig war. */}
-            <Type variant="eyebrow" tone="text3" style={{ marginTop: Spacing.md, marginBottom: Spacing.xs }}>
-              Nach dem Erledigen
+
+            {/* Der eigentliche Unterschied — in einem Satz erklärt. */}
+            <Type variant="eyebrow" tone="text3" style={{ marginTop: Spacing.md, marginBottom: Spacing.xs }}>Gezählt ab</Type>
+            <ChipWrap>
+              <Chip
+                label="Fälligkeit"
+                active={rrule !== null && rrule !== 'weekdays' && !afterDone}
+                onPress={() => applyParts(count, unit, false)}
+              />
+              <Chip
+                label="Erledigen"
+                active={afterDone}
+                onPress={() => applyParts(count, unit, true)}
+              />
+            </ChipWrap>
+            <Type variant="caption" tone="text3" style={{ marginTop: Spacing.xs }}>
+              {afterDone
+                ? 'Der nächste Termin zählt ab dem Tag, an dem du abhakst.'
+                : 'Der nächste Termin folgt dem Kalender, unabhängig vom Abhaken.'}
             </Type>
+
+            <Type variant="eyebrow" tone="text3" style={{ marginTop: Spacing.md, marginBottom: Spacing.xs }}>Sonderfall</Type>
             <ChipWrap>
-              {RRULES_DANACH.map((r) => (
-                <Chip
-                  key={r}
-                  label={rruleLabel(r).replace(' nach Erledigen', '')}
-                  active={rrule === r}
-                  onPress={() => setRrule(rrule === r ? null : r)}
-                />
-              ))}
+              <Chip label="Werktags" active={rrule === 'weekdays'} onPress={() => setRrule(rrule === 'weekdays' ? null : 'weekdays')} />
+              <Chip label="Nie" active={rrule === null} onPress={() => { setRrule(null); setRruleUntil(null); }} />
             </ChipWrap>
+
             {rrule && (
               <>
                 <Type variant="eyebrow" tone="text3" style={{ marginTop: Spacing.md, marginBottom: Spacing.xs }}>Endet</Type>
@@ -386,9 +443,7 @@ export function TaskEditorSheet({
                   {ENDS.map((e) => {
                     const date = e.months === null ? null : addMonths(today, e.months);
                     const active = e.months === null ? rruleUntil === null : rruleUntil === date;
-                    return (
-                      <Chip key={e.label} label={e.label} active={active} onPress={() => setRruleUntil(date)} />
-                    );
+                    return <Chip key={e.label} label={e.label} active={active} onPress={() => setRruleUntil(date)} />;
                   })}
                 </ChipWrap>
               </>
