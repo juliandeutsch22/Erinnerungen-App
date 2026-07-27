@@ -1,5 +1,6 @@
 // calendarLogic.ts — reine Ableitungen für die Kalenderansicht (testbar ohne
 // EventKit): welche lokalen Tage deckt ein Termin ab, Buckets pro Tag, Labels.
+import type { List } from '@/data/types';
 import { addDays, toDateStr } from '@/lib/dates';
 
 export type SpanLike = { start: Date; end: Date; allDay: boolean };
@@ -60,4 +61,22 @@ export function eventTimeLabel(span: SpanLike, day: string): string {
   if (day === startDay) return `ab ${hm(span.start)}`;
   if (day === endDay) return `bis ${hm(span.end)}`;
   return 'Ganztägig';
+}
+
+/**
+ * Projekt-Deadlines im Zeitfenster, nach Tag gebündelt. Listen mit Deadline
+ * sind Projekte — bisher wusste der Kalender nichts davon. Papierkorb-Listen
+ * zählen nicht mit.
+ */
+export function deadlinesByDay(lists: List[], from: string, to: string): Map<string, List[]> {
+  const map = new Map<string, List[]>();
+  for (const l of lists) {
+    if (l.deletedAt || !l.deadline) continue;
+    if (l.deadline < from || l.deadline > to) continue;
+    const arr = map.get(l.deadline) ?? [];
+    arr.push(l);
+    map.set(l.deadline, arr);
+  }
+  for (const arr of map.values()) arr.sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  return map;
 }

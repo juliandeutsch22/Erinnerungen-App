@@ -3,7 +3,7 @@
 // EventKit) UND die eigenen Erinnerungen des Tages. Termine lassen sich
 // anlegen, bearbeiten und löschen; Erinnerungen öffnen ihren Editor.
 import { useRouter } from 'expo-router';
-import { CalendarPlus, Images, Sun } from 'lucide-react-native';
+import { CalendarPlus, Images, Sun, Target } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 
@@ -28,9 +28,10 @@ import { usePhotoCounts } from '@/data/photoQueries';
 import { useDeviceCalendars, useDeviceEvents } from '@/data/calendarQueries';
 import { useCompleteTask, useLists, useReopenTask, useTasks } from '@/data/queries';
 import type { Task } from '@/data/types';
-import { bucketEventsByDay } from '@/lib/calendarLogic';
+import type { List } from '@/data/types';
+import { bucketEventsByDay, deadlinesByDay } from '@/lib/calendarLogic';
 import { buildDayTimeline } from '@/lib/dayTimeline';
-import { formatDayHeading, parseDateStr, todayStr } from '@/lib/dates';
+import { deadlineLabel, formatDayHeading, parseDateStr, todayStr } from '@/lib/dates';
 import { deviceCalendarAvailable, type DeviceEvent, ensureCalendarPermission } from '@/lib/deviceCalendar';
 import { hapticSelect } from '@/lib/haptics';
 import { byTimeThenCreation, isOpen } from '@/lib/taskLogic';
@@ -94,6 +95,10 @@ export default function KalenderScreen() {
     return set;
   }, [tasks, from, to]);
 
+  // Vernetzung: Listen mit Deadline sind Projekte — der Kalender zeigt sie jetzt.
+  const deadlineDays = useMemo(() => deadlinesByDay(lists ?? [], from, to), [lists, from, to]);
+  const dayDeadlines = deadlineDays.get(selected) ?? [];
+
   const markers = useMemo(() => {
     const map = new Map<string, string[]>();
     for (const [day, dayEvents] of eventsByDay) {
@@ -108,8 +113,13 @@ export default function KalenderScreen() {
     for (const day of openTaskDays.keys()) {
       map.set(day, [colors.teal, ...(map.get(day) ?? [])]);
     }
+    // Projekt-Deadlines als Oliv-Punkt (zweiter Akzent, ruhig — kein Alarm).
+    for (const day of deadlineDays.keys()) {
+      const cur = map.get(day) ?? [];
+      if (!cur.includes(colors.indigo)) map.set(day, [...cur, colors.indigo]);
+    }
     return map;
-  }, [eventsByDay, openTaskDays, calendarById, colors.teal, colors.indigo]);
+  }, [eventsByDay, openTaskDays, deadlineDays, calendarById, colors.teal, colors.indigo]);
 
   const dayEvents = eventsByDay.get(selected) ?? [];
   const dayTasks = useMemo(
@@ -137,7 +147,7 @@ export default function KalenderScreen() {
     if (granted && writableExists) setEditorEvent(null);
   };
 
-  const dayCount = dayEvents.length + dayTasks.length;
+  const dayCount = dayEvents.length + dayTasks.length + dayDeadlines.length;
 
   return (
     <Screen>
@@ -203,6 +213,22 @@ export default function KalenderScreen() {
 
           {/* Inhalt fadet bei jedem Tageswechsel neu ein (Grid ↔ Agenda verbunden). */}
           <Reveal key={selected} delay={0}>
+          {/* Projekt-Deadlines des Tages — ruhig, tippbar, führt ins Projekt. */}
+          {dayDeadlines.map((l: List) => (
+            <PressableScale
+              key={l.id}
+              accessibilityLabel={`Projekt ${l.name} öffnen`}
+              onPress={() => router.push(`/liste/${l.id}`)}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.sm }}
+            >
+              <Target size={15} color={colors.indigo} strokeWidth={2} />
+              <View style={{ flex: 1 }}>
+                <Type variant="body" numberOfLines={1}>{l.name}</Type>
+                <Type variant="caption" tone="text3">{l.goal ? l.goal : 'Projekt-Deadline'}</Type>
+              </View>
+              <Type variant="caption" tone="indigo">{deadlineLabel(l.deadline!, today)}</Type>
+            </PressableScale>
+          ))}
           {/* Termine des Tages */}
           {permission === 'denied' && deviceCalendarAvailable && (
             <EmptyState
@@ -216,7 +242,7 @@ export default function KalenderScreen() {
             </Type>
           )}
           {granted && eventsLoading && dayEvents.length === 0 && <LoadingState label="Termine werden geladen…" />}
-          {granted && !eventsLoading && dayEvents.length === 0 && dayTasks.length === 0 && (
+          {granted && !eventsLoading && dayEvents.length === 0 && dayTasks.length === 0 && dayDeadlines.length === 0 && (
             <EmptyState icon={<Sun size={20} color={colors.teal} strokeWidth={2} />} body="Nichts geplant an diesem Tag." />
           )}
           {view === 'woche' && (dayEvents.length > 0 || dayTasks.length > 0) ? (

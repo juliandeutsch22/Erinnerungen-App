@@ -1,5 +1,6 @@
 // calendarLogic.test.ts — Tages-Zuordnung von Terminen (lokale Kalendertage).
-import { bucketEventsByDay, eventDays, eventTimeLabel } from './calendarLogic';
+import type { List } from '@/data/types';
+import { bucketEventsByDay, deadlinesByDay, eventDays, eventTimeLabel } from './calendarLogic';
 
 const ev = (start: string, end: string, allDay = false) => ({
   start: new Date(start),
@@ -45,5 +46,31 @@ describe('eventTimeLabel', () => {
     expect(eventTimeLabel(multi, '2026-07-06')).toBe('ab 18:00');
     expect(eventTimeLabel(multi, '2026-07-07')).toBe('Ganztägig');
     expect(eventTimeLabel(multi, '2026-07-08')).toBe('bis 09:30');
+  });
+});
+
+describe('deadlinesByDay — Projekte im Kalender', () => {
+  const list = (name: string, deadline: string | null, deletedAt: string | null = null): List => ({
+    id: name, name, icon: 'inbox', color: '#2B5FA6', goal: null, deadline, deletedAt,
+    sort: 0, createdAt: '2026-07-01T08:00:00.000Z',
+  });
+
+  it('bündelt Deadlines im Fenster nach Tag, alphabetisch', () => {
+    const m = deadlinesByDay(
+      [list('Umzug', '2026-08-01'), list('Auto', '2026-08-01'), list('Fern', '2026-12-01')],
+      '2026-07-27',
+      '2026-08-31',
+    );
+    expect(m.get('2026-08-01')?.map((l) => l.name)).toEqual(['Auto', 'Umzug']);
+    expect(m.has('2026-12-01')).toBe(false); // außerhalb des Fensters
+  });
+
+  it('ignoriert Listen ohne Deadline und aus dem Papierkorb', () => {
+    const m = deadlinesByDay(
+      [list('Ohne', null), list('Gelöscht', '2026-08-01', '2026-07-20T10:00:00.000Z')],
+      '2026-07-01',
+      '2026-12-31',
+    );
+    expect(m.size).toBe(0);
   });
 });

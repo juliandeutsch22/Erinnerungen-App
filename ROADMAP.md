@@ -49,12 +49,6 @@ meisten Wirkung pro Zeile Code. Alle **NEU**, sofern nicht anders vermerkt.
   Notizen (und implizit an Chats/Terminen über Verknüpfungen) → eine
   Kontext-Ansicht: `#umzug` zeigt Aufgaben, Notizen, Termine und Chats an einem
   Ort. Macht aus Tags ein Rückgrat statt einer Aufgaben-Randnotiz.
-- **Checklisten-Zeile → Aufgabe** `[JS · klein]` — *Notiz-Checklisten und
-  Aufgaben-Unteraufgaben sind zwei getrennte Welten.* Eine Zeile per Wisch zur
-  echten Aufgabe befördern (mit Rücklink zur Notiz).
-- **Projekt-Deadline im Kalender** `[JS · klein]` — *Listen mit Ziel/Deadline
-  sind Projekte, aber der Kalender weiß nichts davon.* Deadline erscheint auf
-  Kalender und Zeitachse; auf der Projektseite: was bis dahin offen ist.
 - **Aufgabe auf die Zeitachse ziehen** `[JS · mittel]` — *Timeboxing zeigt
   Aufgaben, kann aber keine Zeit vergeben.* Seit v1.26.0 können wir in den
   Kalender schreiben → Aufgabe auf eine Stunde ziehen = echter Zeitblock.
@@ -158,9 +152,10 @@ Damit die Linie klar bleibt — diese Dinge wurden erwogen und verworfen:
 1. ~~**§1 Offene Kanten**~~ — erledigt in v1.28.0 (Säule + gefühlte Wartezeit).
 2. **§2 Der Bogen** — das Flaggschiff, macht die App zu einer Praxis.
    Vorher Mocks zeigen: es ist UX-lastig, da lohnt sich ein Blick vor dem Bau.
-3. **§3 Vernetzungen**, in dieser Reihenfolge: Checklisten-Zeile → Aufgabe ·
-   Projekt-Deadline im Kalender · Tags über alles.
-   (Erst die kleinen mit sofortiger Wirkung, dann das Rückgrat.)
+3. **§3 Vernetzungen** — die beiden kleinen sind in v1.31.0 erledigt
+   (Checklisten-Zeile → Aufgabe, Projekt-Deadline im Kalender). Als Nächstes das
+   Rückgrat: **Tags über alles** — eigener Schritt, weil es das Datenmodell der
+   Notizen erweitert.
 4. **Web-Suche** — erweitert den Assistenten spürbar, sobald der Bogen steht.
 5. **Widget** `[NATIV]` — größter Alltagsgewinn, aber erst wenn alles
    JS-seitige rund ist und ein ruhiger Build-Rhythmus da ist.

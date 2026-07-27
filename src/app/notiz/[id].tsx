@@ -21,10 +21,11 @@ import { useDeviceEvents } from '@/data/calendarQueries';
 import { useCreateChat } from '@/data/chatQueries';
 import { useDeleteNote, useNotes, useUpdateNote } from '@/data/noteQueries';
 import { useSettings } from '@/theme/settings.store';
-import { useTasks } from '@/data/queries';
+import { useCreateTask, useTasks } from '@/data/queries';
 import { addDays, todayStr } from '@/lib/dates';
 import { hasCalendarPermission } from '@/lib/deviceCalendar';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
+import { noteTitle } from '@/lib/noteLogic';
 import { shareText } from '@/lib/share';
 import { noteShareTitle, noteToShareText } from '@/lib/shareText';
 import { webNoOutline } from '@/theme/layout';
@@ -156,6 +157,23 @@ export default function NotizScreen() {
     hapticSelect();
     setItemsAnd(items.filter((_, k) => k !== i), true);
   };
+  // Vernetzung: eine Checklisten-Zeile ist manchmal in Wahrheit eine Aufgabe.
+  // „Befördern" legt sie im Eingang an und nimmt sie aus der Liste — sie steht
+  // danach an genau EINER Stelle, statt doppelt gepflegt werden zu müssen.
+  const createTask = useCreateTask();
+  const [promoted, setPromoted] = useState<string | null>(null);
+  const promoteItem = (i: number) => {
+    const item = items[i];
+    const text = item.text.trim();
+    if (!text) return;
+    hapticSuccess();
+    const quelle = noteTitle(composeBody(title ?? '', free, items)) || 'Notiz';
+    createTask.mutate({ listId: 'default', title: text, note: `Aus der Notiz „${quelle}"` });
+    setItemsAnd(items.filter((_, k) => k !== i), true);
+    setPromoted(text);
+    setTimeout(() => setPromoted(null), 2600);
+  };
+
   const addDraft = () => {
     const text = draft.trim();
     if (!text) return;
@@ -492,11 +510,25 @@ export default function NotizScreen() {
                       webNoOutline,
                     ]}
                   />
+                  {!item.done && item.text.trim().length > 0 && (
+                    <PressableScale
+                      accessibilityLabel={`„${item.text}" als Aufgabe übernehmen`}
+                      onPress={() => promoteItem(i)}
+                      style={{ padding: Spacing.xs }}
+                    >
+                      <ListTodo size={15} color={colors.teal} strokeWidth={2} />
+                    </PressableScale>
+                  )}
                   <PressableScale accessibilityLabel={`Punkt ${item.text} entfernen`} onPress={() => removeItem(i)} style={{ padding: Spacing.xs }}>
                     <X size={14} color={colors.text3} strokeWidth={2} />
                   </PressableScale>
                 </View>
               ))}
+              {promoted && (
+                <Type variant="caption" tone="teal" style={{ paddingVertical: Spacing.xs }}>
+                  „{promoted}" ist jetzt eine Aufgabe.
+                </Type>
+              )}
               {/* Neuer Punkt — Enter fügt an und bleibt im Feld. */}
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.xs }}>
                 <Plus size={18} color={colors.teal} strokeWidth={2.2} />
