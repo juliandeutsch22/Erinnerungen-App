@@ -21,7 +21,7 @@ import { useCreateAssistantEvents } from '@/data/calendarQueries';
 import { useCreateNote } from '@/data/noteQueries';
 import { useCreateTask, useLists } from '@/data/queries';
 import type { ChatMessage } from '@/data/types';
-import { askAssistant, buildBraindumpContext, extractActions, resolveListId, type AssistantAction } from '@/lib/assistant';
+import { askAssistant, buildBraindumpContext, extractActions, describeSchritte, resolveListId, subtasksFromSchritte, type AssistantAction } from '@/lib/assistant';
 import { formatDueDate, parseDateStr, todayStr } from '@/lib/dates';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { webNoOutline } from '@/theme/layout';
@@ -144,6 +144,7 @@ export default function BraindumpScreen() {
         title: a.titel,
         dueDate: a.datum ?? null,
         dueTime: a.zeit ?? null,
+        subtasks: subtasksFromSchritte(a.schritte),
       });
       tasks += 1;
     }
@@ -305,6 +306,11 @@ export default function BraindumpScreen() {
                               .filter(Boolean)
                               .join(' · ')}
                           </Type>
+                        )}
+                        {/* Die Checkliste sichtbar machen: du sollst vor dem
+                            Übernehmen sehen, dass EINE Aufgabe entsteht. */}
+                        {describeSchritte(a.schritte) && (
+                          <Type variant="caption" tone="text3" numberOfLines={2}>{describeSchritte(a.schritte)}</Type>
                         )}
                       </View>
                       <Type variant="caption" tone="text3">Aufgabe</Type>

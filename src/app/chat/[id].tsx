@@ -29,7 +29,7 @@ import { useAppendMessage, useChatMessages, useChats, useUpdateChat } from '@/da
 import { useCreateNote, useNotes, useUpdateNote } from '@/data/noteQueries';
 import { useCreateTask, useLists, useTasks } from '@/data/queries';
 import type { Chat, ChatMessage } from '@/data/types';
-import { askAssistant, type AssistantAction, buildAppContext, buildNoteContext, buildTaskContext, type ChatLink, extractActions, generateChatTitle, promptChips } from '@/lib/assistant';
+import { askAssistant, type AssistantAction, buildAppContext, buildNoteContext, buildTaskContext, type ChatLink, describeSchritte, extractActions, generateChatTitle, promptChips, subtasksFromSchritte } from '@/lib/assistant';
 import { addDays, formatDueDate, toDateStr, todayStr } from '@/lib/dates';
 import { hasCalendarPermission } from '@/lib/deviceCalendar';
 import { noteTitle } from '@/lib/noteLogic';
@@ -189,13 +189,13 @@ function ActionCard({
       }}
     >
       <Type variant="eyebrow" tone="text3" style={{ marginBottom: Spacing.xs }}>Vorschläge</Type>
-      {actions.aufgaben.map((a, i) =>
-        row(
-          `a${i}`,
-          a.titel,
-          a.datum ? `${formatDueDate(a.datum, today)}${a.zeit ? ` · ${a.zeit} Uhr` : ''}` : a.zeit ? `${a.zeit} Uhr` : null,
-        ),
-      )}
+      {actions.aufgaben.map((a, i) => {
+        const wann = a.datum ? `${formatDueDate(a.datum, today)}${a.zeit ? ` · ${a.zeit} Uhr` : ''}` : a.zeit ? `${a.zeit} Uhr` : null;
+        // Schritte mit anzeigen — sonst sieht man der Zeile nicht an, dass eine
+        // Aufgabe MIT Checkliste entsteht statt vieler einzelner.
+        const schritte = describeSchritte(a.schritte);
+        return row(`a${i}`, a.titel, [wann, schritte].filter(Boolean).join(' · ') || null);
+      })}
       {actions.termine.map((t, i) =>
         row(
           `t${i}`,
@@ -390,6 +390,7 @@ export default function ChatScreen() {
         dueDate: a.datum ?? null,
         dueTime: a.zeit ?? null,
         eventId: chat?.eventId ?? null,
+        subtasks: subtasksFromSchritte(a.schritte),
       });
     }
     if (selected.checkliste.length > 0) {

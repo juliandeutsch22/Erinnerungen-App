@@ -323,6 +323,16 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
     mit, und tsc meldet jede Stelle, die noch fehlt. Beim nächsten persistierten
     Store-Feld also: erst `BackupStoreSlice` erweitern, dann alles andere.
 
+16. **Aktions-Aufgaben können „schritte" tragen** (v1.34.0) — eine eingefügte
+    Einkaufs-/Packliste wird EINE Aufgabe mit Checkliste, nicht N Aufgaben.
+    Der eigentliche Fix ist die BÜNDELN-Regel in `SYSTEM_PROMPT` und
+    `buildBraindumpContext`; ohne sie zerlegt das Modell die Liste wieder in
+    Einzelaufgaben. Wer diese Prompts umschreibt, muss die Regel mitnehmen —
+    der Test „Prompt und Braindump-Kontext verlangen das Bündeln" hält das fest.
+    `subtasksFromSchritte`/`describeSchritte` (assistant.ts) werden von Chat,
+    Braindump und Sprach-Sheet gemeinsam benutzt; `parseSchritte` nimmt auch
+    einen einzelnen String mit Zeilenumbrüchen, weil Modelle das liefern.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

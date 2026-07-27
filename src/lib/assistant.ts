@@ -2,7 +2,7 @@
 // Bewusst OHNE eigenen Server: das Gerät spricht die API direkt an — keine
 // laufenden Kosten, kein Mittelsmann. Reine Logik testbar (Prompt-Bau,
 // Antwort-Extraktion); der fetch selbst wird im Test nicht ausgeführt.
-import type { ChatMessage, List, Note, Task } from '@/data/types';
+import { type ChatMessage, type List, type Note, newId, type Subtask, type Task } from '@/data/types';
 import { noteTitle } from '@/lib/noteLogic';
 import type { DeviceEvent } from '@/lib/deviceCalendar';
 
@@ -36,8 +36,14 @@ export const SYSTEM_PROMPT =
   'AKTIONEN: Wenn der Nutzer dich bittet, Aufgaben/Erinnerungen, Termine oder eine Checkliste ' +
   'ANZULEGEN (z. B. „mach mir daraus Aufgaben", „trag das als Termin ein", „erstelle eine Packliste"), ' +
   'hänge ans ENDE deiner Antwort GENAU EINEN Block in diesem Format an:\n' +
-  '```stoa-aktionen\n{"aufgaben":[{"titel":"…","datum":"YYYY-MM-DD","zeit":"HH:MM"}],"termine":[{"titel":"…","datum":"YYYY-MM-DD","start":"HH:MM","ende":"HH:MM"}],"checkliste":["…"],"notizen":["…"]}\n```\n' +
+  '```stoa-aktionen\n{"aufgaben":[{"titel":"…","datum":"YYYY-MM-DD","zeit":"HH:MM","schritte":["…"]}],"termine":[{"titel":"…","datum":"YYYY-MM-DD","start":"HH:MM","ende":"HH:MM"}],"checkliste":["…"],"notizen":["…"]}\n```\n' +
   '„aufgaben" sind zu ERLEDIGENDE Handlungen (anrufen, kaufen, vorbereiten), datum/zeit optional. ' +
+  'WICHTIG — „schritte": Wenn viele Einzelteile zu EINEM Gang oder EINER Handlung gehören, ' +
+  'ist das EINE Aufgabe mit „schritte", NICHT viele Aufgaben. Eine Einkaufsliste ' +
+  '(„Milch, Brot, Butter, Äpfel") ist EINE Aufgabe „Einkaufen" mit den Dingen als schritte — ' +
+  'man geht einmal los, nicht viermal. Ebenso Packlisten, Zutaten, Besorgungen an einem Ort, ' +
+  'Teilschritte eines Vorhabens. Getrennte Aufgaben nur, wenn die Dinge wirklich unabhängig ' +
+  'voneinander erledigt werden (verschiedene Orte, verschiedene Tage, verschiedene Anlässe). ' +
   '„termine" sind feste Verabredungen zu einem Zeitpunkt (Arzttermin, Meeting, Kino, Zug, Geburtstag) — ' +
   'sie landen im Gerätekalender; datum ist Pflicht, start/ende optional (ohne start = ganztägig). ' +
   'Im Zweifel: fester Zeitpunkt/Verabredung → Termin, etwas zu TUN → Aufgabe. ' +
@@ -54,6 +60,13 @@ export function buildBraindumpContext(todayLabel: string, strict = false, listen
     'feste Verabredungen zu einer Uhrzeit (Arzttermin, Meeting, Zug, Kino) → "termine" ' +
     '(datum Pflicht, start/ende optional); ' +
     'Gedanken/Ideen/Fakten → "notizen" (sinnvoll gruppiert, erste Zeile = Titel). ' +
+    // Ohne diese Regel zerlegt das Modell eine eingefügte Einkaufsliste in
+    // sieben Einzelaufgaben — man geht aber einmal einkaufen, nicht siebenmal.
+    'BÜNDELN statt zerstückeln: Gehören mehrere Einzelteile zu EINEM Gang oder EINER Handlung, ' +
+    'ist das EINE Aufgabe mit "schritte" (Array von Strings), nicht mehrere Aufgaben. ' +
+    'Eine eingefügte Einkaufsliste („Milch, Brot, Butter") wird EINE Aufgabe „Einkaufen" mit den ' +
+    'Dingen als schritte. Dasselbe gilt für Packlisten, Zutaten und Besorgungen an einem Ort. ' +
+    'Getrennte Aufgaben nur bei wirklich unabhängigen Dingen (anderer Ort, anderer Tag, anderer Anlass). ' +
     'Keine "checkliste". Antworte mit maximal einem kurzen Satz plus dem Block — nichts darf verloren gehen. ' +
     // Der Nutzer hat Listen/Projekte — Aufgaben sollen dort landen, wo sie
     // hingehören, statt pauschal im Eingang. Unsicher → Feld weglassen.
@@ -69,14 +82,23 @@ export function buildBraindumpContext(todayLabel: string, strict = false, listen
     (strict
       ? ' WICHTIG: Deine letzte Antwort enthielt keinen gültigen Block. Gib jetzt ZWINGEND ' +
         'den ```stoa-aktionen```-Block mit mindestens einem Eintrag zurück — jede Zeile der ' +
-        'Eingabe wird zu einer Aufgabe (Handlung) oder Notiz.'
+        'Eingabe wird zu einer Aufgabe (Handlung), einem Schritt einer Aufgabe oder einer Notiz.'
       : '')
   );
 }
 
 // ——— Aktions-Block: strukturierte Vorschläge aus der Antwort ziehen. ———
 export type AssistantAction = {
-  aufgaben: { titel: string; datum?: string; zeit?: string; /** Zielliste (Name, wie vom Modell vorgeschlagen) — wird beim Anlegen aufgelöst. */ liste?: string }[];
+  aufgaben: {
+    titel: string;
+    datum?: string;
+    zeit?: string;
+    /** Zielliste (Name, wie vom Modell vorgeschlagen) — wird beim Anlegen aufgelöst. */
+    liste?: string;
+    /** Checkliste INNERHALB der Aufgabe (Einkaufsliste, Packliste, Teilschritte).
+     *  Wird zu `Task.subtasks` — nicht zu eigenen Aufgaben. */
+    schritte?: string[];
+  }[];
   /** Feste Verabredungen → Gerätekalender. datum Pflicht; ohne start = ganztägig. */
   termine: { titel: string; datum: string; start?: string; ende?: string }[];
   checkliste: string[];
@@ -100,7 +122,37 @@ export function resolveListId(
   return exact ? exact.id : fallback;
 }
 
+/** Schritte einer Aktions-Aufgabe → echte Unteraufgaben. An EINER Stelle, damit
+ *  Chat, Braindump und Sprach-Sheet dieselbe Checkliste anlegen. */
+export function subtasksFromSchritte(schritte: string[] | undefined): Subtask[] {
+  return (schritte ?? []).map((title) => ({ id: newId(), title, done: false }));
+}
+
+/** Kurzfassung der Schritte für die Bestätigungskarte — du sollst VOR dem
+ *  Übernehmen sehen, dass eine Aufgabe mit Checkliste entsteht und keine sieben. */
+export function describeSchritte(schritte: string[] | undefined): string | null {
+  if (!schritte || schritte.length === 0) return null;
+  const wort = schritte.length === 1 ? 'Schritt' : 'Schritte';
+  return `${schritte.length} ${wort}: ${schritte.slice(0, 3).join(', ')}${schritte.length > 3 ? ' …' : ''}`;
+}
+
 const ACTION_RE = /```stoa-aktionen\s*\n([\s\S]*?)```/;
+
+/**
+ * Schritte einer Aufgabe robust lesen. Modelle liefern hier mal ein Array, mal
+ * einen einzelnen String mit Zeilenumbrüchen/Kommas — beides ist gemeint, und
+ * eine verworfene Einkaufsliste wäre der teuerste Fehler an dieser Stelle.
+ * Leer → undefined, damit die Aufgabe wie bisher ohne Checkliste entsteht.
+ */
+function parseSchritte(raw: unknown): string[] | undefined {
+  const items = Array.isArray(raw)
+    ? raw.filter((s): s is string => typeof s === 'string')
+    : typeof raw === 'string'
+      ? raw.split(/\r?\n|[;,]/)
+      : [];
+  const out = items.map((s) => s.replace(/^[-*•\s]*(\[[ xX]\])?\s*/, '').trim()).filter((s) => s.length > 0);
+  return out.length > 0 ? out : undefined;
+}
 
 /** Trennt den Aktions-Block vom Anzeigetext (tolerant gegen kaputtes JSON). */
 export function extractActions(text: string): { clean: string; actions: AssistantAction | null } {
@@ -130,6 +182,9 @@ export function extractActions(text: string): { clean: string; actions: Assistan
             datum: typeof a.datum === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(a.datum) ? a.datum : undefined,
             zeit: typeof a.zeit === 'string' && /^\d{2}:\d{2}$/.test(a.zeit) ? a.zeit : undefined,
             liste: typeof a.liste === 'string' && (a.liste as string).trim().length > 0 ? (a.liste as string).trim() : undefined,
+            // Manche Modelle liefern die Schritte als einzelnen String statt als
+            // Array — beides annehmen, sonst geht die Einkaufsliste verloren.
+            schritte: parseSchritte(a.schritte),
           }))
       : [];
     const termine = Array.isArray(raw.termine)

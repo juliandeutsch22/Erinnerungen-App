@@ -23,7 +23,7 @@ import { useCreateAssistantEvents } from '@/data/calendarQueries';
 import { useCreateNote } from '@/data/noteQueries';
 import { useCreateTask, useLists } from '@/data/queries';
 import type { ChatMessage } from '@/data/types';
-import { type AssistantAction, askAssistant, buildBraindumpContext, extractActions, resolveListId } from '@/lib/assistant';
+import { type AssistantAction, askAssistant, buildBraindumpContext, describeSchritte, extractActions, resolveListId, subtasksFromSchritte } from '@/lib/assistant';
 import { formatDueDate, parseDateStr, todayStr } from '@/lib/dates';
 import { useDictation } from '@/lib/dictation';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
@@ -207,7 +207,7 @@ export function QuickVoiceView({
       // Datum/Zeit und — wenn der Assistent eine Liste vorschlägt — auch das
       // Ziel zeigen: du siehst vor dem Bestätigen, wo es landet.
       sub:
-        [a.datum ? formatDueDate(a.datum, today) : '', a.zeit ?? '', a.liste ? `→ ${a.liste}` : '']
+        [a.datum ? formatDueDate(a.datum, today) : '', a.zeit ?? '', a.liste ? `→ ${a.liste}` : '', describeSchritte(a.schritte) ?? '']
           .filter(Boolean)
           .join(' · ') || undefined,
       kind: 'Aufgabe' as const,
@@ -458,6 +458,7 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
         title: a.titel,
         dueDate: a.datum ?? null,
         dueTime: a.zeit ?? null,
+        subtasks: subtasksFromSchritte(a.schritte),
       });
       tasks += 1;
     }

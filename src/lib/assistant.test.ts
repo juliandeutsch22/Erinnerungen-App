@@ -1,7 +1,7 @@
 // assistant.test.ts — Prompt-Bau, Antwort-Extraktion, Fehlertexte.
 import type { ChatMessage } from '@/data/types';
 
-import { buildAppContext,  buildRequestBody, createSseParser, describeError, extractActions, extractChunkText, extractText, pickModelsFromList, promptChips, resolveListId, sanitizeChatTitle } from './assistant';
+import { buildAppContext,  buildBraindumpContext, buildRequestBody, createSseParser, describeError, describeSchritte, extractActions, extractChunkText, extractText, pickModelsFromList, promptChips, resolveListId, sanitizeChatTitle, SYSTEM_PROMPT, subtasksFromSchritte } from './assistant';
 
 const msg = (role: 'user' | 'assistant', content: string, at: string): ChatMessage => ({
   id: `m-${at}`, chatId: 'c1', role, content, createdAt: at,
@@ -281,5 +281,29 @@ describe('resolveListId', () => {
     expect(resolveListId('Werkstatt', lists)).toBe('default');
     expect(resolveListId(undefined, lists)).toBe('default');
     expect(resolveListId('', lists)).toBe('default');
+  });
+});
+
+
+describe('Schritte → Unteraufgaben', () => {
+  it('macht offene Unteraufgaben mit eigenen IDs', () => {
+    const subs = subtasksFromSchritte(['Milch', 'Brot']);
+    expect(subs.map((s) => s.title)).toEqual(['Milch', 'Brot']);
+    expect(subs.every((s) => !s.done)).toBe(true);
+    expect(new Set(subs.map((s) => s.id)).size).toBe(2);
+  });
+
+  it('beschreibt die Checkliste für die Bestätigungskarte', () => {
+    expect(describeSchritte(undefined)).toBeNull();
+    expect(describeSchritte(['Milch'])).toBe('1 Schritt: Milch');
+    expect(describeSchritte(['Milch', 'Brot', 'Butter', 'Äpfel'])).toBe('4 Schritte: Milch, Brot, Butter …');
+  });
+
+  // Ohne diese Regel im Prompt zerlegt das Modell die Einkaufsliste wieder in
+  // Einzelaufgaben — die Regel ist der eigentliche Fix, nicht das Parsen.
+  it('Prompt und Braindump-Kontext verlangen das Bündeln', () => {
+    expect(SYSTEM_PROMPT).toContain('schritte');
+    expect(SYSTEM_PROMPT).toContain('NICHT viele Aufgaben');
+    expect(buildBraindumpContext('Montag, 27. Juli 2026 (2026-07-27)')).toContain('BÜNDELN statt zerstückeln');
   });
 });
