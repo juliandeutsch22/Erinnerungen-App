@@ -7,6 +7,7 @@ import React, { useMemo, useState } from 'react';
 import { TextInput, View } from 'react-native';
 
 import { GlassPanel } from '@/components/GlassPanel';
+import { InsetField } from '@/components/InsetField';
 import { KeyboardDoneBar, keyboardDoneProps } from '@/components/KeyboardDone';
 import { PressableScale } from '@/components/PressableScale';
 import { Reveal } from '@/components/Reveal';
@@ -95,29 +96,31 @@ export default function JournalScreen() {
                 {editingId === e.id ? (
                   <View>
                     <Type variant="heading">{formatDueDate(e.date, today)}</Type>
-                    <TextInput
-                      value={editText}
-                      onChangeText={setEditText}
-                      multiline
-                      autoFocus
-                      scrollEnabled={false}
-                      accessibilityLabel={`Betrachtung vom ${e.date} bearbeiten`}
-                      {...keyboardDoneProps}
-                      style={[
-                        {
-                          marginTop: Spacing.sm,
-                          minHeight: 72,
-                          textAlignVertical: 'top',
-                          color: colors.text,
-                          fontSize: T.md,
-                          lineHeight: 22,
-                          padding: Spacing.md,
-                          borderRadius: R.md,
-                          backgroundColor: colors.chip,
-                        },
-                        webNoOutline,
-                      ]}
-                    />
+                    {/* Dieselbe eingelassene Schreibfläche wie in der Abendkarte —
+                        es ist dasselbe Feld, also darf es nicht anders aussehen. */}
+                    <InsetField radius={R.lg} style={{ marginTop: Spacing.sm, marginHorizontal: -Spacing.lg }}>
+                      <TextInput
+                        value={editText}
+                        onChangeText={setEditText}
+                        multiline
+                        autoFocus
+                        scrollEnabled={false}
+                        accessibilityLabel={`Betrachtung vom ${e.date} bearbeiten`}
+                        {...keyboardDoneProps}
+                        style={[
+                          {
+                            minHeight: 96,
+                            textAlignVertical: 'top',
+                            color: colors.text,
+                            fontSize: T.md,
+                            lineHeight: 26,
+                            paddingHorizontal: Spacing.lg,
+                            paddingVertical: Spacing.md,
+                          },
+                          webNoOutline,
+                        ]}
+                      />
+                    </InsetField>
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: Spacing.sm }}>
                       <PressableScale
                         accessibilityLabel="Eintrag löschen"

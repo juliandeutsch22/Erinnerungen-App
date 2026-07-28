@@ -574,6 +574,31 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
     Bewusst nur Anzeige, keine Auswahl: eine Modell-Wahl wäre eine Einstellung,
     die man pflegen muss, und die Kette macht es ohnehin besser.
 
+35. **Eingabefelder liegen IN der Platte, nicht darauf**
+    (`components/InsetField.tsx`, v1.47.0) — gemeldet an der Abendbetrachtung
+    („wirkt draufgeklebt"), und der Befund stimmte: Das Feld war ein gefülltes
+    Rechteck mit Radius, das mit Luft an allen vier Seiten mittig auf der
+    behauenen Steinplatte schwebte. Auf einer Platte, die Grate und Fasen trägt,
+    liest sich so etwas zwangsläufig als aufgelegtes Plättchen.
+    · Die Lösung ist die Meißel-Physik von `Glass.tsx`/`Type.tsx`, **umgekehrt**:
+      Die PLATTE hat den Lichtgrat oben und den Schattengrat unten (sie steht
+      hervor). Eine MULDE spiegelt das — Schattengrat OBEN (die Kante wirft
+      hinein), Lichtgrat UNTEN (die innere Wand fängt das Licht). Wer die beiden
+      vertauscht, macht daraus wieder ein Plättchen. Und wie die Platte trägt
+      die Mulde KEINE Umrandung.
+    · Neuer Token `sunk` — im Hellen eine Spur tiefer als `chip`, im Dunkeln
+      DUNKLER als die Platte (`chip` ist dort Alpha-Weiß und läge wieder oben
+      drauf).
+    · Die Fläche läuft bis an die Kartenränder (negative Margins gegen das
+      Panel-Padding). Folgt nichts mehr, auch bis an die Unterkante: ein
+      schmales Steinband darunter ist zu dünn für einen Rand und zu dick für
+      nichts. Gibt es den Verlaufs-Link, endet sie davor.
+    · Zeilenhöhe 26 statt 22: hier entsteht eine Seite, kein Formularfeld.
+    **Noch NICHT umgestellt** sind Braindump, Merkzettel und der Schlüssel in
+    den Einstellungen — dort steht heute dasselbe Feld in drei verschiedenen
+    Fassungen (mal `chip`+`chipBorder`, mal `bg2`+`border`, mal ganz ohne).
+    Wer dort das nächste Mal anfasst, nimmt `InsetField` mit.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

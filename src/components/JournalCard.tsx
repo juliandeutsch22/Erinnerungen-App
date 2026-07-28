@@ -7,6 +7,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { TextInput, View } from 'react-native';
 
 import { GlassPanel } from '@/components/GlassPanel';
+import { InsetField } from '@/components/InsetField';
 import { KeyboardDoneBar, keyboardDoneProps } from '@/components/KeyboardDone';
 import { PressableScale } from '@/components/PressableScale';
 import { Type } from '@/components/Type';
@@ -99,39 +100,53 @@ export function JournalCard({ today, onFocusInput }: { today: string; onFocusInp
         </PressableScale>
       )}
       <Type variant="caption" tone="text3" style={{ marginTop: Spacing.xs }}>{JOURNAL_PROMPT}</Type>
-      <TextInput
-        accessibilityLabel="Abendbetrachtung schreiben"
-        value={text ?? ''}
-        onChangeText={onChange}
-        onFocus={() => {
-          setFocused(true);
-          onFocusInput?.();
+      {/* Die Schreibfläche liegt IN der Platte (siehe InsetField) und reicht bis
+          an deren Ränder — ein eingerücktes Kästchen mit Luft ringsum sähe aus
+          wie aufgeklebt. Der Zeilenabstand ist bewusst großzügig: hier entsteht
+          eine Seite, kein Formularfeld.
+          Folgt nichts mehr, läuft die Mulde bis an die Unterkante: ein schmales
+          Steinband darunter wäre zu dünn für einen Rand und zu dick für nichts.
+          Gibt es den Verlaufs-Link, endet sie davor — dann trägt der Stein ihn. */}
+      <InsetField
+        radius={R.lg}
+        style={{
+          marginTop: Spacing.sm,
+          marginHorizontal: -Spacing.lg,
+          marginBottom: hasHistory ? 0 : -Spacing.lg,
         }}
-        onBlur={() => setFocused(false)}
-        // Neue Zeile → Feld wächst nach unten → Karte über der Tastatur halten.
-        onContentSizeChange={() => {
-          if (focused) onFocusInput?.();
-        }}
-        multiline
-        scrollEnabled={false}
-        placeholder="Ein paar ehrliche Zeilen genügen …"
-        placeholderTextColor={colors.text3}
-        {...keyboardDoneProps}
-        style={[
-          {
-            marginTop: Spacing.sm,
-            minHeight: 72,
-            textAlignVertical: 'top',
-            color: colors.text,
-            fontSize: T.md,
-            lineHeight: 22,
-            padding: Spacing.md,
-            borderRadius: R.md,
-            backgroundColor: colors.chip,
-          },
-          webNoOutline,
-        ]}
-      />
+      >
+        <TextInput
+          accessibilityLabel="Abendbetrachtung schreiben"
+          value={text ?? ''}
+          onChangeText={onChange}
+          onFocus={() => {
+            setFocused(true);
+            onFocusInput?.();
+          }}
+          onBlur={() => setFocused(false)}
+          // Neue Zeile → Feld wächst nach unten → Karte über der Tastatur halten.
+          onContentSizeChange={() => {
+            if (focused) onFocusInput?.();
+          }}
+          multiline
+          scrollEnabled={false}
+          placeholder="Ein paar ehrliche Zeilen genügen …"
+          placeholderTextColor={colors.text3}
+          {...keyboardDoneProps}
+          style={[
+            {
+              minHeight: 96,
+              textAlignVertical: 'top',
+              color: colors.text,
+              fontSize: T.md,
+              lineHeight: 26,
+              paddingHorizontal: Spacing.md,
+              paddingVertical: Spacing.md,
+            },
+            webNoOutline,
+          ]}
+        />
+      </InsetField>
       <KeyboardDoneBar />
       {hasHistory && (
         <PressableScale

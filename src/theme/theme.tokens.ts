@@ -34,6 +34,10 @@ export const lightColors = {
   // Chip = ruhige Stein-Well auf der Marmor-Tafel (solide, kein Alpha-Weiß).
   chip: '#EFEBDE',
   chipBorder: 'rgba(50,50,40,0.12)',
+  // sunk = eingelassene Schreibfläche (InsetField). Eine Spur TIEFER als chip:
+  // ein Feld ist eine Mulde im Stein, kein aufgelegtes Plättchen. Im Dunkeln
+  // muss es dunkler als die Platte sein — sonst läge es wieder oben drauf.
+  sunk: '#EBE6D6',
   border: 'rgba(50,50,40,0.12)',
   border2: 'rgba(50,50,40,0.18)',
   border3: 'rgba(50,50,40,0.30)',
@@ -59,6 +63,7 @@ export const darkColors: typeof lightColors = {
   bg4: '#222A34',
   chip: 'rgba(255,255,255,0.07)',
   chipBorder: 'rgba(255,255,255,0.10)',
+  sunk: 'rgba(0,0,0,0.28)',
   border: 'rgba(255,255,255,0.12)',
   border2: 'rgba(255,255,255,0.20)',
   border3: 'rgba(255,255,255,0.32)',
