@@ -26,7 +26,7 @@ import { Type } from '@/components/Type';
 import { useCompleteList, useCompleteTask, useLists, useReopenList, useReopenTask, useTasks } from '@/data/queries';
 import type { Task } from '@/data/types';
 import { deadlineLabel, todayStr } from '@/lib/dates';
-import { byTimeThenCreation, groupPlanned, isOpen, listProgress, projectDeadlineLabel, projectState, recentlyCompleted } from '@/lib/taskLogic';
+import { byTimeThenCreation, expiredTasks, groupPlanned, isCurrent, isDormant, isOpen, listProgress, projectDeadlineLabel, projectState, recentlyCompleted } from '@/lib/taskLogic';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { shareText } from '@/lib/share';
 import { listToShareText } from '@/lib/shareText';
@@ -49,6 +49,8 @@ export default function ListeDetailScreen() {
   const [quickTask, setQuickTask] = useState<Task | null>(null);
   const [editList, setEditList] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
+  const [showLater, setShowLater] = useState(false);
+  const [showExpired, setShowExpired] = useState(false);
   const [reordering, setReordering] = useState(false);
 
   const today = todayStr();
@@ -66,7 +68,7 @@ export default function ListeDetailScreen() {
   // Offene: fällige zuerst (chronologisch), der Rest nach Anlage (Fahrplan §4).
   const open = useMemo(
     () =>
-      scoped.filter(isOpen).sort((a, b) => {
+      scoped.filter((t) => isOpen(t) && isCurrent(t, today)).sort((a, b) => {
         if (a.dueDate !== b.dueDate) {
           if (a.dueDate === null) return 1;
           if (b.dueDate === null) return -1;
@@ -74,8 +76,15 @@ export default function ListeDetailScreen() {
         }
         return byTimeThenCreation(a, b);
       }),
-    [scoped],
+    [scoped, today],
   );
+  // Schlummernde und verfallene Aufgaben verschwinden aus der offenen Liste,
+  // aber NICHT aus der App: sie bekommen unten je eine eigene, ruhige Gruppe.
+  const spaeter = useMemo(
+    () => scoped.filter((t) => isOpen(t) && isDormant(t, today)).sort((a, b) => (a.startDate! < b.startDate! ? -1 : 1)),
+    [scoped, today],
+  );
+  const verfallen = useMemo(() => expiredTasks(scoped, today), [scoped, today]);
   const completed = useMemo(() => recentlyCompleted(scoped, today), [scoped, today]);
   const progress = useMemo(() => listProgress(scoped), [scoped]);
   const isProject = !!(list && (list.goal || list.deadline));
@@ -205,6 +214,46 @@ export default function ListeDetailScreen() {
             ))
           ) : (
             <View>{open.map((t) => renderRow(t, isSmartView))}</View>
+          )}
+
+          {/* Spaeter: schlummernde Aufgaben. Sie sind nicht weg, sie sind nur
+              noch nicht dran — deshalb sichtbar, aber eingeklappt und leise. */}
+          {spaeter.length > 0 && (
+            <>
+              <Seam marginVertical={Spacing.md} />
+              <PressableScale
+                accessibilityLabel={showLater ? 'Später ausblenden' : 'Später anzeigen'}
+                onPress={() => {
+                  hapticSelect();
+                  setShowLater((v) => !v);
+                }}
+                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+              >
+                <Type variant="eyebrow" tone="text3">Später · {spaeter.length}</Type>
+                <DisclosureChevron open={showLater} color={colors.text3} />
+              </PressableScale>
+              {showLater && <View style={{ marginTop: Spacing.xs }}>{spaeter.map((t) => renderRow(t, isSmartView))}</View>}
+            </>
+          )}
+
+          {/* Anlass vorbei: nicht ueberfaellig, sondern gegenstandslos. Nur ein
+              ruhiger Hinweis — weggeraeumt wird von Hand. */}
+          {verfallen.length > 0 && (
+            <>
+              <Seam marginVertical={Spacing.md} />
+              <PressableScale
+                accessibilityLabel={showExpired ? 'Anlass vorbei ausblenden' : 'Anlass vorbei anzeigen'}
+                onPress={() => {
+                  hapticSelect();
+                  setShowExpired((v) => !v);
+                }}
+                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+              >
+                <Type variant="eyebrow" tone="text3">Anlass vorbei · {verfallen.length}</Type>
+                <DisclosureChevron open={showExpired} color={colors.text3} />
+              </PressableScale>
+              {showExpired && <View style={{ marginTop: Spacing.xs }}>{verfallen.map((t) => renderRow(t, isSmartView))}</View>}
+            </>
           )}
 
           {/* Erledigt — einklappbar, automatisch nur die letzten 30 Tage. */}

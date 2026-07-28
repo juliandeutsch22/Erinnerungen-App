@@ -1,6 +1,7 @@
 // scheduling.ts — reine Auswahl-Logik der Erinnerungs-Engine (testbar ohne
 // expo-notifications): welche Aufgaben kommen ins 64er-Planungsfenster?
 import type { Task } from '@/data/types';
+import { isExpired } from '@/lib/taskLogic';
 import { parseDateStr } from '@/lib/dates';
 
 /** Planungsfenster: bewusst unter dem 64er-Limit von iOS (Fahrplan §8.1). */
@@ -25,8 +26,10 @@ export function selectNotificationWindow(
   now: Date,
   limit: number = NOTIFICATION_WINDOW,
 ): { task: Task; fire: Date }[] {
+  // Verfallenes klingelt nicht: der Anlass ist vorbei, nicht verpasst.
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   return tasks
-    .filter((t) => t.completedAt === null)
+    .filter((t) => t.completedAt === null && !isExpired(t, today))
     .map((task) => ({ task, fire: taskFireDate(task) }))
     .filter((x): x is { task: Task; fire: Date } => x.fire !== null && x.fire.getTime() > now.getTime())
     .sort((a, b) => a.fire.getTime() - b.fire.getTime())

@@ -310,6 +310,8 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
       dueTime: str(t.dueTime) ? t.dueTime : null,
       rrule: isRrule(t.rrule) ? t.rrule : null,
       rruleUntil: str(t.rruleUntil) ? t.rruleUntil : null,
+      startDate: str(t.startDate) ? t.startDate : null,
+      expiresOn: str(t.expiresOn) ? t.expiresOn : null,
       flagged: t.flagged === true,
       eventId: str(t.eventId) ? t.eventId : null,
       completedAt: str(t.completedAt) ? t.completedAt : null,

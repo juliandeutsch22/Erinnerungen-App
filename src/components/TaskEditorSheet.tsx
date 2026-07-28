@@ -3,7 +3,7 @@
 // Detail-Zeilen (Liste / Fällig / Wiederholung / Flagge) mit aktuellem Wert,
 // die erst beim Antippen ihre Chips aufklappen — keine Chip-Wand. Der
 // Primär-Button sitzt fest im Sheet-Footer. Löschen zweistufig.
-import { CalendarDays, CalendarX2, Clock, Flag, ListChecks, type LucideIcon, Minus, Plus, Repeat, Tag as TagIcon, Trash2, X } from 'lucide-react-native';
+import { CalendarDays, CalendarX2, Clock, Flag, ListChecks, type LucideIcon, Minus, Plus, Repeat, Tag as TagIcon, Trash2, X, Hourglass } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
@@ -15,6 +15,7 @@ import { KeyboardDoneBar, keyboardDoneProps } from '@/components/KeyboardDone';
 import { LinkedChats } from '@/components/LinkedChats';
 import { LinkedNotes } from '@/components/LinkedNotes';
 import { listIcon } from '@/components/listMeta';
+import { Seam } from '@/components/Seam';
 import { MiniCalendar } from '@/components/MiniCalendar';
 import { PressableScale } from '@/components/PressableScale';
 import { Expanded, Group, RowDivider } from '@/components/SheetParts';
@@ -46,7 +47,7 @@ const ENDS: { label: string; months: number | null }[] = [
   { label: 'Nach 1 Jahr', months: 12 },
 ];
 
-type Section = 'list' | 'due' | 'repeat';
+type Section = 'list' | 'due' | 'repeat' | 'span';
 
 export function TaskEditorSheet({
   task,
@@ -75,6 +76,8 @@ export function TaskEditorSheet({
   const [dueTime, setDueTime] = useState<string | null>(task?.dueTime ?? null);
   const [rrule, setRrule] = useState<Rrule | null>(task?.rrule ?? null);
   const [rruleUntil, setRruleUntil] = useState<string | null>(task?.rruleUntil ?? null);
+  const [startDate, setStartDate] = useState<string | null>(task?.startDate ?? null);
+  const [expiresOn, setExpiresOn] = useState<string | null>(task?.expiresOn ?? null);
   // Bausteine des Satzes „Alle [n] [Einheit], gezählt ab [Fälligkeit|Erledigen]".
   // Startwerte aus einer bestehenden Regel; 'weekdays' hat keine → Vorgabe.
   const initialParts = rruleParts(task?.rrule ?? null);
@@ -120,6 +123,14 @@ export function TaskEditorSheet({
   const currentList = useMemo(() => (lists ?? []).find((l) => l.id === listId), [lists, listId]);
 
   const dueLabel = dueDate ? formatDueDate(dueDate, today) + (dueTime ? `, ${dueTime}` : '') : 'Kein Datum';
+  // Beschriftung der Lebensspanne: „ab …", „bis …" oder beides.
+  const spanLabel = startDate
+    ? expiresOn
+      ? `${formatDueDate(startDate, today)} – ${formatDueDate(expiresOn, today)}`
+      : `ab ${formatDueDate(startDate, today)}`
+    : expiresOn
+      ? `bis ${formatDueDate(expiresOn, today)}`
+      : 'Immer';
 
   // Tag-Vorschläge aus dem Bestand (die noch nicht gewählt sind).
   const { data: allTasks } = useTasks();
@@ -155,6 +166,8 @@ export function TaskEditorSheet({
       listId,
       dueDate: finalDate,
       dueTime: finalDate ? validTime : null,
+      startDate,
+      expiresOn,
       rrule: finalDate ? rrule : null,
       rruleUntil: finalDate && rrule ? rruleUntil : null,
       flagged,
@@ -354,6 +367,73 @@ export function TaskEditorSheet({
             </View>
           </Expanded>
         )}
+        <RowDivider />
+
+        {/* Lebensspanne — ab wann sie auftaucht, bis wann sie Sinn hat.
+            Zusammen in EINER Zeile: es sind die zwei Enden derselben Sache,
+            und getrennt wären es zwei Zeilen, die fast nie beide benutzt werden. */}
+        <DetailRow
+          icon={Hourglass}
+          iconColor={startDate || expiresOn ? colors.teal : colors.text3}
+          label="Zeitraum"
+          value={spanLabel}
+          valueTone={startDate || expiresOn ? 'teal' : 'text3'}
+          expanded={section === 'span'}
+          onPress={() => toggleSection('span')}
+        />
+        {section === 'span' && (
+          <Expanded>
+            <View style={{ gap: Spacing.md }}>
+              <View style={{ gap: Spacing.xs }}>
+                <Type variant="label" tone="text2">Zeig sie mir ab</Type>
+                <Type variant="caption" tone="text3">
+                  Vorher liegt sie nicht im Weg — sie ist da, nur nicht jetzt.
+                </Type>
+                <View style={{ borderRadius: R.lg, borderWidth: 1, borderColor: colors.chipBorder, backgroundColor: colors.bg2, padding: Spacing.sm }}>
+                  <MiniCalendar selected={startDate} onSelect={setStartDate} />
+                </View>
+                {startDate && (
+                  <PressableScale
+                    accessibilityLabel="Startdatum entfernen"
+                    onPress={() => {
+                      hapticSelect();
+                      setStartDate(null);
+                    }}
+                    style={{ alignSelf: 'center', paddingVertical: Spacing.xs }}
+                  >
+                    <Type variant="label" tone="text3">Startdatum entfernen</Type>
+                  </PressableScale>
+                )}
+              </View>
+
+              <Seam />
+
+              <View style={{ gap: Spacing.xs }}>
+                <Type variant="label" tone="text2">Danach ist sie gegenstandslos</Type>
+                <Type variant="caption" tone="text3">
+                  Nicht überfällig, sondern erledigt durch Zeitablauf — Karten fürs
+                  Konzert kauft man danach nicht mehr.
+                </Type>
+                <View style={{ borderRadius: R.lg, borderWidth: 1, borderColor: colors.chipBorder, backgroundColor: colors.bg2, padding: Spacing.sm }}>
+                  <MiniCalendar selected={expiresOn} onSelect={setExpiresOn} />
+                </View>
+                {expiresOn && (
+                  <PressableScale
+                    accessibilityLabel="Verfallsdatum entfernen"
+                    onPress={() => {
+                      hapticSelect();
+                      setExpiresOn(null);
+                    }}
+                    style={{ alignSelf: 'center', paddingVertical: Spacing.xs }}
+                  >
+                    <Type variant="label" tone="text3">Verfallsdatum entfernen</Type>
+                  </PressableScale>
+                )}
+              </View>
+            </View>
+          </Expanded>
+        )}
+
         <RowDivider />
 
         {/* Wiederholung */}

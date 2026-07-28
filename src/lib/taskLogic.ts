@@ -176,3 +176,45 @@ export function projectShowsDeadline(
   if (list.deletedAt || !list.deadline) return false;
   return projectState(list, progress) === 'laeuft';
 }
+
+// ——— Lebensspanne einer Aufgabe: ab wann, bis wann. ———
+// Eine Aufgabe kannte bisher genau EINEN Zeitpunkt: fällig. Das erzeugt zwei
+// Sorten Rauschen — Dinge, die noch nicht dran sind, stehen trotzdem im Weg;
+// und Dinge, deren Anlass vorbei ist, gelten als „überfällig", obwohl sie
+// schlicht gegenstandslos sind. Beides bekommt jetzt ein eigenes Datum.
+
+/** Schlummert die Aufgabe noch? (Startdatum liegt in der Zukunft.) */
+export function isDormant(t: Pick<Task, 'startDate'>, today: string): boolean {
+  return !!t.startDate && t.startDate > today;
+}
+
+/** Ist der Anlass vorbei? Nicht „zu spät" — sondern gegenstandslos. */
+export function isExpired(t: Pick<Task, 'expiresOn' | 'completedAt'>, today: string): boolean {
+  return t.completedAt === null && !!t.expiresOn && t.expiresOn < today;
+}
+
+/**
+ * Zählt die Aufgabe in den normalen Ansichten mit? Schlummernde und verfallene
+ * werden ausgeblendet — sie sind nicht gelöscht, nur nicht jetzt.
+ * WICHTIG: erledigte Aufgaben filtert weiterhin `isOpen`; das hier ist eine
+ * ZUSÄTZLICHE Bedingung, keine Ersetzung.
+ */
+export function isCurrent(t: Pick<Task, 'startDate' | 'expiresOn' | 'completedAt'>, today: string): boolean {
+  return !isDormant(t, today) && !isExpired(t, today);
+}
+
+/** Verfallene, noch offene Aufgaben — für den ruhigen Aufräum-Hinweis. */
+export function expiredTasks(tasks: Task[], today: string): Task[] {
+  return tasks.filter((t) => !t.deletedAt && isExpired(t, today));
+}
+
+/** Wie eine Lebensspanne unter der Aufgabe steht. null = nichts zu sagen. */
+export function lifespanLabel(
+  t: Pick<Task, 'startDate' | 'expiresOn' | 'completedAt'>,
+  today: string,
+): string | null {
+  if (isExpired(t, today)) return 'Anlass vorbei';
+  if (isDormant(t, today)) return `ab ${t.startDate}`;
+  if (t.expiresOn) return `bis ${t.expiresOn}`;
+  return null;
+}

@@ -32,7 +32,7 @@ import {
 import type { List, Task } from '@/data/types';
 import { applyFilter } from '@/lib/taskFilters';
 import { addDays, deadlineLabel, formatDueDate, toDateStr, todayStr } from '@/lib/dates';
-import { isOpen, listProgress, projectDeadlineLabel, projectState } from '@/lib/taskLogic';
+import { isCurrent, isOpen, listProgress, projectDeadlineLabel, projectState } from '@/lib/taskLogic';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { useSettings } from '@/theme/settings.store';
 import { useColors } from '@/theme/ThemeProvider';
@@ -52,7 +52,8 @@ export default function ListenScreen() {
   const openByList = useMemo(() => {
     const map = new Map<string, number>();
     for (const t of tasks ?? []) {
-      if (isOpen(t)) map.set(t.listId, (map.get(t.listId) ?? 0) + 1);
+      // Schlummerndes und Verfallenes zaehlt nicht mit - es ist da, aber nicht jetzt.
+      if (isOpen(t) && isCurrent(t, today)) map.set(t.listId, (map.get(t.listId) ?? 0) + 1);
     }
     return map;
   }, [tasks]);
@@ -67,8 +68,8 @@ export default function ListenScreen() {
     for (const [id, arr] of byList) map.set(id, listProgress(arr));
     return map;
   }, [tasks]);
-  const openTotal = useMemo(() => (tasks ?? []).filter(isOpen).length, [tasks]);
-  const openPlanned = useMemo(() => (tasks ?? []).filter((t) => isOpen(t) && t.dueDate !== null).length, [tasks]);
+  const openTotal = useMemo(() => (tasks ?? []).filter((t) => isOpen(t) && isCurrent(t, today)).length, [tasks, today]);
+  const openPlanned = useMemo(() => (tasks ?? []).filter((t) => isOpen(t) && isCurrent(t, today) && t.dueDate !== null).length, [tasks, today]);
 
   return (
     <Screen>

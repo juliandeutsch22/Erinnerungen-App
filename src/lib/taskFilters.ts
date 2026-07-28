@@ -2,7 +2,7 @@
 // Kombiniert Tags, Flagge und Zeitraum; testbar ohne UI/DB.
 import type { Subtask, Task } from '@/data/types';
 import { addDays } from '@/lib/dates';
-import { isOpen, isOverdue } from '@/lib/taskLogic';
+import { isCurrent, isOpen, isOverdue } from '@/lib/taskLogic';
 
 export type FilterRange = 'all' | 'today' | 'week' | 'overdue' | 'undated';
 
@@ -41,6 +41,9 @@ function matchesRange(t: Task, range: FilterRange, today: string): boolean {
 export function applyFilter(tasks: Task[], filter: Omit<SavedFilter, 'id' | 'name'>, today: string): Task[] {
   return tasks.filter((t) => {
     if (!filter.includeCompleted && !isOpen(t)) return false;
+    // Ein Filter beantwortet, was JETZT dran ist - Schlummerndes und Verfallenes
+    // gehoert nicht hinein.
+    if (!isCurrent(t, today)) return false;
     if (filter.flagged && !t.flagged) return false;
     if (filter.tags.length > 0 && !filter.tags.every((tag) => t.tags.includes(tag))) return false;
     if (!matchesRange(t, filter.range, today)) return false;

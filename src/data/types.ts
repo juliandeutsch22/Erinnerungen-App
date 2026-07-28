@@ -59,6 +59,14 @@ export type Task = {
   /** Ende der Serie ('YYYY-MM-DD'): rückt die Wiederholung darüber hinaus,
    *  wird die Aufgabe endgültig erledigt. Optional — fehlend = ohne Ende. */
   rruleUntil?: string | null;
+  /** AB wann die Aufgabe überhaupt sichtbar ist ('YYYY-MM-DD').
+   *  „Winterreifen wechseln" gehört in den Oktober — bis dahin existiert sie,
+   *  liegt aber nicht im Weg. Null = ab sofort. */
+  startDate?: string | null;
+  /** BIS wann sie noch Sinn hat ('YYYY-MM-DD'). Danach ist sie nicht überfällig,
+   *  sondern gegenstandslos („Karten fürs Konzert kaufen" nach dem Konzert).
+   *  Null = ohne Verfall. */
+  expiresOn?: string | null;
   flagged: boolean;
   /** An einen Gerätekalender-Termin gehängt (EventKit-Event-ID), null = frei. */
   eventId: string | null;
@@ -85,6 +93,8 @@ export type NewTask = {
   dueDate?: string | null;
   dueTime?: string | null;
   rrule?: Rrule | null;
+  startDate?: string | null;
+  expiresOn?: string | null;
   flagged?: boolean;
   eventId?: string | null;
   tags?: string[];

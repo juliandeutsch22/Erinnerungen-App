@@ -1,7 +1,7 @@
 // taskLogic.test.ts — Überfällig-Ableitung, Abhak-Semantik, Gruppierungen.
 import type { Task } from '@/data/types';
 import type { List } from '@/data/types';
-import { adoptOverdueToToday, groupPlanned, listProgress, groupToday, groupUpcomingDays, isDueToday, isOverdue, recentlyCompleted, resolveCompletion, projectState, projectDeadlineLabel, projectShowsDeadline } from './taskLogic';
+import { adoptOverdueToToday, groupPlanned, listProgress, groupToday, groupUpcomingDays, isDueToday, isOverdue, recentlyCompleted, resolveCompletion, projectState, projectDeadlineLabel, projectShowsDeadline, isCurrent, isDormant, isExpired, expiredTasks, lifespanLabel } from './taskLogic';
 
 const TODAY = '2026-07-03';
 
@@ -237,5 +237,45 @@ describe('Projekt-Zustand — das gemeldete „überfällig" trotz erledigt', ()
 
   it('ein leeres Projekt mit Deadline mahnt weiterhin — da ist ja nichts erledigt', () => {
     expect(projectState(proj(), { done: 0, total: 0 })).toBe('laeuft');
+  });
+});
+
+describe('Lebensspanne — ab wann, bis wann', () => {
+  const heute = '2026-07-27';
+
+  it('schlummert, solange das Startdatum in der Zukunft liegt', () => {
+    expect(isDormant({ startDate: '2026-10-01' }, heute)).toBe(true);
+    expect(isDormant({ startDate: heute }, heute)).toBe(false); // ab heute = jetzt
+    expect(isDormant({ startDate: null }, heute)).toBe(false);
+  });
+
+  it('ist gegenstandslos, wenn der Anlass vorbei ist — NICHT überfällig', () => {
+    expect(isExpired({ expiresOn: '2026-07-26', completedAt: null }, heute)).toBe(true);
+    expect(isExpired({ expiresOn: heute, completedAt: null }, heute)).toBe(false); // heute noch gültig
+    // Erledigtes verfällt nicht mehr — es ist ja getan.
+    expect(isExpired({ expiresOn: '2026-07-26', completedAt: '2026-07-25T10:00:00.000Z' }, heute)).toBe(false);
+  });
+
+  it('isCurrent blendet beides aus, ohne etwas zu löschen', () => {
+    expect(isCurrent({ startDate: null, expiresOn: null, completedAt: null }, heute)).toBe(true);
+    expect(isCurrent({ startDate: '2026-10-01', expiresOn: null, completedAt: null }, heute)).toBe(false);
+    expect(isCurrent({ startDate: null, expiresOn: '2026-07-01', completedAt: null }, heute)).toBe(false);
+  });
+
+  it('sammelt Verfallenes für den Aufräum-Hinweis', () => {
+    const t = (over: Partial<Task>): Task => ({
+      id: 'x', listId: 'default', title: 'T', note: null, dueDate: null, dueTime: null, rrule: null,
+      flagged: false, eventId: null, completedAt: null, notificationId: null, tags: [], subtasks: [],
+      createdAt: '2026-07-01T08:00:00.000Z', sort: 1, ...over,
+    });
+    const alle = [t({ id: 'a', expiresOn: '2026-07-01' }), t({ id: 'b' }), t({ id: 'c', expiresOn: '2026-07-01', deletedAt: '2026-07-02T00:00:00.000Z' })];
+    expect(expiredTasks(alle, heute).map((x) => x.id)).toEqual(['a']);
+  });
+
+  it('beschriftet die Spanne verständlich', () => {
+    expect(lifespanLabel({ startDate: '2026-10-01', expiresOn: null, completedAt: null }, heute)).toBe('ab 2026-10-01');
+    expect(lifespanLabel({ startDate: null, expiresOn: '2026-08-10', completedAt: null }, heute)).toBe('bis 2026-08-10');
+    expect(lifespanLabel({ startDate: null, expiresOn: '2026-07-01', completedAt: null }, heute)).toBe('Anlass vorbei');
+    expect(lifespanLabel({ startDate: null, expiresOn: null, completedAt: null }, heute)).toBeNull();
   });
 });

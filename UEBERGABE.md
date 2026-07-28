@@ -453,6 +453,19 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
     im Assistenten-Überblick nicht mehr auf, sonst schlüge der Verwalter
     Verschiebungen für etwas Beendetes vor.
 
+26. **Lebensspanne einer Aufgabe** (`startDate`/`expiresOn`, v1.42.0) — eine
+    Aufgabe kannte bis dahin genau EINEN Zeitpunkt: fällig. Daraus entstanden
+    zwei Sorten Rauschen, beide jetzt behoben:
+    · **Startdatum** — was noch nicht dran ist, liegt nicht im Weg. Es ist nicht
+      gelöscht, sondern schlummert (`isDormant`).
+    · **Verfallsdatum** — was seinen Anlass verloren hat, ist NICHT überfällig,
+      sondern gegenstandslos (`isExpired`). Auch die Notification unterbleibt.
+    `isCurrent` ist die ZUSÄTZLICHE Bedingung neben `isOpen` — nicht deren
+    Ersatz. Verwendet in: Zählungen der Listen-Übersicht, Smart-Filtern und der
+    offenen Liste. **Bewusst NICHT in der Suche**: wer sucht, will alles finden.
+    Auf der Projektseite bekommen beide eine eigene, eingeklappte Gruppe
+    („Später", „Anlass vorbei") — verschwinden heißt hier nie verlieren.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**
