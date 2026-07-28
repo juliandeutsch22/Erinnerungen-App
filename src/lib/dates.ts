@@ -81,8 +81,56 @@ export function isAfterCompletionRule(rrule: Rrule): boolean {
 export function isRrule(v: unknown): v is Rrule {
   if (typeof v !== 'string') return false;
   if (['daily', 'weekdays', 'weekly', 'monthly', 'yearly'].includes(v)) return true;
+  if (parseWeekdays(v as Rrule) !== null) return true;
   const p = parseRrule(v as Rrule);
   return p !== null && p.n >= 1 && p.n <= 999;
+}
+
+/** Kürzel der Wochentage in JS-Reihenfolge (0 = Sonntag). */
+export const WEEKDAY_SHORT = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'] as const;
+/** Anzeige-Reihenfolge: die deutsche Woche beginnt am Montag. */
+export const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0] as const;
+
+/**
+ * Feste Wochentage aus 'wd:1,4' lesen — aufsteigend, ohne Dubletten.
+ * null, wenn es keine solche Regel ist ODER sie unbrauchbar wäre (leer,
+ * Zahl außerhalb 0–6): eine kaputte Wiederholung soll wie „keine" wirken,
+ * nicht wie eine, die nie wieder fällig wird.
+ */
+export function parseWeekdays(rrule: Rrule | string): number[] | null {
+  if (typeof rrule !== 'string' || !rrule.startsWith('wd:')) return null;
+  const teile = rrule.slice(3).split(',').filter((t) => t.length > 0);
+  if (teile.length === 0) return null;
+  const tage: number[] = [];
+  for (const t of teile) {
+    if (!/^[0-6]$/.test(t)) return null;
+    const n = Number(t);
+    if (!tage.includes(n)) tage.push(n);
+  }
+  return tage.sort((a, b) => a - b);
+}
+
+/**
+ * Wochentage → Regel. Mo–Fr ergibt bewusst das PRESET 'weekdays' (wie
+ * buildRrule bei n = 1): gespeicherte Werte bleiben kanonisch, und alte
+ * Aufgaben lesen sich unverändert. Leere Auswahl = keine Wiederholung.
+ */
+export function buildWeekdayRrule(tage: number[]): Rrule | null {
+  const rein = [...new Set(tage.filter((t) => t >= 0 && t <= 6))].sort((a, b) => a - b);
+  if (rein.length === 0) return null;
+  if (rein.join(',') === '1,2,3,4,5') return 'weekdays';
+  return `wd:${rein.join(',')}`;
+}
+
+/** Trifft die Regel feste Wochentage? ('weekdays' ist die Mo–Fr-Fassung davon.) */
+export function isWeekdayRule(rrule: Rrule | null): boolean {
+  return rrule === 'weekdays' || parseWeekdays(rrule ?? '') !== null;
+}
+
+/** Die Wochentage einer Regel — auch für 'weekdays'. Sonst leer. */
+export function weekdaysOf(rrule: Rrule | null): number[] {
+  if (rrule === 'weekdays') return [1, 2, 3, 4, 5];
+  return parseWeekdays(rrule ?? '') ?? [];
 }
 
 const UNIT_WORDS: Record<RruleUnit, [string, string]> = {
@@ -95,6 +143,15 @@ const UNIT_WORDS: Record<RruleUnit, [string, string]> = {
 /** „Alle 2 Wochen", „Täglich", „3 Tage nach Erledigen" — eine Quelle für alles. */
 export function rruleLabel(rrule: Rrule): string {
   if (rrule === 'weekdays') return 'Werktags';
+  const feste = parseWeekdays(rrule);
+  // „Mo + Do" bei zweien, sonst „Mo, Mi, Fr" — in der Reihenfolge der Woche,
+  // nicht in der von JS (die fängt sonntags an).
+  if (feste) {
+    const namen = WEEKDAY_ORDER.filter((t) => feste.includes(t)).map((t) => WEEKDAY_SHORT[t]);
+    if (namen.length === 1) return `Jeden ${namen[0]}`;
+    if (namen.length === 2) return `${namen[0]} + ${namen[1]}`;
+    return namen.join(', ');
+  }
   const p = rruleParts(rrule);
   if (!p) return 'Werktags';
   const [one, many] = UNIT_WORDS[p.unit];
@@ -132,6 +189,17 @@ export function nextOccurrence(dueDate: string, rrule: Rrule): string {
     return addMonths(dueDate, p.n * 12);
   }
   const d = parseDateStr(dueDate);
+  const feste = parseWeekdays(rrule);
+  if (feste) {
+    // Tagweise vorrücken bis zum nächsten gewählten Wochentag. Höchstens
+    // sieben Schritte — mehr kann es nicht sein, und so gibt es keine
+    // Endlosschleife, falls je eine leere Menge durchrutscht.
+    for (let i = 0; i < 7; i += 1) {
+      d.setDate(d.getDate() + 1);
+      if (feste.includes(d.getDay())) return toDateStr(d);
+    }
+    return addDays(dueDate, 7);
+  }
   switch (rrule) {
     case 'daily':
       return addDays(dueDate, 1);

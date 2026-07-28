@@ -18,7 +18,13 @@ export type RrulePreset = 'daily' | 'weekdays' | 'weekly' | 'monthly' | 'yearly'
  *                       sondern danach, wann du es zuletzt getan hast.
  */
 export type RruleUnit = 'd' | 'w' | 'm' | 'y';
-export type Rrule = RrulePreset | `every:${number}${RruleUnit}` | `after:${number}${RruleUnit}`;
+export type Rrule =
+  | RrulePreset
+  | `every:${number}${RruleUnit}`
+  | `after:${number}${RruleUnit}`
+  /** Feste Wochentage, JS-Nummern (0=So … 6=Sa), aufsteigend und
+   *  kommagetrennt: 'wd:1,4' = jeden Montag und Donnerstag. */
+  | `wd:${string}`;
 
 /** Ein Schritt innerhalb einer Aufgabe (Checkliste). */
 export type Subtask = {

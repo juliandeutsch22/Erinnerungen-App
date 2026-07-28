@@ -77,7 +77,9 @@ const P_AKTIONEN_RUMPF =
   '„aufgaben" sind zu ERLEDIGENDE Handlungen (anrufen, kaufen, vorbereiten), datum/zeit optional. ' +
   '„wiederholung" nur bei ausdrücklich wiederkehrenden Dingen: "daily", "weekly", "monthly", "yearly", ' +
   'oder mit Abstand "every:2w" (alle 2 Wochen; d=Tage, w=Wochen, m=Monate, y=Jahre), ' +
-  'oder ab Erledigung gerechnet "after:3d" („3 Tage nachdem ich es erledigt habe"). ' +
+  'oder ab Erledigung gerechnet "after:3d" („3 Tage nachdem ich es erledigt habe"), ' +
+  'oder an festen Wochentagen "wd:1,4" (0=So, 1=Mo … 6=Sa; „jeden Montag und Donnerstag"); ' +
+  'für Montag bis Freitag gibt es "weekdays". ' +
   '„tags" sind kurze Schlagworte ohne #; „notiz" ist Zusatzkontext an der Aufgabe (Nummern, Adressen, Details). ' +
   '„listen" legt ein neues Projekt an — NUR wenn der Nutzer ein größeres Vorhaben beschreibt und ' +
   'keine passende Liste existiert. Aufgaben dazu bekommen dann "liste" mit genau diesem Namen. ' +
@@ -245,7 +247,7 @@ export type AssistantAction = {
     /** Checkliste INNERHALB der Aufgabe (Einkaufsliste, Packliste, Teilschritte).
      *  Wird zu `Task.subtasks` — nicht zu eigenen Aufgaben. */
     schritte?: string[];
-    /** Wiederholung als Rrule ('weekly', 'every:2w', 'after:3d') — geprüft über isRrule. */
+    /** Wiederholung als Rrule ('weekly', 'every:2w', 'after:3d', 'wd:1,4') — geprüft über isRrule. */
     wiederholung?: Rrule;
     tags?: string[];
     /** Zusatzkontext an der Aufgabe (Nummern, Adressen) statt im Titel. */

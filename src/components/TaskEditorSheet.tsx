@@ -25,7 +25,7 @@ import { Type } from '@/components/Type';
 import { useCreateTask, useDeleteTask, useLists, useTasks, useUpdateTask } from '@/data/queries';
 import type { Rrule, RruleUnit, Subtask, Task } from '@/data/types';
 import { newId, normalizeTag } from '@/data/types';
-import { addMonths, buildRrule, formatDueDate, rruleLabel, rruleParts, todayStr } from '@/lib/dates';
+import { addMonths, buildRrule, buildWeekdayRrule, formatDueDate, isWeekdayRule, rruleLabel, rruleParts, todayStr, weekdaysOf, WEEKDAY_ORDER, WEEKDAY_SHORT } from '@/lib/dates';
 import { tagCounts } from '@/lib/taskFilters';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { webNoOutline } from '@/theme/layout';
@@ -505,7 +505,7 @@ export function TaskEditorSheet({
                 <Chip
                   key={u.value}
                   label={u.label}
-                  active={rrule !== null && rrule !== 'weekdays' && unit === u.value}
+                  active={rrule !== null && !isWeekdayRule(rrule) && unit === u.value}
                   onPress={() => applyParts(count, u.value, afterDone)}
                 />
               ))}
@@ -516,7 +516,7 @@ export function TaskEditorSheet({
             <ChipWrap>
               <Chip
                 label="Fälligkeit"
-                active={rrule !== null && rrule !== 'weekdays' && !afterDone}
+                active={rrule !== null && !isWeekdayRule(rrule) && !afterDone}
                 onPress={() => applyParts(count, unit, false)}
               />
               <Chip
@@ -531,9 +531,33 @@ export function TaskEditorSheet({
                 : 'Der nächste Termin folgt dem Kalender, unabhängig vom Abhaken.'}
             </Type>
 
+            {/* Feste Tage: „jeden Montag und Donnerstag" lässt sich als „alle n
+                Wochen" nicht ausdrücken. Mo–Fr ergibt automatisch das
+                bestehende Preset „Werktags" (buildWeekdayRrule) — deshalb
+                braucht es dafür keinen eigenen Knopf mehr. */}
+            <Type variant="eyebrow" tone="text3" style={{ marginTop: Spacing.md, marginBottom: Spacing.xs }}>An festen Tagen</Type>
+            <ChipWrap>
+              {WEEKDAY_ORDER.map((tag) => {
+                const gewaehlt = weekdaysOf(rrule);
+                const an = gewaehlt.includes(tag);
+                return (
+                  <Chip
+                    key={tag}
+                    label={WEEKDAY_SHORT[tag]}
+                    active={an}
+                    onPress={() => {
+                      const naechste = an ? gewaehlt.filter((t) => t !== tag) : [...gewaehlt, tag];
+                      const gebaut = buildWeekdayRrule(naechste);
+                      setRrule(gebaut);
+                      if (!gebaut) setRruleUntil(null);
+                    }}
+                  />
+                );
+              })}
+            </ChipWrap>
+
             <Type variant="eyebrow" tone="text3" style={{ marginTop: Spacing.md, marginBottom: Spacing.xs }}>Sonderfall</Type>
             <ChipWrap>
-              <Chip label="Werktags" active={rrule === 'weekdays'} onPress={() => setRrule(rrule === 'weekdays' ? null : 'weekdays')} />
               <Chip label="Nie" active={rrule === null} onPress={() => { setRrule(null); setRruleUntil(null); }} />
             </ChipWrap>
 

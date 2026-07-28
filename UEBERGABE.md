@@ -635,6 +635,46 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
     Aufgaben — ein Handle auf etwas Erledigtes bräuchte eine 6-Zeichen-
     Halluzinations-Kollision.
 
+37. **Ein Schritt zurück** (`lib/undo.ts` + `components/UndoBar.tsx`, v1.50.0) —
+    Abhaken, Papierkorb und „Überfällige auf heute holen" passieren mit EINEM
+    Tipp, und zwei davon fassen mehrere Aufgaben gleichzeitig an. Vier bewusste
+    Festlegungen:
+    · **Nur EIN Schritt, kein Stapel.** Ein Verlauf lädt zum Herumprobieren
+      ein; das hier ist ein Netz für den Fehlgriff, keine Zeitmaschine.
+    · **Abhaken stellt `completedAt` UND `dueDate` wieder her.** Bei einer
+      Wiederholung ist das Abhaken ein Datums-Sprung — nur `completedAt`
+      zurückzusetzen ließe die Aufgabe an einem falschen Tag stehen.
+    · **Die Rücknahme MUSS `invalidate()` rufen.** Beim ersten Anlauf tat sie
+      das nicht: der Bestand änderte sich, die Oberfläche zeigte weiter den
+      alten Stand. Die Playwright-Tour hat es gefangen — wer hier eine weitere
+      Rücknahme einbaut, muss invalidieren (das stößt auch die Neuplanung der
+      Erinnerungen an).
+    · **Das Übernehmen von Assistenten-Vorschlägen ist NICHT rückgängig zu
+      machen** — es ist keine Rutschhand, sondern eine bestätigte Handlung mit
+      eigener Bremse in der Vorschlagskarte.
+    Die Leiste sitzt ÜBER der Eingabezeile von „Heute", nicht darüber — eine
+    Meldung, die das Feld verdeckt, während man tippt, wäre schlimmer als
+    keine. Der Abstand (`BOTTOM_CLEARANCE`) ist eine Annahme über die Höhe von
+    Tab-Leiste und Eingabezeile; wer an einer der beiden schraubt, sieht hier
+    nach.
+
+38. **Wiederholungen an festen Wochentagen** (`wd:1,4`, v1.50.0) — „jeden
+    Montag und Donnerstag" ließ sich als „alle n Wochen" nicht ausdrücken, und
+    das war die letzte echte Lücke gegenüber den bekannten Aufgaben-Apps.
+    · Format: JS-Nummern (0=So … 6=Sa), aufsteigend, kommagetrennt.
+      `parseWeekdays` gibt bei Unbrauchbarem `null` — eine kaputte Regel wirkt
+      damit wie „keine", nicht wie eine, die nie wieder fällig wird.
+    · **Mo–Fr ergibt das bestehende Preset `'weekdays'`** (`buildWeekdayRrule`),
+      genau wie `buildRrule` bei n = 1 die Presets erzeugt: gespeicherte Werte
+      bleiben kanonisch, alte Aufgaben unverändert lesbar. Deshalb brauchte der
+      Editor auch keinen eigenen „Werktags"-Knopf mehr.
+    · Beschriftet wird in der Reihenfolge der WOCHE (Mo zuerst), nicht in der
+      von JS — sonst stünde der Sonntag vorn.
+    · Der Assistent kennt die Form (`wd:1,4` steht im Prompt) und `isRrule`
+      wirft Unsinn weg wie bisher.
+    · Erinnerungen brauchten keine Änderung: geplant wird immer nur die
+      AKTUELLE Fälligkeit, die nächste entsteht beim Abhaken.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

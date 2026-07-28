@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { todayStr } from '@/lib/dates';
 import { adoptOverdueToToday, resolveCompletion } from '@/lib/taskLogic';
+import { rememberUndo } from '@/lib/undo';
 import { getListRepository, getTaskRepository } from './index';
 import type { List, NewList, NewTask, Task } from './types';
 import { newId } from './types';
@@ -117,6 +118,16 @@ export function useCompleteTask() {
     mutationFn: async (task: Task) => {
       const patch = resolveCompletion(task, todayStr());
       await getTaskRepository().update(task.id, patch);
+      // Rückgängig stellt BEIDE Felder wieder her, nicht nur completedAt: bei
+      // einer Wiederholung ist das Abhaken ein Datums-Sprung, und den würde
+      // man sonst nicht mehr los.
+      rememberUndo('Abgehakt', async () => {
+        await getTaskRepository().update(task.id, { completedAt: task.completedAt, dueDate: task.dueDate });
+        // Ohne das schreibt die Rücknahme zwar in den Bestand, aber die
+        // Oberfläche zeigt weiter den alten Stand — invalidate() stößt auch
+        // die Neuplanung der Erinnerungen an (onTasksChanged).
+        invalidate();
+      });
     },
     onSuccess: invalidate,
   });
@@ -135,8 +146,15 @@ export function useReopenTask() {
 export function useDeleteTask() {
   const invalidate = useInvalidate();
   return useMutation({
-    mutationFn: (id: string) =>
-      getTaskRepository().update(id, { deletedAt: new Date().toISOString(), notificationId: null }),
+    mutationFn: async (id: string) => {
+      await getTaskRepository().update(id, { deletedAt: new Date().toISOString(), notificationId: null });
+      // Die Erinnerung wird nicht mitgesichert — sie wird nach jeder Änderung
+      // ohnehin neu geplant (setOnTasksChanged in _layout).
+      rememberUndo('In den Papierkorb gelegt', async () => {
+        await getTaskRepository().update(id, { deletedAt: null });
+        invalidate();
+      });
+    },
     onSuccess: invalidate,
   });
 }
@@ -164,7 +182,16 @@ export function useAdoptOverdue() {
     mutationFn: async (tasks: Task[]) => {
       const repo = getTaskRepository();
       const patches = adoptOverdueToToday(tasks, todayStr());
+      // Vorher merken: das hier fasst ALLE überfälligen auf einmal an — ohne
+      // Rückweg müsste man jedes Datum von Hand rekonstruieren.
+      const vorher = patches.map(({ id }) => ({ id, dueDate: tasks.find((t) => t.id === id)?.dueDate ?? null }));
       for (const { id, dueDate } of patches) await repo.update(id, { dueDate });
+      if (patches.length > 0) {
+        rememberUndo(patches.length === 1 ? 'Auf heute geholt' : `${patches.length} auf heute geholt`, async () => {
+          for (const { id, dueDate } of vorher) await repo.update(id, { dueDate });
+          invalidate();
+        });
+      }
       return patches.length;
     },
     onSuccess: invalidate,

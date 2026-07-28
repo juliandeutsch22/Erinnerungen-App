@@ -11,6 +11,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AppLockGate } from '@/components/AppLockGate';
+import { UndoBar } from '@/components/UndoBar';
 import { setOnTasksChanged } from '@/data/queries';
 import { primeWorkingModel, setModelPersister } from '@/lib/assistant';
 import { isAutoBackupDue, runAutoBackup } from '@/lib/autoBackup';
@@ -94,6 +95,9 @@ function RootStack() {
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
       <AppLockGate>
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
+        {/* Über allen Bildschirmen, damit ein Schritt zurück auch dann noch
+            angeboten wird, wenn man nach dem Abhaken weitergegangen ist. */}
+        <UndoBar />
       </AppLockGate>
     </>
   );

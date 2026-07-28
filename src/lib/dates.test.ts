@@ -1,5 +1,5 @@
 // dates.test.ts — Wiederholungs-Berechnung + lokale Kalenderdaten (Fahrplan M1).
-import { addDays, addMonths, buildRrule, daysBetween, deadlineLabel, formatDueDate, isRrule, nextOccurrence, nextOccurrenceAfter, parseDateStr, parseRrule, rruleLabel, rruleParts, toDateStr } from './dates';
+import { addDays, addMonths, buildRrule, daysBetween, deadlineLabel, formatDueDate, isRrule, nextOccurrence, nextOccurrenceAfter, parseDateStr, parseRrule, rruleLabel, rruleParts, toDateStr, parseWeekdays, buildWeekdayRrule, isWeekdayRule, weekdaysOf} from './dates';
 
 describe('toDateStr/parseDateStr', () => {
   it('läuft lokal rund (kein UTC-Versatz)', () => {
@@ -173,5 +173,55 @@ describe('buildRrule / rruleParts — der Satzbaukasten', () => {
 
   it('rückt Jahre korrekt weiter', () => {
     expect(nextOccurrence('2026-07-27', 'every:3y')).toBe('2029-07-27');
+  });
+});
+
+// ——— Feste Wochentage (v1.50.0): „jeden Montag und Donnerstag" ———
+describe('Wochentags-Wiederholungen', () => {
+  it('liest, normalisiert und weist Unbrauchbares ab', () => {
+    expect(parseWeekdays('wd:4,1')).toEqual([1, 4]);
+    expect(parseWeekdays('wd:1,1,4')).toEqual([1, 4]);
+    expect(parseWeekdays('weekly')).toBeNull();
+    // Kaputt soll wie „keine Wiederholung" wirken, nicht wie eine, die nie
+    // wieder fällig wird.
+    expect(parseWeekdays('wd:')).toBeNull();
+    expect(parseWeekdays('wd:7')).toBeNull();
+    expect(parseWeekdays('wd:x')).toBeNull();
+  });
+
+  it('Mo–Fr wird zum bestehenden Preset, damit Werte kanonisch bleiben', () => {
+    expect(buildWeekdayRrule([1, 2, 3, 4, 5])).toBe('weekdays');
+    expect(buildWeekdayRrule([4, 1])).toBe('wd:1,4');
+    expect(buildWeekdayRrule([])).toBeNull();
+    expect(isWeekdayRule('weekdays')).toBe(true);
+    expect(weekdaysOf('weekdays')).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('springt auf den nächsten gewählten Tag', () => {
+    // 2026-07-28 ist ein Dienstag. Mo(1) + Do(4):
+    expect(nextOccurrence('2026-07-28', 'wd:1,4')).toBe('2026-07-30'); // Do
+    expect(nextOccurrence('2026-07-30', 'wd:1,4')).toBe('2026-08-03'); // Mo
+    // Ein einzelner Tag verhält sich wie „wöchentlich an diesem Tag".
+    expect(nextOccurrence('2026-07-28', 'wd:2')).toBe('2026-08-04');
+  });
+
+  it('überspringt beim Abhaken alle vergangenen Termine', () => {
+    // Lange nicht abgehakt: der nächste Termin liegt IN DER ZUKUNFT, nicht
+    // wieder in der Vergangenheit.
+    expect(nextOccurrenceAfter('2026-07-06', 'wd:1,4', '2026-07-28')).toBe('2026-07-30');
+  });
+
+  it('beschriftet in der Reihenfolge der Woche, nicht in der von JS', () => {
+    expect(rruleLabel('wd:1,4')).toBe('Mo + Do');
+    expect(rruleLabel('wd:0,1')).toBe('Mo + So'); // Sonntag steht hinten
+    expect(rruleLabel('wd:1,3,5')).toBe('Mo, Mi, Fr');
+    expect(rruleLabel('wd:2')).toBe('Jeden Di');
+    expect(rruleLabel('weekdays')).toBe('Werktags');
+  });
+
+  it('gilt als gültige Regel und lässt sich im Editor nicht als „alle n" darstellen', () => {
+    expect(isRrule('wd:1,4')).toBe(true);
+    expect(isRrule('wd:9')).toBe(false);
+    expect(rruleParts('wd:1,4')).toBeNull();
   });
 });

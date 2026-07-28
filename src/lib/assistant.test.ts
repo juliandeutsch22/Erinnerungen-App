@@ -688,3 +688,21 @@ describe('Unlesbare Antworten führen nie in eine stumme Sackgasse', () => {
     expect(actions!.aufgaben[0].titel).toBe('Milch');
   });
 });
+
+describe('Wochentags-Wiederholungen im Aktions-Block', () => {
+  it('nimmt "wd:1,4" an und verwirft Unsinn', () => {
+    const block = (w: string) =>
+      extractActions('Gut.\n```stoa-aktionen\n' + JSON.stringify({ aufgaben: [{ titel: 'Sport', wiederholung: w }] }) + '\n```').actions!
+        .aufgaben[0].wiederholung;
+    expect(block('wd:1,4')).toBe('wd:1,4');
+    expect(block('weekdays')).toBe('weekdays');
+    // Ungültiges fällt weg — lieber einmalig als kaputt (UEBERGABE §8.17).
+    expect(block('wd:9')).toBeUndefined();
+    expect(block('jeden montag')).toBeUndefined();
+  });
+
+  it('der Prompt nennt die Form, sonst benutzt sie niemand', () => {
+    expect(SYSTEM_PROMPT).toContain('wd:1,4');
+    expect(systemPrompt('erfassen')).toContain('wd:1,4');
+  });
+});
