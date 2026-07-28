@@ -441,9 +441,11 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
     dieser Verdreifachung. Die Mutationen werden hereingereicht → rein und
     testbar; die Reihenfolge (Projekte → Änderungen → Neues) ist durch Tests
     festgenagelt. **Neue Bildschirme mit Aktions-Karte benutzen das hier.**
-    Migriert sind Verwalter, Braindump und das Sprach-Sheet; nur der Chat hat
-    seine eigene Fassung noch (er braucht als einziger die Handles/Änderungen) —
-    beim nächsten Anfassen nachziehen.
+    Seit v1.49.0 sind ALLE vier migriert (Verwalter, Braindump, Sprach-Sheet,
+    Chat). Im Chat blieb nur die `checkliste` außerhalb: sie braucht die
+    verknüpfte Notiz und existiert nirgends sonst — der `'erfassen'`-Prompt
+    kennt sie gar nicht. Der Chat ist auch der EINZIGE, der `tasks` hereinreicht:
+    nur dort gibt es den App-Überblick und damit Handles.
 
 25. **Projekte lassen sich ABSCHLIESSEN** (`List.completedAt`, v1.41.0) — und
     damit ist der gemeldete Fehler weg: Im Kalender stand „x Tage überfällig"
@@ -589,15 +591,15 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
     · Neuer Token `sunk` — im Hellen eine Spur tiefer als `chip`, im Dunkeln
       DUNKLER als die Platte (`chip` ist dort Alpha-Weiß und läge wieder oben
       drauf).
-    · Die Fläche läuft bis an die Kartenränder (negative Margins gegen das
-      Panel-Padding). Folgt nichts mehr, auch bis an die Unterkante: ein
-      schmales Steinband darunter ist zu dünn für einen Rand und zu dick für
-      nichts. Gibt es den Verlaufs-Link, endet sie davor.
+    · **Die Mulde fluchtet mit dem Text, sie läuft NICHT bis an die Kante**
+      (v1.49.0). Bündig war der erste Versuch und sah falsch aus — der Inhalt
+      wird über den seitlichen Fasen gezeichnet (`Glass.tsx`, children stehen
+      NACH den Fasen), die Platte verliert dort also sichtbar ihre Dicke. Der
+      Fehler war nie die Breite, sondern dass das Feld oben AUF lag.
     · Zeilenhöhe 26 statt 22: hier entsteht eine Seite, kein Formularfeld.
-    **Noch NICHT umgestellt** sind Braindump, Merkzettel und der Schlüssel in
-    den Einstellungen — dort steht heute dasselbe Feld in drei verschiedenen
-    Fassungen (mal `chip`+`chipBorder`, mal `bg2`+`border`, mal ganz ohne).
-    Wer dort das nächste Mal anfasst, nimmt `InsetField` mit.
+    Seit v1.49.0 benutzen es AUCH Braindump, Merkzettel und das Schlüsselfeld —
+    vorher stand dasselbe Feld dort in drei Fassungen (mal `chip`+`chipBorder`,
+    mal `bg2`+`border`, mal ganz ohne). **Neue Eingabefelder nehmen `InsetField`.**
 
 36. **Fehlersuche v1.48.0 — was die letzten drei Releases still hinterlassen
     haben.** Gezielt an den neu gebauten Stellen gesucht; drei echte Funde, alle

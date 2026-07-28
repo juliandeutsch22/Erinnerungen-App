@@ -15,6 +15,7 @@ import { ImportRemindersSheet } from '@/components/ImportRemindersSheet';
 import { KeyboardDoneBar, keyboardDoneProps } from '@/components/KeyboardDone';
 import { PasteNoteSheet } from '@/components/PasteNoteSheet';
 import { GlassPanel } from '@/components/GlassPanel';
+import { InsetField } from '@/components/InsetField';
 import { PressableScale } from '@/components/PressableScale';
 import { Reveal } from '@/components/Reveal';
 import { Screen } from '@/components/Screen';
@@ -526,29 +527,19 @@ export default function EinstellungenScreen() {
             gehen direkt vom Gerät an Google, ohne Mittelsmann. Schlüssel erstellen:
             aistudio.google.com/apikey. Ohne Schlüssel bleibt die App vollständig offline.
           </Type>
-          <TextInput
-            value={geminiApiKey}
-            onChangeText={onChangeApiKey}
-            placeholder="Gemini-API-Schlüssel einfügen…"
-            placeholderTextColor={colors.text3}
-            autoCapitalize="none"
-            autoCorrect={false}
-            secureTextEntry
-            accessibilityLabel="Gemini-API-Schlüssel"
-            style={[
-              {
-                marginTop: Spacing.md,
-                borderRadius: R.md,
-                borderWidth: 1,
-                borderColor: colors.chipBorder,
-                backgroundColor: colors.chip,
-                padding: Spacing.sm,
-                fontSize: T.sm,
-                color: colors.text,
-              },
-              webNoOutline,
-            ]}
-          />
+          <InsetField style={{ marginTop: Spacing.md }}>
+            <TextInput
+              value={geminiApiKey}
+              onChangeText={onChangeApiKey}
+              placeholder="Gemini-API-Schlüssel einfügen…"
+              placeholderTextColor={colors.text3}
+              autoCapitalize="none"
+              autoCorrect={false}
+              secureTextEntry
+              accessibilityLabel="Gemini-API-Schlüssel"
+              style={[{ padding: Spacing.sm, fontSize: T.sm, color: colors.text }, webNoOutline]}
+            />
+          </InsetField>
           {geminiApiKey.length > 0 && (
             <Type variant="caption" tone="teal" style={{ marginTop: Spacing.sm }}>
               Assistent aktiv — Einstieg über ✨ auf „Heute" oder aus einem Termin heraus.
@@ -595,31 +586,28 @@ export default function EinstellungenScreen() {
                 Die App lernt hier nichts von selbst. Zum Beispiel: „Besorgungen kommen in die Liste
                 Erledigungen." · „Termine bitte nie vor 9 Uhr." · „Sport heißt bei mir dienstags abends."
               </Type>
-              <TextInput
-                value={assistantMemory}
-                onChangeText={(v) => setAssistantMemory(v.slice(0, MEMORY_LIMIT))}
-                placeholder="Eine Vorgabe pro Zeile…"
-                placeholderTextColor={colors.text3}
-                multiline
-                accessibilityLabel="Merkzettel für den Assistenten"
-                {...keyboardDoneProps}
-                style={[
-                  {
-                    marginTop: Spacing.sm,
-                    borderRadius: R.md,
-                    borderWidth: 1,
-                    borderColor: colors.chipBorder,
-                    backgroundColor: colors.chip,
-                    padding: Spacing.sm,
-                    minHeight: 96,
-                    fontSize: T.sm,
-                    lineHeight: T.sm * 1.45,
-                    color: colors.text,
-                    textAlignVertical: 'top',
-                  },
-                  webNoOutline,
-                ]}
-              />
+              <InsetField style={{ marginTop: Spacing.sm }}>
+                <TextInput
+                  value={assistantMemory}
+                  onChangeText={(v) => setAssistantMemory(v.slice(0, MEMORY_LIMIT))}
+                  placeholder="Eine Vorgabe pro Zeile…"
+                  placeholderTextColor={colors.text3}
+                  multiline
+                  accessibilityLabel="Merkzettel für den Assistenten"
+                  {...keyboardDoneProps}
+                  style={[
+                    {
+                      padding: Spacing.sm,
+                      minHeight: 96,
+                      fontSize: T.sm,
+                      lineHeight: T.sm * 1.45,
+                      color: colors.text,
+                      textAlignVertical: 'top',
+                    },
+                    webNoOutline,
+                  ]}
+                />
+              </InsetField>
               <Type variant="caption" tone="text3" style={{ marginTop: Spacing.xs }} tabular>
                 {assistantMemory.trim().length} / {MEMORY_LIMIT} Zeichen
               </Type>

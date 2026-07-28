@@ -30,7 +30,8 @@ import { useAppendMessage, useChatMessages, useChats, useUpdateChat } from '@/da
 import { useCreateNote, useNotes, useUpdateNote } from '@/data/noteQueries';
 import { useCompleteTask, useCreateList, useCreateTask, useDeleteTask, useLists, useTasks, useUpdateTask } from '@/data/queries';
 import type { Chat, ChatMessage, Task } from '@/data/types';
-import { askAssistant, type AssistantAction, buildAppContext, buildNoteContext, buildTaskContext, type ChatLink, actionDueDate, describeAenderung, describeExtras, describeSchritte, extractActions, generateChatTitle, promptChips, resolveListId, resolveTaskHandle, subtasksFromSchritte, type ToolData } from '@/lib/assistant';
+import { applyAssistantActions } from '@/lib/applyActions';
+import { askAssistant, type AssistantAction, buildAppContext, buildNoteContext, buildTaskContext, type ChatLink, describeAenderung, describeExtras, describeSchritte, extractActions, generateChatTitle, promptChips, resolveTaskHandle, type ToolData } from '@/lib/assistant';
 import { runKeyForChat, useAssistantRuns } from '@/lib/assistantRun';
 import { addDays, formatDueDate, toDateStr, todayStr } from '@/lib/dates';
 import { hasCalendarPermission } from '@/lib/deviceCalendar';
@@ -420,62 +421,29 @@ export default function ChatScreen() {
    *  anlegen (nichts geht verloren). */
   const applyActions = async (m: ChatMessage, selected: AssistantAction) => {
     hapticSuccess();
-    // Projekte zuerst — danach kann „liste" einer Aufgabe darauf zeigen.
-    const frisch: { id: string; name: string }[] = [];
-    for (const l of selected.listen) {
-      // Befund aus der Fehlersuche: Gibt es die Liste schon, wird sie
-      // WIEDERVERWENDET statt ein zweites Mal angelegt. Das Modell soll laut
-      // Prompt nur neue vorschlagen, hält sich aber nicht immer daran.
-      const bestehend = resolveListId(l.name, lists ?? [], '');
-      if (bestehend) {
-        frisch.push({ id: bestehend, name: l.name });
-        continue;
-      }
-      const created = await createList.mutateAsync({
-        name: l.name,
-        icon: 'inbox',
-        color: LIST_COLORS[((lists?.length ?? 0) + frisch.length) % LIST_COLORS.length],
-        goal: l.ziel ?? null,
-        deadline: l.deadline ?? null,
-      });
-      frisch.push({ id: created.id, name: created.name });
-    }
-    const alleListen = [...(lists ?? []), ...frisch];
-
-    // Änderungen an Bestehendem laufen über DIESELBEN Mutationen wie die
-    // Handbedienung — sonst umgeht der Assistent die Wiederholungs-Logik
-    // (resolveCompletion) und die Notification-Neuplanung.
-    for (const c of selected.aenderungen) {
-      const t = resolveTaskHandle(c.handle, tasks ?? []);
-      if (!t) continue; // unbekanntes/mehrdeutiges Handle → nie raten
-      if (c.papierkorb) {
-        await deleteTask.mutateAsync(t.id);
-        continue;
-      }
-      const patch: Partial<Omit<Task, 'id'>> = {};
-      if (c.titel) patch.title = c.titel;
-      if (c.datum !== undefined) patch.dueDate = c.datum;
-      if (c.zeit !== undefined) patch.dueTime = c.zeit;
-      if (c.liste) patch.listId = resolveListId(c.liste, alleListen, t.listId);
-      if (Object.keys(patch).length > 0) await updateTask.mutateAsync({ id: t.id, patch });
-      // Abhaken zuletzt: bei einer Wiederholung wandert dabei das Datum, das
-      // soll auf dem bereits geänderten Stand passieren.
-      if (c.erledigt) await completeTask.mutateAsync({ ...t, ...patch });
-    }
-
-    for (const a of selected.aufgaben) {
-      await createTask.mutateAsync({
-        listId: resolveListId(a.liste, alleListen),
-        title: a.titel,
-        note: a.notiz ?? null,
-        dueDate: actionDueDate(a, today),
-        dueTime: a.zeit ?? null,
-        rrule: a.wiederholung ?? null,
-        tags: a.tags ?? [],
-        eventId: chat?.eventId ?? null,
-        subtasks: subtasksFromSchritte(a.schritte),
-      });
-    }
+    // Anwenden liegt zentral in lib/applyActions — dieselbe Reihenfolge
+    // (Projekte → Änderungen → Neues) und dieselben Schutzregeln wie im
+    // Braindump, beim Verwalter und im Sprach-Sheet. Der Chat war der letzte
+    // Bildschirm mit eigener Fassung; die Verdreifachung war beim letzten Mal
+    // die Ursache für drei Fehler auf einmal.
+    await applyAssistantActions(selected, {
+      lists: lists ?? [],
+      // NUR der Chat reicht Aufgaben herein — nur hier gibt es den
+      // App-Überblick und damit Handles für „aenderungen".
+      tasks: tasks ?? [],
+      today,
+      createList: (input) => createList.mutateAsync(input),
+      createTask: (input) => createTask.mutateAsync(input),
+      createNote: (body) => createNote.mutateAsync({ body, taskId: chat?.taskId ?? null, eventId: chat?.eventId ?? null }),
+      updateTask: (id, patch) => updateTask.mutateAsync({ id, patch }),
+      completeTask: (t) => completeTask.mutateAsync(t),
+      trashTask: (id) => deleteTask.mutateAsync(id),
+      createEvents: (termine) => createEvents(termine),
+      colorAt: (i) => LIST_COLORS[i % LIST_COLORS.length],
+      taskEventId: chat?.eventId ?? null,
+    });
+    // Die Checkliste bleibt hier: sie braucht die verknüpfte Notiz und gibt es
+    // nur im Chat — Braindump und Sprach-Sheet kennen sie gar nicht.
     if (selected.checkliste.length > 0) {
       const lines = selected.checkliste.map((c) => `- [ ] ${c}`).join('\n');
       if (linkedNote) {
@@ -485,10 +453,6 @@ export default function ChatScreen() {
         await createNote.mutateAsync({ body: `Checkliste\n${lines}`, taskId: chat?.taskId ?? null, eventId: chat?.eventId ?? null });
       }
     }
-    for (const n of selected.notizen) {
-      await createNote.mutateAsync({ body: n, taskId: chat?.taskId ?? null, eventId: chat?.eventId ?? null });
-    }
-    if (selected.termine.length > 0) await createEvents(selected.termine);
     setAppliedActionIds((prev) => new Set(prev).add(m.id));
   };
 

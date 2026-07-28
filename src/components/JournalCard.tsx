@@ -100,21 +100,15 @@ export function JournalCard({ today, onFocusInput }: { today: string; onFocusInp
         </PressableScale>
       )}
       <Type variant="caption" tone="text3" style={{ marginTop: Spacing.xs }}>{JOURNAL_PROMPT}</Type>
-      {/* Die Schreibfläche liegt IN der Platte (siehe InsetField) und reicht bis
-          an deren Ränder — ein eingerücktes Kästchen mit Luft ringsum sähe aus
-          wie aufgeklebt. Der Zeilenabstand ist bewusst großzügig: hier entsteht
-          eine Seite, kein Formularfeld.
-          Folgt nichts mehr, läuft die Mulde bis an die Unterkante: ein schmales
-          Steinband darunter wäre zu dünn für einen Rand und zu dick für nichts.
-          Gibt es den Verlaufs-Link, endet sie davor — dann trägt der Stein ihn. */}
-      <InsetField
-        radius={R.lg}
-        style={{
-          marginTop: Spacing.sm,
-          marginHorizontal: -Spacing.lg,
-          marginBottom: hasHistory ? 0 : -Spacing.lg,
-        }}
-      >
+      {/* Die Schreibfläche liegt IN der Platte (siehe InsetField) — das war der
+          eigentliche Fehler, nicht ihre Breite: vorher lag sie OBEN AUF.
+          Sie fluchtet mit Überschrift und Frage und lässt der Platte ringsum
+          ihren Rand. Bündig bis an die Kante wäre stärker, überdeckte aber die
+          seitliche Fase der Platte (Inhalt wird über den Fasen gezeichnet,
+          Glass.tsx) — der Stein verlöre dort sichtbar seine Dicke.
+          Der Zeilenabstand ist bewusst großzügig: hier entsteht eine Seite,
+          kein Formularfeld. */}
+      <InsetField radius={R.lg} style={{ marginTop: Spacing.sm }}>
         <TextInput
           accessibilityLabel="Abendbetrachtung schreiben"
           value={text ?? ''}

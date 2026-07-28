@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Backdrop } from '@/components/Backdrop';
 import { GlassButton } from '@/components/GlassButton';
 import { GlassPanel } from '@/components/GlassPanel';
+import { InsetField } from '@/components/InsetField';
 import { KeyboardDoneBar, keyboardDoneProps } from '@/components/KeyboardDone';
 import { MicButton } from '@/components/MicButton';
 import { PressableScale } from '@/components/PressableScale';
@@ -294,7 +295,11 @@ export default function BraindumpScreen() {
             Aufgaben (mit erkannten Daten) und Notizen; du bestätigst, bevor etwas angelegt wird.
           </Type>
 
-          <View style={{ backgroundColor: colors.bg2, borderWidth: 1, borderColor: colors.border, borderRadius: R.lg }}>
+          {/* Eingelassen statt umrandet — dieselbe Schreibfläche wie in der
+              Abendbetrachtung. Vorher stand hier ein gezeichnetes Rechteck mit
+              Haarlinie, im Merkzettel eines mit anderer Füllung: EIN Feld,
+              drei Fassungen. */}
+          <InsetField radius={R.lg}>
             <TextInput
               value={text}
               onChangeText={setText}
@@ -316,7 +321,7 @@ export default function BraindumpScreen() {
                 webNoOutline,
               ]}
             />
-          </View>
+          </InsetField>
 
           {/* Angehängte Bilder: sichtbar und einzeln wieder abnehmbar. Sie
               werden NICHT gespeichert — nur zu dieser einen Anfrage geschickt. */}

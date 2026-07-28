@@ -98,7 +98,7 @@ export default function JournalScreen() {
                     <Type variant="heading">{formatDueDate(e.date, today)}</Type>
                     {/* Dieselbe eingelassene Schreibfläche wie in der Abendkarte —
                         es ist dasselbe Feld, also darf es nicht anders aussehen. */}
-                    <InsetField radius={R.lg} style={{ marginTop: Spacing.sm, marginHorizontal: -Spacing.lg }}>
+                    <InsetField radius={R.lg} style={{ marginTop: Spacing.sm }}>
                       <TextInput
                         value={editText}
                         onChangeText={setEditText}
@@ -114,7 +114,7 @@ export default function JournalScreen() {
                             color: colors.text,
                             fontSize: T.md,
                             lineHeight: 26,
-                            paddingHorizontal: Spacing.lg,
+                            paddingHorizontal: Spacing.md,
                             paddingVertical: Spacing.md,
                           },
                           webNoOutline,
