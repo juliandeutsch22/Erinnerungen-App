@@ -20,9 +20,10 @@ import { LIST_COLORS } from '@/components/listMeta';
 import { Type } from '@/components/Type';
 import { useCreateAssistantEvents } from '@/data/calendarQueries';
 import { useCreateNote } from '@/data/noteQueries';
-import { useCreateList, useCreateTask, useLists } from '@/data/queries';
+import { useCompleteTask, useCreateList, useCreateTask, useDeleteTask, useLists, useUpdateTask } from '@/data/queries';
 import type { ChatMessage } from '@/data/types';
 import { askAssistant, type AssistantImage, buildBraindumpContext, IMAGE_LIMIT, actionDueDate, describeExtras, describeSchritte, extractActions, hasCapturableActions, resolveListId, subtasksFromSchritte, type AssistantAction } from '@/lib/assistant';
+import { applyAssistantActions } from '@/lib/applyActions';
 import { assistantCameraAvailable, assistantImagesAvailable, captureAssistantImage, pickAssistantImages } from '@/lib/assistantImage';
 import { formatDueDate, parseDateStr, todayStr } from '@/lib/dates';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
@@ -39,6 +40,9 @@ export default function BraindumpScreen() {
   const memory = useSettings((s) => s.assistantMemory);
   const createTask = useCreateTask();
   const createList = useCreateList();
+  const updateTask = useUpdateTask();
+  const completeTask = useCompleteTask();
+  const deleteTask = useDeleteTask();
   const createNote = useCreateNote();
   const createEvents = useCreateAssistantEvents();
   const { data: lists } = useLists();
@@ -167,63 +171,39 @@ export default function BraindumpScreen() {
   const apply = async () => {
     if (!actions) return;
     hapticSuccess();
-    let tasks = 0;
-    let notes = 0;
-    // Projekte ZUERST — damit „liste" einer Aufgabe auf ein frisch angelegtes
-    // Projekt zeigen kann und nicht im Eingang landet.
-    const frisch: { id: string; name: string }[] = [];
-    for (let i = 0; i < actions.listen.length; i += 1) {
-      if (deselected.has(`l${i}`)) continue;
-      const l = actions.listen[i];
-      // Befund aus der Fehlersuche: Gibt es die Liste schon, wird sie
-      // WIEDERVERWENDET statt ein zweites Mal angelegt. Das Modell soll laut
-      // Prompt nur neue vorschlagen, hält sich aber nicht immer daran.
-      const bestehend = resolveListId(l.name, lists ?? [], '');
-      if (bestehend) {
-        frisch.push({ id: bestehend, name: l.name });
-        continue;
-      }
-      const created = await createList.mutateAsync({
-        name: l.name,
-        icon: 'inbox',
-        color: LIST_COLORS[((lists?.length ?? 0) + i) % LIST_COLORS.length],
-        goal: l.ziel ?? null,
-        deadline: l.deadline ?? null,
-      });
-      frisch.push({ id: created.id, name: created.name });
-    }
-    const alleListen = [...(lists ?? []), ...frisch];
-    for (let i = 0; i < actions.aufgaben.length; i += 1) {
-      if (deselected.has(`a${i}`)) continue;
-      const a = actions.aufgaben[i];
-      await createTask.mutateAsync({
-        listId: resolveListId(a.liste, alleListen),
-        title: a.titel,
-        note: a.notiz ?? null,
-        dueDate: actionDueDate(a, today),
-        dueTime: a.zeit ?? null,
-        rrule: a.wiederholung ?? null,
-        tags: a.tags ?? [],
-        subtasks: subtasksFromSchritte(a.schritte),
-      });
-      tasks += 1;
-    }
-    for (let i = 0; i < actions.notizen.length; i += 1) {
-      if (deselected.has(`n${i}`)) continue;
-      await createNote.mutateAsync({ body: actions.notizen[i] });
-      notes += 1;
-    }
-    const termine = actions.termine.filter((_, i) => !deselected.has(`t${i}`));
-    const events = termine.length > 0 ? await createEvents(termine) : 0;
+    // Anwenden liegt zentral in lib/applyActions — die Reihenfolge (Projekte →
+    // Änderungen → Neues) und die Schutzregeln gelten damit überall gleich.
+    const gewaehlt: AssistantAction = {
+      ...actions,
+      listen: actions.listen.filter((_, i) => !deselected.has(`l${i}`)),
+      aufgaben: actions.aufgaben.filter((_, i) => !deselected.has(`a${i}`)),
+      termine: actions.termine.filter((_, i) => !deselected.has(`t${i}`)),
+      notizen: actions.notizen.filter((_, i) => !deselected.has(`n${i}`)),
+      // Der Braindump kann keine Änderungen anwenden (keine Handles).
+      aenderungen: [],
+    };
+    const res = await applyAssistantActions(gewaehlt, {
+      lists: lists ?? [],
+      tasks: [],
+      today,
+      createList: (input) => createList.mutateAsync(input),
+      createTask: (input) => createTask.mutateAsync(input),
+      createNote: (body) => createNote.mutateAsync({ body }),
+      updateTask: (id, patch) => updateTask.mutateAsync({ id, patch }),
+      completeTask: (t) => completeTask.mutateAsync(t),
+      trashTask: (id) => deleteTask.mutateAsync(id),
+      createEvents: (termine) => createEvents(termine),
+      colorAt: (i) => LIST_COLORS[i % LIST_COLORS.length],
+    });
     setActions(null);
     setText('');
     setImages([]);
-    setDoneEvents(events);
+    setDoneEvents(res.termine);
     const parts = [
-      ...(frisch.length > 0 ? [`${frisch.length} ${frisch.length === 1 ? 'Projekt' : 'Projekte'}`] : []),
-      `${tasks} ${tasks === 1 ? 'Aufgabe' : 'Aufgaben'}`,
-      ...(events > 0 ? [`${events} ${events === 1 ? 'Termin im Kalender' : 'Termine im Kalender'}`] : []),
-      `${notes} ${notes === 1 ? 'Notiz' : 'Notizen'}`,
+      ...(res.projekte > 0 ? [`${res.projekte} ${res.projekte === 1 ? 'Projekt' : 'Projekte'}`] : []),
+      `${res.aufgaben} ${res.aufgaben === 1 ? 'Aufgabe' : 'Aufgaben'}`,
+      ...(res.termine > 0 ? [`${res.termine} ${res.termine === 1 ? 'Termin im Kalender' : 'Termine im Kalender'}`] : []),
+      `${res.notizen} ${res.notizen === 1 ? 'Notiz' : 'Notizen'}`,
     ];
     setDone(`${parts.join(', ')} angelegt. Kopf frei.`);
   };

@@ -35,10 +35,10 @@ still quittierbar. Ein erster, größerer Entwurf mit drei eigenen Panels wurde 
 überladen verworfen — das ist hier die richtige Lehre: der Kern des Bogens ist ein
 Satz, keine Oberfläche.
 
-- **Der Wochenbogen** `[JS · mittel]` — derselbe Rhythmus eine Ebene höher:
-  ruhiger Rückblick + Ausblick, sonntags. **Bewusst zurückgestellt**, bis sich der
-  tägliche Bogen im Alltag bewährt hat — eine dritte Oberfläche wäre sonst genau
-  die Überladung, die wir vermieden haben.
+~~**Der Wochenbogen**~~ — aufgegangen im **Verwalter** (v1.40.0): „Die Woche
+ansehen" liefert Ausblick UND konkrete Vorschläge statt einer weiteren
+Betrachtungs-Oberfläche. Damit ist auch „Das Maß des Tages" halb erledigt — die
+Tagesfassung des Verwalters wäre der nächste kleine Schritt.
 
 ## 3. Vernetzungen — das größte ungehobene Potenzial
 

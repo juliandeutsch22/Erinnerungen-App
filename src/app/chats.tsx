@@ -140,6 +140,20 @@ export default function ChatsScreen() {
         <Reveal delay={60}>
           <GlassPanel>
             <PressableScale
+              accessibilityLabel="Die Woche ansehen"
+              onPress={() => router.push('/verwalter')}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}
+            >
+              <CalendarDays size={18} color={colors.teal} strokeWidth={2.2} />
+              <View style={{ flex: 1 }}>
+                <Type variant="label" tone="teal">Die Woche ansehen</Type>
+                <Type variant="caption" tone="text3">
+                  Der Assistent legt einen Entwurf für die kommende Woche vor — du bestätigst.
+                </Type>
+              </View>
+            </PressableScale>
+            <Seam marginVertical={Spacing.sm} />
+            <PressableScale
               accessibilityLabel="Plane meinen Tag"
               onPress={planMyDay}
               style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}

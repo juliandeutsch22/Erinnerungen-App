@@ -418,6 +418,27 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
     · Nur im Braindump. Der Chat müsste Bilder am Nachrichtenverlauf
       speichern — das ist ein eigener Schritt, kein Nebenbei.
 
+23. **Der Verwalter** (`app/verwalter.tsx` + `lib/verwalter.ts`, v1.40.0) — die
+    erste Funktion, bei der die App VORARBEITET statt Eingaben entgegenzunehmen:
+    ein Tipp, und der Assistent legt einen Entwurf für die kommende Woche vor.
+    · **Die Leitplanke steckt im Prompt**, nicht in der UI: „Zähle nichts aus
+      und bewerte nicht", keine Prozente, kein Lob/Tadel, höchstens fünf Zeilen,
+      und jede vorgeschlagene Änderung muss zu einer Zeile gehören. Ein
+      Wochenrückblick kippt sonst in Bewertung, und „kein Druck" ist hin. Tests
+      halten diese Sätze fest — wer den Prompt umschreibt, muss sie mitnehmen.
+    · `weekReviewDue` zeigt den Einstieg auf „Heute" NUR sonntags (und montags
+      früh). Täglich sichtbar wäre er eine Mahnung statt eines Angebots.
+      Dauerhaft erreichbar bleibt er über den Assistenten-Bildschirm.
+    · Er schlägt **kein „erledigt"** vor — Abhaken ist Sache des Nutzers.
+24. **`lib/applyActions.ts` — EINE Stelle fürs Anwenden.** Vorher lag dieselbe
+    Schleife dreimal, und ALLE drei Fehler der Fehlersuche (doppelte Liste, nie
+    anlaufende Wiederholung, nicht verankerte Fälligkeit) steckten genau in
+    dieser Verdreifachung. Die Mutationen werden hereingereicht → rein und
+    testbar; die Reihenfolge (Projekte → Änderungen → Neues) ist durch Tests
+    festgenagelt. **Neue Bildschirme mit Aktions-Karte benutzen das hier.**
+    Migriert sind Verwalter und Braindump; Chat und Sprach-Sheet haben ihre
+    eigene Fassung noch — beim nächsten Anfassen nachziehen.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

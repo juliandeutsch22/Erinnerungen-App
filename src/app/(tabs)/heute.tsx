@@ -3,7 +3,7 @@
 // Uhrzeit auf EINER Glass-Fläche mit Seams, plus dünne Fortschrittslinie und
 // einklappbare „Erledigt heute"-Sektion. Abhaken = Teal-Puls + Haptik.
 import { useRouter } from 'expo-router';
-import { CalendarCheck, Mic, Plus, Settings, Sparkles, Sun } from 'lucide-react-native';
+import { CalendarCheck, CalendarDays, Mic, Plus, Settings, Sparkles, Sun } from 'lucide-react-native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { TextInput, View } from 'react-native';
 
@@ -38,6 +38,7 @@ import type { Task } from '@/data/types';
 import { bucketEventsByDay } from '@/lib/calendarLogic';
 import { buildDayTimeline, nowMarkerIndex } from '@/lib/dayTimeline';
 import { addDays, formatDayHeading, toDateStr, todayStr } from '@/lib/dates';
+import { weekReviewDue } from '@/lib/verwalter';
 import { type DeviceEvent, hasCalendarPermission } from '@/lib/deviceCalendar';
 import { groupToday, groupUpcomingDays } from '@/lib/taskLogic';
 import { dictationAvailable } from '@/lib/dictation';
@@ -417,6 +418,25 @@ export default function HeuteScreen() {
               </PressableScale>
             ) : (
               <Type variant="caption" tone={allDone ? 'teal' : 'text3'} tabular>{summary}</Type>
+            )}
+            {/* Der Verwalter — sichtbar NUR sonntags (und montags früh als
+                Nachzügler). Eine Einladung, die jeden Tag dastünde, wäre eine
+                Mahnung; so bleibt sie ein Angebot am richtigen Moment. */}
+            {apiKey.length > 0 && weekReviewDue(today, hour) && (
+              <PressableScale
+                accessibilityLabel="Die Woche ansehen"
+                onPress={() => {
+                  hapticSelect();
+                  router.push('/verwalter');
+                }}
+                pressedScale={0.99}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 }}
+              >
+                <CalendarDays size={12} color={colors.teal} strokeWidth={2} />
+                <Type variant="caption" tone="teal" numberOfLines={1} style={{ flex: 1 }}>
+                  Die Woche ansehen?
+                </Type>
+              </PressableScale>
             )}
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
