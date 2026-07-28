@@ -393,7 +393,11 @@ export function extractActions(text: string): { clean: string; actions: Assistan
   if (!m) {
     const roh = text.trim();
     if (!roh.startsWith('{')) return { clean: text, actions: null };
-    return { clean: '', actions: parseActionJson(roh) };
+    const actions = parseActionJson(roh);
+    // Lässt es sich NICHT lesen, ist es kein Aktions-Block, sondern eben Text.
+    // Ihn hier wegzuwerfen ließ den Braindump „Seine Antwort:" ankündigen und
+    // dann schweigen — eine Sackgasse ohne jeden Anhaltspunkt.
+    return actions ? { clean: '', actions } : { clean: text, actions: null };
   }
   const clean = text.replace(ACTION_RE, '').trim();
   // Modelle setzen gelegentlich ECHTE Zeilenumbrüche in JSON-Strings —
@@ -1019,6 +1023,19 @@ function getStreamFetch(): typeof fetch {
   return streamFetchImpl;
 }
 
+/** Körper als JSON lesen — mit deutscher Meldung, wenn gar kein JSON kommt.
+ *  Ein HTTP 200 ist keine Garantie: WLAN-Anmeldeseiten (Hotel, Bahn, Café)
+ *  antworten mit einer HTML-Seite, und `res.json()` warf dann eine rohe
+ *  englische Parser-Ausnahme bis auf den Bildschirm. */
+async function readJson(res: Response): Promise<unknown> {
+  const roh = await res.text();
+  try {
+    return JSON.parse(roh);
+  } catch {
+    throw new Error('Unerwartete Antwort — hängst du in einer WLAN-Anmeldeseite fest?');
+  }
+}
+
 // ——— Zwei API-Dialekte, ein Anfrage-Körper ———
 // Ab der 3.5er-Generation sind „temperature"/„topP"/„topK" abgekündigt; gesteuert
 // wird stattdessen über „thinkingConfig.thinkingLevel". Beides gleichzeitig zu
@@ -1337,7 +1354,7 @@ export async function askAssistant(
     if (onDelta) {
       text = await readSse(res, onDelta, (c) => calls.push(...c));
     } else {
-      const jsonBody: unknown = await res.json();
+      const jsonBody: unknown = await readJson(res);
       calls.push(...extractCalls(jsonBody));
       text = extractText(jsonBody) ?? '';
     }

@@ -670,3 +670,21 @@ describe('Zwei API-Dialekte (temperature ↔ thinkingLevel)', () => {
     expect(MODEL_CHAIN.length).toBeGreaterThan(2);
   });
 });
+
+// ——— Fehlersuche v1.48.0 ———
+describe('Unlesbare Antworten führen nie in eine stumme Sackgasse', () => {
+  it('rohes JSON, das sich nicht lesen lässt, bleibt als Text erhalten', () => {
+    // Vorher: clean war '' und die Antwort verschwand — der Braindump kündigte
+    // „Seine Antwort:" an und schwieg dann.
+    const kaputt = '{"unbrauchbar": true';
+    const { clean, actions } = extractActions(kaputt);
+    expect(actions).toBeNull();
+    expect(clean).toBe(kaputt);
+  });
+
+  it('lesbares rohes JSON bleibt der Aktions-Block (kein Rückschritt)', () => {
+    const { clean, actions } = extractActions('{"aufgaben":[{"titel":"Milch"}]}');
+    expect(clean).toBe('');
+    expect(actions!.aufgaben[0].titel).toBe('Milch');
+  });
+});

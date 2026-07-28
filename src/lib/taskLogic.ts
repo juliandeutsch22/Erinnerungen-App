@@ -8,11 +8,17 @@ export function isOpen(t: Task): boolean {
 
 /** Überfällig = offen, Fälligkeitsdatum vor heute (Indigo-Akzent, kein Alarm-Rot). */
 export function isOverdue(t: Task, today: string): boolean {
-  return isOpen(t) && t.dueDate !== null && t.dueDate < today;
+  // `isCurrent` steht hier bewusst MIT drin, nicht erst bei den Aufrufern:
+  // Verfallen heißt „gegenstandslos", nicht „zu spät" — eine Aufgabe, deren
+  // Anlass vorbei ist, darf nirgends als überfällig gelten. Vorher galt das nur
+  // in den Listen-Zählungen und den Smart-Filtern, ausgerechnet nicht auf
+  // „Heute", wo „überfällig" am lautesten steht (und wo „Überfällige auf heute
+  // holen" sie mit EINEM Tipp reihenweise wiederbelebt hat).
+  return isOpen(t) && isCurrent(t, today) && t.dueDate !== null && t.dueDate < today;
 }
 
 export function isDueToday(t: Task, today: string): boolean {
-  return isOpen(t) && t.dueDate === today;
+  return isOpen(t) && isCurrent(t, today) && t.dueDate === today;
 }
 
 /** Erledigte der letzten 30 Tage (ältere werden automatisch ausgeblendet). */

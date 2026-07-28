@@ -25,6 +25,11 @@ export type RunStatus = 'running' | 'done' | 'error';
 export type AssistantRun = {
   /** Womit der Lauf beschriftet wird, wenn anderswo darauf hingewiesen wird. */
   label: string;
+  /** Die Eingabe, aus der der Lauf entstand (Braindump-Text, Transkript).
+   *  Sie gehört in den Lauf, nicht in den Bildschirm: sonst überlebt zwar die
+   *  ANTWORT das Verlassen, aber der abgetippte Wurf ist weg — und scheitert
+   *  der Lauf, steht man vor einem leeren Feld und hat alles verloren. */
+  input: string;
   status: RunStatus;
   /** Bisher eingetroffener Text (Streaming) — nur für die Wartezeit. */
   stream: string;
@@ -44,7 +49,7 @@ export const runKeyForChat = (chatId: string) => `chat:${chatId}`;
 
 type RunStore = {
   runs: Record<string, AssistantRun>;
-  begin: (key: string, label: string) => void;
+  begin: (key: string, label: string, input?: string) => void;
   delta: (key: string, text: string) => void;
   finish: (key: string, result: { clean: string; actions: AssistantAction | null }) => void;
   fail: (key: string, message: string) => void;
@@ -53,11 +58,11 @@ type RunStore = {
 
 export const useAssistantRuns = create<RunStore>((set) => ({
   runs: {},
-  begin: (key, label) =>
+  begin: (key, label, input = '') =>
     set((s) => ({
       runs: {
         ...s.runs,
-        [key]: { label, status: 'running', stream: '', clean: '', actions: null, error: null, startedAt: Date.now() },
+        [key]: { label, input, status: 'running', stream: '', clean: '', actions: null, error: null, startedAt: Date.now() },
       },
     })),
   delta: (key, text) =>

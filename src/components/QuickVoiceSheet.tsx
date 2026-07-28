@@ -376,7 +376,7 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
   const sort = async (dump: string) => {
     setPhase('thinking');
     setLocalError(null);
-    beginRun(RUN_QUICKVOICE, 'Diktat');
+    beginRun(RUN_QUICKVOICE, 'Diktat', dump);
     try {
       const listNames = (lists ?? []).filter((l) => !l.deletedAt).map((l) => l.name);
       const msg: ChatMessage = { id: 'qv', chatId: 'qv', role: 'user', content: dump, createdAt: new Date().toISOString() };
@@ -445,7 +445,14 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
     if (visible) {
       // Liegt noch ein Lauf von vorhin da (man hat zwischendurch zugemacht),
       // wird er gezeigt statt weggeworfen — die Phase setzt der Effekt oben.
-      if (useAssistantRuns.getState().runs[RUN_QUICKVOICE]) return undefined;
+      const offen = useAssistantRuns.getState().runs[RUN_QUICKVOICE];
+      if (offen) {
+        // Das Gesagte gehört dazu: es steht über dem Ergebnis und ist die
+        // Grundlage fürs „Ergänzen". Ohne das spräche man ins Leere weiter.
+        transcriptRef.current = offen.input;
+        setTranscript(offen.input);
+        return undefined;
+      }
       setPhase('listening');
       setInterim('');
       setTranscript('');

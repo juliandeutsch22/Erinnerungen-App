@@ -304,3 +304,31 @@ describe('Der Abend als zweite Hälfte des Tages', () => {
     expect(groupToday([t({ id: 'd' })], heute).evening).toEqual([]);
   });
 });
+
+// ——— Fehlersuche v1.48.0: Lebensspanne gegen „Heute" ———
+// Verfallen heißt „gegenstandslos", nicht „zu spät". Auf dem Bildschirm, wo
+// „überfällig" am lautesten steht, muss das gelten — sonst tut das Feld genau
+// dort nichts, wo es gebraucht wird.
+describe('Verfallene und schlummernde Aufgaben auf „Heute"', () => {
+  const verfallen = task({ id: 'tv1234', dueDate: '2026-06-20', expiresOn: '2026-06-30' });
+  const schlummert = task({ id: 'ts1234', dueDate: TODAY, startDate: '2026-08-01' });
+  const normal = task({ id: 'tn1234', dueDate: '2026-06-20' });
+
+  it('eine verfallene Aufgabe steht nicht mehr unter Überfällig', () => {
+    const g = groupToday([verfallen, normal], TODAY);
+    expect(g.overdue.map((t) => t.id)).toEqual(['tn1234']);
+  });
+
+  it('eine schlummernde Aufgabe taucht heute noch nicht auf', () => {
+    const g = groupToday([schlummert], TODAY);
+    expect(g.timed).toHaveLength(0);
+    expect(g.untimed).toHaveLength(0);
+    expect(g.evening).toHaveLength(0);
+  });
+
+  it('„Überfällige auf heute holen" weckt nichts Verfallenes wieder auf', () => {
+    // Sonst macht EIN Tipp aus gegenstandslos wieder „heute fällig" — und das
+    // stillschweigend für alle auf einmal.
+    expect(adoptOverdueToToday([verfallen, normal], TODAY).map((p) => p.id)).toEqual(['tn1234']);
+  });
+});

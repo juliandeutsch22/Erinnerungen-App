@@ -599,6 +599,40 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
     Fassungen (mal `chip`+`chipBorder`, mal `bg2`+`border`, mal ganz ohne).
     Wer dort das nächste Mal anfasst, nimmt `InsetField` mit.
 
+36. **Fehlersuche v1.48.0 — was die letzten drei Releases still hinterlassen
+    haben.** Gezielt an den neu gebauten Stellen gesucht; drei echte Funde, alle
+    ohne Absturz, alle mit Test belegt, bevor etwas geändert wurde:
+    · **Die Lebensspanne galt ausgerechnet auf „Heute" nicht.** `isCurrent`
+      steckte in den Listen-Zählungen und den Smart-Filtern, aber `groupToday`
+      benutzte nur `isOverdue`/`isDueToday`. Eine verfallene Aufgabe stand also
+      weiter unter ÜBERFÄLLIG — auf dem Bildschirm, wo das Wort am lautesten
+      ist —, sie zählte in `open` mit (also wurde „alles erledigt" nie erreicht),
+      und **„Überfällige auf heute holen" hat sie mit EINEM Tipp reihenweise
+      wiederbelebt**. Die Bedingung sitzt jetzt IN `isOverdue`/`isDueToday`,
+      nicht bei den Aufrufern: „verfallen ist nicht überfällig" ist eine
+      Eigenschaft der Aufgabe, keine Meinung des Bildschirms.
+    · **Der Lauf überlebte das Verlassen, die EINGABE nicht.** Genau der Fall,
+      für den v1.44 geworben hat: Braindump abtippen, weggehen, wiederkommen —
+      der Lauf lief weiter, aber `text` lag im Bildschirm-State, und der wird
+      beim Zurückgehen abgebaut. Scheiterte der Lauf, stand man vor einem leeren
+      Feld und der ganze Wurf war weg. Die Eingabe liegt jetzt IM Lauf
+      (`AssistantRun.input`) und wird beim Betreten zurückgeholt — einmalig,
+      damit sie niemandem ins Tippen fährt.
+    · **Eine stumme Sackgasse im JSON-Modus.** Ließ sich die rohe Antwort nicht
+      lesen, gab `extractActions` `clean: ''` zurück; der Braindump kündigte
+      „Seine Antwort:" an und schwieg dann. Unlesbares JSON ist kein
+      Aktions-Block, sondern eben Text — es bleibt jetzt erhalten.
+    Dazu eine **Härtung ohne bekannten Auslöser**: `readJson()` statt
+    `res.json()`. Ein HTTP 200 mit einer HTML-Anmeldeseite (Hotel-WLAN) hätte
+    eine rohe englische Parser-Ausnahme auf den Bildschirm gebracht. Erreichbar
+    ist das nur über den strikten ZWEITversuch (die Erstanfragen streamen alle,
+    und `readSse` schluckt kaputte Zeilen bereits) — also eng, aber eine
+    englische `SyntaxError`-Meldung hat in dieser App nichts verloren.
+    **Geprüft und NICHT verändert:** Handles greifen nie in den Papierkorb
+    (`useTasks` filtert `deletedAt`), und der Überblick zeigt nur offene
+    Aufgaben — ein Handle auf etwas Erledigtes bräuchte eine 6-Zeichen-
+    Halluzinations-Kollision.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

@@ -54,3 +54,21 @@ describe('assistantRun', () => {
     expect(store().runs[runKeyForChat('c1')].error).toBe('Keine Verbindung');
   });
 });
+
+describe('Die Eingabe gehört in den Lauf', () => {
+  it('begin merkt sich den Wurf, damit er das Verlassen überlebt', () => {
+    useAssistantRuns.getState().clear('t');
+    useAssistantRuns.getState().begin('t', 'Braindump', 'Milch kaufen, Zahnarzt');
+    expect(useAssistantRuns.getState().runs['t'].input).toBe('Milch kaufen, Zahnarzt');
+    // Auch nach dem Scheitern steht sie noch da — sonst ist der Text verloren.
+    useAssistantRuns.getState().fail('t', 'ging nicht');
+    expect(useAssistantRuns.getState().runs['t'].input).toBe('Milch kaufen, Zahnarzt');
+    useAssistantRuns.getState().clear('t');
+  });
+
+  it('ohne Eingabe bleibt sie leer statt undefined', () => {
+    useAssistantRuns.getState().begin('t2', 'Verwalter');
+    expect(useAssistantRuns.getState().runs['t2'].input).toBe('');
+    useAssistantRuns.getState().clear('t2');
+  });
+});

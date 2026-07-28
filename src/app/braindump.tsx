@@ -64,6 +64,17 @@ export default function BraindumpScreen() {
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 250);
     }
   }, [sharedText]);
+  // Kommt man zu einem laufenden oder gescheiterten Wurf zurück, steht der
+  // abgetippte Text wieder da. Der Bildschirm wird beim Verlassen abgebaut —
+  // ohne das ist die Eingabe weg, obwohl der Lauf selbst überlebt hat.
+  // Nur EINMAL beim Betreten, damit es niemandem ins Tippen fährt.
+  const wiederhergestellt = useRef(false);
+  useEffect(() => {
+    if (wiederhergestellt.current || seeded.current) return;
+    wiederhergestellt.current = true;
+    const offen = useAssistantRuns.getState().runs[RUN_BRAINDUMP];
+    if (offen && offen.status !== 'done' && offen.input.length > 0) setText(offen.input);
+  }, []);
   // Bilder leben nur bis zum nächsten Sortieren — sie werden nirgends abgelegt.
   const [images, setImages] = useState<AssistantImage[]>([]);
   const dictBaseRef = useRef('');
@@ -112,7 +123,7 @@ export default function BraindumpScreen() {
     if ((!dump && images.length === 0) || pending) return;
     setDone(null);
     setDoneEvents(0);
-    beginRun(RUN_BRAINDUMP, 'Braindump');
+    beginRun(RUN_BRAINDUMP, 'Braindump', dump);
     try {
       const listNames = (lists ?? []).filter((l) => !l.deletedAt).map((l) => l.name);
       const dateLabel = `${parseDateStr(today).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} (${today})`;
