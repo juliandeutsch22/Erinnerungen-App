@@ -123,7 +123,7 @@ export default function HeuteScreen() {
   const freeTasks = useMemo(() => (tasks ?? []).filter((t) => !attachedIds.has(t.id)), [tasks, attachedIds]);
 
   const groups = useMemo(() => groupToday(freeTasks, today), [freeTasks, today]);
-  const open = groups.overdue.length + groups.timed.length + groups.untimed.length;
+  const open = groups.overdue.length + groups.timed.length + groups.untimed.length + groups.evening.length;
 
   // Heute Erledigtes (lokales Datum!) — neueste zuerst, für Bilanz + Sektion.
   const doneToday = useMemo(
@@ -261,6 +261,7 @@ export default function HeuteScreen() {
   const hasOverdue = groups.overdue.length > 0;
   const hasPlan = timeline.length > 0 || allDayEvents.length > 0;
   const hasUntimed = groups.untimed.length > 0;
+  const hasEvening = groups.evening.length > 0;
   const hasDone = doneToday.length > 0;
   const nothingAtAll = !hasOverdue && !hasPlan && !hasUntimed && !hasDone;
 
@@ -353,9 +354,25 @@ export default function HeuteScreen() {
       id: 'untimed',
       node: (
       <View key="untimed">
-        <Type variant="eyebrow" tone="text3">Ohne Uhrzeit</Type>
+        {/* „Tagsüber" nur, wenn es auch einen Abend gibt — sonst wäre die
+            Unterscheidung eine Behauptung ohne Gegenstück. */}
+        <Type variant="eyebrow" tone="text3">{hasEvening ? 'Tagsüber' : 'Ohne Uhrzeit'}</Type>
         <View style={{ marginTop: Spacing.xs }}>{renderRows(groups.untimed)}</View>
       </View>
+      ),
+    });
+  }
+
+  if (hasEvening) {
+    sections.push({
+      id: 'evening',
+      node: (
+        <View key="evening">
+          {/* Die zweite Hälfte des Tages. Der Abend hat in Stoa ohnehin eine
+              eigene Bedeutung (Abendbetrachtung) — hier schließt sich das. */}
+          <Type variant="eyebrow" tone="text3">Abends</Type>
+          <View style={{ marginTop: Spacing.xs }}>{renderRows(groups.evening)}</View>
+        </View>
       ),
     });
   }

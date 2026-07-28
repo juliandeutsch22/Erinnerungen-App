@@ -61,7 +61,11 @@ export function byTimeThenCreation(a: Task, b: Task): number {
 export type TodayGroups = {
   overdue: Task[];
   timed: Task[]; // heute, mit Uhrzeit (chronologisch)
-  untimed: Task[]; // heute, ohne Uhrzeit
+  untimed: Task[]; // heute, ohne Uhrzeit, tagsüber
+  /** Heute, ohne Uhrzeit, ausdrücklich für den Abend. Der Tag ist keine Liste,
+   *  er hat zwei Temperaturen — was nach Feierabend passiert, gehört nicht
+   *  zwischen die Arbeitssachen. */
+  evening: Task[];
 };
 
 /** Gruppen des Heute-Screens: überfällig → heute mit Uhrzeit → heute ohne Uhrzeit. */
@@ -73,7 +77,10 @@ export function groupToday(tasks: Task[], today: string): TodayGroups {
   return {
     overdue,
     timed: dueToday.filter((t) => t.dueTime !== null).sort(byTimeThenCreation),
-    untimed: dueToday.filter((t) => t.dueTime === null).sort(byTimeThenCreation),
+    // Mit Uhrzeit hat eine Aufgabe ihren Platz auf der Zeitachse — die
+    // Abend-Markierung wirkt deshalb nur ohne.
+    untimed: dueToday.filter((t) => t.dueTime === null && !t.evening).sort(byTimeThenCreation),
+    evening: dueToday.filter((t) => t.dueTime === null && !!t.evening).sort(byTimeThenCreation),
   };
 }
 

@@ -67,6 +67,10 @@ export type Task = {
    *  sondern gegenstandslos („Karten fürs Konzert kaufen" nach dem Konzert).
    *  Null = ohne Verfall. */
   expiresOn?: string | null;
+  /** Gehört in die zweite Hälfte des Tages („Anna anrufen", nicht zwischen die
+   *  Arbeitssachen). Wirkt nur bei Aufgaben OHNE Uhrzeit — mit Uhrzeit hat die
+   *  Aufgabe ihren Platz auf der Zeitachse. */
+  evening?: boolean;
   flagged: boolean;
   /** An einen Gerätekalender-Termin gehängt (EventKit-Event-ID), null = frei. */
   eventId: string | null;
@@ -95,6 +99,7 @@ export type NewTask = {
   rrule?: Rrule | null;
   startDate?: string | null;
   expiresOn?: string | null;
+  evening?: boolean;
   flagged?: boolean;
   eventId?: string | null;
   tags?: string[];

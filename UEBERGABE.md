@@ -466,6 +466,14 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
     Auf der Projektseite bekommen beide eine eigene, eingeklappte Gruppe
     („Später", „Anlass vorbei") — verschwinden heißt hier nie verlieren.
 
+27. **Der Abend ist die zweite Hälfte des Tages** (`Task.evening`, v1.43.0) —
+    „Heute" trennt jetzt „Tagsüber" und „Abends". Zwei Feinheiten:
+    · Die Markierung wirkt NUR bei Aufgaben ohne Uhrzeit. Mit Uhrzeit hat eine
+      Aufgabe ihren Platz auf der Zeitachse; sie dort herauszunehmen wäre falsch.
+    · Die Überschrift heißt nur dann „Tagsüber", wenn es auch einen Abend gibt —
+      sonst „Ohne Uhrzeit". Eine Unterscheidung ohne Gegenstück ist eine
+      Behauptung.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

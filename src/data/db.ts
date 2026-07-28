@@ -96,7 +96,7 @@ export function getDb(): Promise<SQLiteDatabase> {
       `);
       // Migration: neue Spalten nachrüsten (bestehende Installs).
       // ALTER wirft, wenn die Spalte schon existiert → still schlucken.
-      for (const col of ['tags TEXT', 'subtasks TEXT', 'event_id TEXT', 'deleted_at TEXT', 'rrule_until TEXT', 'start_date TEXT', 'expires_on TEXT']) {
+      for (const col of ['tags TEXT', 'subtasks TEXT', 'event_id TEXT', 'deleted_at TEXT', 'rrule_until TEXT', 'start_date TEXT', 'expires_on TEXT', 'evening INTEGER NOT NULL DEFAULT 0']) {
         try {
           await db.execAsync(`ALTER TABLE tasks ADD COLUMN ${col};`);
         } catch {

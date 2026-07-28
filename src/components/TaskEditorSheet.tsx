@@ -3,7 +3,7 @@
 // Detail-Zeilen (Liste / Fällig / Wiederholung / Flagge) mit aktuellem Wert,
 // die erst beim Antippen ihre Chips aufklappen — keine Chip-Wand. Der
 // Primär-Button sitzt fest im Sheet-Footer. Löschen zweistufig.
-import { CalendarDays, CalendarX2, Clock, Flag, ListChecks, type LucideIcon, Minus, Plus, Repeat, Tag as TagIcon, Trash2, X, Hourglass } from 'lucide-react-native';
+import { CalendarDays, CalendarX2, Clock, Flag, ListChecks, type LucideIcon, Minus, Plus, Repeat, Tag as TagIcon, Trash2, X, Hourglass, Moon } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
@@ -76,6 +76,7 @@ export function TaskEditorSheet({
   const [dueTime, setDueTime] = useState<string | null>(task?.dueTime ?? null);
   const [rrule, setRrule] = useState<Rrule | null>(task?.rrule ?? null);
   const [rruleUntil, setRruleUntil] = useState<string | null>(task?.rruleUntil ?? null);
+  const [evening, setEvening] = useState<boolean>(task?.evening ?? false);
   const [startDate, setStartDate] = useState<string | null>(task?.startDate ?? null);
   const [expiresOn, setExpiresOn] = useState<string | null>(task?.expiresOn ?? null);
   // Bausteine des Satzes „Alle [n] [Einheit], gezählt ab [Fälligkeit|Erledigen]".
@@ -168,6 +169,8 @@ export function TaskEditorSheet({
       dueTime: finalDate ? validTime : null,
       startDate,
       expiresOn,
+      // Mit Uhrzeit hat die Aufgabe ihren Platz — dann ist „Abends" gegenstandslos.
+      evening: dueTime === null ? evening : false,
       rrule: finalDate ? rrule : null,
       rruleUntil: finalDate && rrule ? rruleUntil : null,
       flagged,
@@ -345,6 +348,24 @@ export function TaskEditorSheet({
                 </PressableScale>
                 {dueTime !== null && (
                   <TimeField value={dueTime} onChange={setDueTime} accessibilityLabel="Uhrzeit wählen" />
+                )}
+                {/* Ohne Uhrzeit: gehört es in den Tag oder in den Abend? */}
+                {dueTime === null && (
+                  <PressableScale
+                    accessibilityRole="switch"
+                    accessibilityState={{ checked: evening }}
+                    accessibilityLabel={evening ? 'Nicht mehr für den Abend' : 'Für den Abend'}
+                    onPress={() => {
+                      hapticSelect();
+                      setEvening((v) => !v);
+                    }}
+                    pressedScale={0.99}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.xs }}
+                  >
+                    <Moon size={18} color={evening ? colors.teal : colors.text3} strokeWidth={2} />
+                    <Type variant="body" style={{ flex: 1 }}>Abends</Type>
+                    <Type variant="label" tone={evening ? 'teal' : 'text3'}>{evening ? 'An' : 'Aus'}</Type>
+                  </PressableScale>
                 )}
               </View>
 

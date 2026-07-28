@@ -84,6 +84,7 @@ export function useCreateTask() {
         rrule: input.rrule ?? null,
         startDate: input.startDate ?? null,
         expiresOn: input.expiresOn ?? null,
+        evening: input.evening ?? false,
         flagged: input.flagged ?? false,
         eventId: input.eventId ?? null,
         completedAt: null,

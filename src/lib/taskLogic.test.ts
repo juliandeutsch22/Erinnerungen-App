@@ -279,3 +279,28 @@ describe('Lebensspanne — ab wann, bis wann', () => {
     expect(lifespanLabel({ startDate: null, expiresOn: null, completedAt: null }, heute)).toBeNull();
   });
 });
+
+describe('Der Abend als zweite Hälfte des Tages', () => {
+  const heute = '2026-07-27';
+  const t = (over: Partial<Task>): Task => ({
+    id: 'x', listId: 'default', title: 'T', note: null, dueDate: heute, dueTime: null, rrule: null,
+    flagged: false, eventId: null, completedAt: null, notificationId: null, tags: [], subtasks: [],
+    createdAt: '2026-07-01T08:00:00.000Z', sort: 1, ...over,
+  });
+
+  it('trennt Tagsüber und Abends', () => {
+    const g = groupToday([t({ id: 'a', title: 'Steuer' }), t({ id: 'b', title: 'Anna anrufen', evening: true })], heute);
+    expect(g.untimed.map((x) => x.title)).toEqual(['Steuer']);
+    expect(g.evening.map((x) => x.title)).toEqual(['Anna anrufen']);
+  });
+
+  it('mit Uhrzeit bleibt die Aufgabe auf der Zeitachse — die Markierung wirkt dort nicht', () => {
+    const g = groupToday([t({ id: 'c', title: 'Zahnarzt', dueTime: '19:00', evening: true })], heute);
+    expect(g.timed.map((x) => x.title)).toEqual(['Zahnarzt']);
+    expect(g.evening).toEqual([]);
+  });
+
+  it('ohne Abend-Aufgaben bleibt die Gruppe leer', () => {
+    expect(groupToday([t({ id: 'd' })], heute).evening).toEqual([]);
+  });
+});

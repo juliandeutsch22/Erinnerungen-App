@@ -9,7 +9,7 @@ type TaskRow = {
   flagged: number; completed_at: string | null; notification_id: string | null;
   created_at: string; sort: number; tags: string | null; subtasks: string | null;
   event_id: string | null; deleted_at: string | null; rrule_until: string | null;
-  start_date: string | null; expires_on: string | null;
+  start_date: string | null; expires_on: string | null; evening: number | null;
 };
 
 function parseArray<T>(json: string | null): T[] {
@@ -34,6 +34,7 @@ function toTask(r: TaskRow): Task {
     rruleUntil: r.rrule_until ?? null,
     startDate: r.start_date ?? null,
     expiresOn: r.expires_on ?? null,
+    evening: r.evening === 1,
     flagged: r.flagged === 1,
     eventId: r.event_id,
     completedAt: r.completed_at,
@@ -57,11 +58,11 @@ export class SqliteTaskRepository implements TaskRepository {
     const db = await getDb();
     await db.runAsync(
       `INSERT OR REPLACE INTO tasks
-         (id, list_id, title, note, due_date, due_time, rrule, rrule_until, start_date, expires_on, flagged, completed_at, notification_id, created_at, sort, tags, subtasks, event_id, deleted_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, list_id, title, note, due_date, due_time, rrule, rrule_until, start_date, expires_on, evening, flagged, completed_at, notification_id, created_at, sort, tags, subtasks, event_id, deleted_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         task.id, task.listId, task.title, task.note, task.dueDate, task.dueTime,
-        task.rrule, task.rruleUntil ?? null, task.startDate ?? null, task.expiresOn ?? null, task.flagged ? 1 : 0, task.completedAt, task.notificationId,
+        task.rrule, task.rruleUntil ?? null, task.startDate ?? null, task.expiresOn ?? null, task.evening ? 1 : 0, task.flagged ? 1 : 0, task.completedAt, task.notificationId,
         task.createdAt, task.sort, JSON.stringify(task.tags ?? []), JSON.stringify(task.subtasks ?? []),
         task.eventId, task.deletedAt ?? null,
       ],
@@ -74,7 +75,7 @@ export class SqliteTaskRepository implements TaskRepository {
     const args: (string | number | null)[] = [];
     const map: Record<string, string> = {
       listId: 'list_id', title: 'title', note: 'note', dueDate: 'due_date', dueTime: 'due_time',
-      rrule: 'rrule', rruleUntil: 'rrule_until', startDate: 'start_date', expiresOn: 'expires_on',
+      rrule: 'rrule', rruleUntil: 'rrule_until', startDate: 'start_date', expiresOn: 'expires_on', evening: 'evening',
       flagged: 'flagged', completedAt: 'completed_at',
       notificationId: 'notification_id', sort: 'sort', tags: 'tags', subtasks: 'subtasks',
       eventId: 'event_id', deletedAt: 'deleted_at',

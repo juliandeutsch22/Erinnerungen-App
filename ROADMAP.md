@@ -40,6 +40,14 @@ ansehen" liefert Ausblick UND konkrete Vorschläge statt einer weiteren
 Betrachtungs-Oberfläche. Damit ist auch „Das Maß des Tages" halb erledigt — die
 Tagesfassung des Verwalters wäre der nächste kleine Schritt.
 
+**Aus vergleichbaren Apps übernommen (v1.42/1.43)** — ~~Startdatum + Verfallsdatum~~
+(OmniFocus/Things „defer", plus eine eigene Idee: Aufgaben mit Verfall) und
+~~„Abends" als zweite Tageshälfte~~ (Things). Offen aus derselben Ecke:
+**verknüpfte Notizen** (`[[Notiz]]` + Rückverweise, Bear/Obsidian) — wartet
+bewusst auf „Tags über alles", sonst entstehen zwei halbe Netze. Und der
+**Tagesplan als echte Zeitblöcke** (Sorted³) — erst, wenn sich der Verwalter
+bewährt hat.
+
 ## 3. Vernetzungen — das größte ungehobene Potenzial
 
 Die Features sind gut, aber sie wissen zu wenig voneinander. Hier liegt am
