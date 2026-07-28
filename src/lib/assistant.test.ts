@@ -648,7 +648,7 @@ describe('Zwei API-Dialekte (temperature ↔ thinkingLevel)', () => {
 
   it('lässt den Rest der Konfiguration unangetastet', () => {
     const neu = cfgVon('gemini-3.6-flash', 'erfassen');
-    expect(neu.maxOutputTokens).toBe(1200);
+    expect(neu.maxOutputTokens).toBe(3000);
     expect(neu.responseMimeType).toBe('application/json');
   });
 
@@ -658,7 +658,7 @@ describe('Zwei API-Dialekte (temperature ↔ thinkingLevel)', () => {
     expect(nackt.thinkingConfig).toBeUndefined();
     // Was die Antwort FORMT, bleibt: sonst käme Prosa statt des Aktions-Blocks.
     expect(nackt.responseMimeType).toBe('application/json');
-    expect(nackt.maxOutputTokens).toBe(1200);
+    expect(nackt.maxOutputTokens).toBe(3000);
   });
 
   it('die neueste ID steht vorn, die alten bleiben als Netz darunter', () => {
@@ -716,5 +716,32 @@ describe('actionDueDate mit festen Wochentagen', () => {
     // Ohne Wiederholung bleibt es wie bisher.
     expect(actionDueDate({}, '2026-07-28')).toBeNull();
     expect(actionDueDate({ wiederholung: 'weekly' }, '2026-07-28')).toBe('2026-07-28');
+  });
+});
+
+describe('Abgeschnittene Antworten (Token-Limit)', () => {
+  // Gemeldet in v1.53.2: Auf dem Bildschirm stand rohes JSON. Ursache war eine
+  // Antwort, die mitten im Aktions-Block endete — ACTION_RE braucht die
+  // schließende Klammer und greift dann GAR NICHT, also wurde alles zu Prosa.
+  const abgeschnitten =
+    'Ich habe die Einkaufsliste als Aufgabe angelegt.\n\n```stoa-aktionen\n{\n  "aufgaben": [\n    {\n      "titel';
+
+  it('zeigt die Prosa und wirft den angefangenen Block weg', () => {
+    const { clean, actions } = extractActions(abgeschnitten);
+    expect(clean).toBe('Ich habe die Einkaufsliste als Aufgabe angelegt.');
+    expect(clean).not.toContain('stoa-aktionen');
+    expect(clean).not.toContain('aufgaben');
+    expect(actions).toBeNull();
+  });
+
+  it('ein vollständiger Block wird weiterhin normal gelesen', () => {
+    const ganz = 'Gut.\n\n```stoa-aktionen\n{"aufgaben":[{"titel":"Milch"}]}\n```';
+    const { clean, actions } = extractActions(ganz);
+    expect(clean).toBe('Gut.');
+    expect(actions!.aufgaben[0].titel).toBe('Milch');
+  });
+
+  it('reine Prosa ohne Klammer bleibt unangetastet', () => {
+    expect(extractActions('Klingt gut.').clean).toBe('Klingt gut.');
   });
 });

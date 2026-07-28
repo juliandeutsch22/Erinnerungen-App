@@ -368,6 +368,7 @@ export function describeSchritte(schritte: string[] | undefined): string | null 
   return `${schritte.length} ${wort}: ${schritte.slice(0, 3).join(', ')}${schritte.length > 3 ? ' …' : ''}`;
 }
 
+const ACTION_OPEN = '```stoa-aktionen';
 const ACTION_RE = /```stoa-aktionen\s*\n([\s\S]*?)```/;
 
 /**
@@ -398,12 +399,20 @@ export function extractActions(text: string): { clean: string; actions: Assistan
   // kein Anzeigetext übrig.
   if (!m) {
     const roh = text.trim();
-    if (!roh.startsWith('{')) return { clean: text, actions: null };
-    const actions = parseActionJson(roh);
-    // Lässt es sich NICHT lesen, ist es kein Aktions-Block, sondern eben Text.
-    // Ihn hier wegzuwerfen ließ den Braindump „Seine Antwort:" ankündigen und
-    // dann schweigen — eine Sackgasse ohne jeden Anhaltspunkt.
-    return actions ? { clean: '', actions } : { clean: text, actions: null };
+    if (roh.startsWith('{')) {
+      const actions = parseActionJson(roh);
+      // Lässt es sich NICHT lesen, ist es kein Aktions-Block, sondern eben Text.
+      // Ihn hier wegzuwerfen ließ den Braindump „Seine Antwort:" ankündigen und
+      // dann schweigen — eine Sackgasse ohne jeden Anhaltspunkt.
+      return actions ? { clean: '', actions } : { clean: text, actions: null };
+    }
+    // ANGEFANGENER, aber nie geschlossener Block: Die Antwort wurde mitten im
+    // JSON abgeschnitten (Token-Limit). Ohne diesen Zweig stand das halbe JSON
+    // als Fließtext auf dem Bildschirm — `ACTION_RE` braucht die schließende
+    // Klammer und greift dann gar nicht. Der Prosa-Teil bleibt, der Rumpf geht.
+    const offen = text.indexOf(ACTION_OPEN);
+    if (offen >= 0) return { clean: text.slice(0, offen).trim(), actions: null };
+    return { clean: text, actions: null };
   }
   const clean = text.replace(ACTION_RE, '').trim();
   // Modelle setzen gelegentlich ECHTE Zeilenumbrüche in JSON-Strings —
@@ -896,7 +905,11 @@ export function buildRequestBody(
       // Erfassen ist Sortieren, kein Nachdenken — wo es die neue Generation
       // versteht, spart „minimal" die teuerste Phase der Antwort.
       ...(mode === 'erfassen' ? { thinkingConfig: { thinkingLevel: 'minimal' } } : {}),
-      maxOutputTokens: 1200,
+      // 1200 war zu knapp: Prosa PLUS ein Aktions-Block mit Checklisten sprengt
+      // das, die Antwort brach mitten im JSON ab (v1.53.3). Der Deckel schützt
+      // nur davor, dass eine entgleiste Antwort das Kontingent frisst — dafür
+      // ist hier reichlich Luft.
+      maxOutputTokens: 3000,
       // JSON-Zwang: Gemini liefert dann garantiert den Aktions-Block als reines
       // JSON — der zweite Anlauf („du hast den Block vergessen") entfällt, und
       // es entstehen weniger Ausgabe-Token. Preis: keine Prosa mehr, also auch

@@ -133,33 +133,23 @@ export function OmniResult({
 
       {run.status === 'done' && (
         <>
-          {run.clean.trim().length > 0 && (
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm }}>
-              <View style={{ flex: 1 }}>
-                <MarkdownText markdown={run.clean.trim()} />
-              </View>
-              {schliessen}
-            </View>
-          )}
-
-          {zeilen.length > 0 && (
-            <>
-              {run.clean.trim().length === 0 && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Type variant="eyebrow" tone="teal">Vorschlag — Kästchen wählt ab, Text ändert</Type>
-                  {schliessen}
-                </View>
-              )}
-              {/* Scrollbereich statt Deckelung: die Karte schwebt über der
-                  Eingabe und darf nicht ungebremst wachsen — aber abschneiden
-                  wäre schlechter, man soll ALLES sehen können, bevor man
-                  bestätigt. */}
-              <ScrollView
-                style={{ maxHeight: 210 }}
-                nestedScrollEnabled
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ gap: 2 }}
-              >
+          {/* Kopf FEST, Inhalt scrollt, Knopf FEST — wie im BottomSheet.
+              Vorher scrollte nur die Vorschlagsliste; eine lange Antwort hatte
+              gar keinen Scrollbereich und lief unter die Eingabezeile. */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm }}>
+            <Type variant="eyebrow" tone="teal" numberOfLines={1} style={{ flex: 1 }}>
+              {zeilen.length > 0 ? 'Vorschlag — Kästchen wählt ab, Text ändert' : 'Antwort'}
+            </Type>
+            {schliessen}
+          </View>
+          <ScrollView
+            style={{ maxHeight: 260 }}
+            nestedScrollEnabled
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ gap: Spacing.xs }}
+          >
+            {run.clean.trim().length > 0 && <MarkdownText markdown={run.clean.trim()} />}
+            <View style={{ gap: 2 }}>
                 {zeilen.map((z) => {
                   const aus = deselected.has(z.key);
                   const inhalt = (
@@ -205,7 +195,9 @@ export function OmniResult({
                     </View>
                   );
                 })}
-              </ScrollView>
+            </View>
+          </ScrollView>
+          {zeilen.length > 0 && (
               <PressableScale
                 accessibilityLabel="Vorschlag übernehmen"
                 onPress={gewaehlt > 0 ? onApply : undefined}
@@ -226,7 +218,6 @@ export function OmniResult({
                   {gewaehlt === 1 ? 'Übernehmen' : `${gewaehlt} übernehmen`}
                 </Type>
               </PressableScale>
-            </>
           )}
         </>
       )}

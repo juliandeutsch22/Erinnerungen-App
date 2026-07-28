@@ -812,9 +812,36 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
     · **Die Karte wuchs ungebremst.** Bei acht Vorschlägen schob sie sich über
       die Eingabe. Jetzt Scrollbereich (210 px) statt Deckelung: abschneiden
       wäre schlechter, man soll ALLES sehen können, bevor man bestätigt.
+      (Nur halb erledigt — die PROSA lag weiter außerhalb; nachgezogen in §8.44.)
     Weiterhin OHNE: Bilder und eine Rückfrage-Runde (jede Anfrage ist ein
     Einzelschuss ohne Gedächtnis). Braindump, Chat und Sprach-Sheet bestehen
     unverändert weiter — sie sind optional statt notwendig, und das war das Ziel.
+
+44. **Rohes JSON in der Antwortkarte + nicht scrollbare Prosa** (v1.53.3) — vom
+    Gerät gemeldet („was ist hier los und das scrollen funktioniert auch
+    nicht"). Zwei getrennte Defekte, beide aus derselben Blindheit: getestet
+    wurde immer mit VOLLSTÄNDIGEN, KURZEN Antworten.
+    · **`ACTION_RE` verlangt eine schließende Zaunreihe.** Lief eine Antwort ins
+      Token-Limit, brach sie mitten im JSON ab; die Regex fand nichts, und der
+      gesamte Rohtext samt ```` ```stoa-aktionen ```` landete als Fließtext in
+      der Karte. `extractActions` schneidet jetzt an einer OFFENEN Zaunreihe ab
+      (`ACTION_OPEN`) und gibt nur die Prosa davor zurück — ein halber
+      Aktions-Block ist nicht reparierbar, aber er darf auch nicht als Text
+      erscheinen. Merksatz: **was nach einer offenen Zaunreihe kommt, ist nie
+      für Augen bestimmt.**
+    · **`maxOutputTokens` stand auf 1200.** Das reichte für Prosa, aber nicht
+      für Prosa PLUS einen Aktions-Block mit mehreren Aufgaben — genau die
+      Kombination, die die Zeile erzeugt. Jetzt 3000. Wer den Wert je senkt:
+      der Aktions-Block ist der teure Teil, nicht die Antwort.
+    · **Nur die Vorschlagsliste hatte einen Scrollbereich.** Eine lange Antwort
+      ohne Aktionen (eine Frage!) hatte gar keinen und lief unter die
+      Eingabezeile. Die Karte folgt jetzt dem BottomSheet-Muster: Kopf FEST,
+      Inhalt (Prosa UND Liste in EINEM `ScrollView`, 260 px) scrollt, Knopf
+      FEST. Prosa und Vorschläge gehören in dieselbe Rolle — sonst scrollt der
+      eine Teil und der andere schiebt.
+    · Abgesichert durch `assistant.test.ts` (Abschnitt „Abgeschnittene
+      Antworten") und `scratchpad/abschnitt.mjs` (Rohtext-Fall, langer
+      Prosa-Fall mit Rad-Geste, zwölf Vorschläge mit festem Kopf und Knopf).
 
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
