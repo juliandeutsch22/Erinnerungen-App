@@ -1,6 +1,6 @@
 // taskLogic.ts — reine Ableitungen über Aufgaben (testbar, ohne UI/DB).
-import type { Rrule, Task } from '@/data/types';
-import { addDays, isAfterCompletionRule, nextOccurrenceAfter, parseRrule } from '@/lib/dates';
+import type { List, Rrule, Task } from '@/data/types';
+import { addDays, deadlineLabel, isAfterCompletionRule, nextOccurrenceAfter, parseRrule } from '@/lib/dates';
 
 export function isOpen(t: Task): boolean {
   return t.completedAt === null;
@@ -133,4 +133,46 @@ export function groupPlanned(tasks: Task[], today: string): PlannedGroup[] {
     { key: 'spaeter', title: 'Später', tasks: open.filter((t) => t.dueDate! > weekEnd) },
   ];
   return groups.filter((g) => g.tasks.length > 0);
+}
+
+/**
+ * Der Zustand eines Projekts mit Deadline — an EINER Stelle, weil er vorher an
+ * drei Stellen unterschiedlich entschieden wurde: Listen-Übersicht und
+ * Projekt-Seite prüften den Fortschritt, der KALENDER gar nicht. Dort stand
+ * deshalb „7 Tage überfällig" unter einem Projekt, in dem längst alles erledigt
+ * war.
+ *
+ * Reihenfolge der Prüfung ist bedeutsam: ausdrücklich abgeschlossen schlägt
+ * „alles erledigt" schlägt Deadline.
+ */
+export type ProjectState = 'abgeschlossen' | 'alles-erledigt' | 'laeuft';
+
+export function projectState(
+  list: Pick<List, 'completedAt'>,
+  progress: { done: number; total: number },
+): ProjectState {
+  if (list.completedAt) return 'abgeschlossen';
+  if (progress.total > 0 && progress.done >= progress.total) return 'alles-erledigt';
+  return 'laeuft';
+}
+
+/** Beschriftung unter einem Projekt. Ein ruhendes Projekt mahnt NIE. */
+export function projectDeadlineLabel(
+  list: Pick<List, 'completedAt' | 'deadline'>,
+  progress: { done: number; total: number },
+  today: string,
+): string | null {
+  const state = projectState(list, progress);
+  if (state === 'abgeschlossen') return 'Abgeschlossen';
+  if (state === 'alles-erledigt') return 'Alles erledigt';
+  return list.deadline ? deadlineLabel(list.deadline, today) : null;
+}
+
+/** Darf das Projekt im Kalender als Deadline auftauchen? Ruhendes nicht. */
+export function projectShowsDeadline(
+  list: Pick<List, 'completedAt' | 'deadline' | 'deletedAt'>,
+  progress: { done: number; total: number },
+): boolean {
+  if (list.deletedAt || !list.deadline) return false;
+  return projectState(list, progress) === 'laeuft';
 }

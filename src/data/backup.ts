@@ -289,6 +289,7 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
       color: str(l.color) ? remapListColor(l.color) : '#2B5FA6',
       goal: str(l.goal) ? l.goal : null,
       deadline: str(l.deadline) ? l.deadline : null,
+      completedAt: str(l.completedAt) ? l.completedAt : null,
       // Papierkorb-Zustand kommt mit zurück (ältere Backups: aktiv).
       deletedAt: str(l.deletedAt) ? l.deletedAt : null,
       sort: typeof l.sort === 'number' ? l.sort : 0,

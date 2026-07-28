@@ -216,6 +216,25 @@ export function useUpdateList() {
 
 /** „Löschen" = Papierkorb: Liste UND ihre aktiven Aufgaben bekommen denselben
  *  Zeitstempel — beim Wiederherstellen kommen genau diese Aufgaben zurück. */
+/** Projekt abschließen: es ruht danach — keine Deadline-Mahnung, kein Punkt im
+ *  Kalender. Die Aufgaben darin bleiben unangetastet (auch offene). */
+export function useCompleteList() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: (id: string) => getListRepository().update(id, { completedAt: new Date().toISOString() }),
+    onSuccess: invalidate,
+  });
+}
+
+/** Wieder aufnehmen. */
+export function useReopenList() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: (id: string) => getListRepository().update(id, { completedAt: null }),
+    onSuccess: invalidate,
+  });
+}
+
 export function useDeleteList() {
   const invalidate = useInvalidate();
   return useMutation({

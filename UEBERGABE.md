@@ -439,6 +439,20 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
     Migriert sind Verwalter und Braindump; Chat und Sprach-Sheet haben ihre
     eigene Fassung noch — beim nächsten Anfassen nachziehen.
 
+25. **Projekte lassen sich ABSCHLIESSEN** (`List.completedAt`, v1.41.0) — und
+    damit ist der gemeldete Fehler weg: Im Kalender stand „x Tage überfällig"
+    unter einem Projekt, in dem längst alles erledigt war. Ursache war, dass der
+    Zustand an drei Stellen unterschiedlich entschieden wurde — Listen-Übersicht
+    und Projekt-Seite prüften den Fortschritt, der Kalender GAR NICHT.
+    Jetzt zentral in `taskLogic`: `projectState` (abgeschlossen › alles-erledigt
+    › läuft), `projectDeadlineLabel`, `projectShowsDeadline`. **Wer eine neue
+    Ansicht mit Projekt-Deadlines baut, benutzt diese drei** — sonst driftet es
+    wieder auseinander.
+    Abschließen ist bewusst eine HANDLUNG des Nutzers, nicht automatisch bei
+    100 %: man fügt oft noch etwas hinzu. Ein abgeschlossenes Projekt taucht auch
+    im Assistenten-Überblick nicht mehr auf, sonst schlüge der Verwalter
+    Verschiebungen für etwas Beendetes vor.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

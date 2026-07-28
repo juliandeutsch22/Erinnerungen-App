@@ -10,6 +10,7 @@ type ListRow = {
   color: string;
   goal: string | null;
   deadline: string | null;
+  completed_at: string | null;
   deleted_at: string | null;
   sort: number;
   created_at: string;
@@ -23,6 +24,7 @@ function toList(r: ListRow): List {
     color: r.color,
     goal: r.goal ?? null,
     deadline: r.deadline ?? null,
+    completedAt: r.completed_at ?? null,
     deletedAt: r.deleted_at ?? null,
     sort: r.sort,
     createdAt: r.created_at,
@@ -39,8 +41,8 @@ export class SqliteListRepository implements ListRepository {
   async create(list: List): Promise<void> {
     const db = await getDb();
     await db.runAsync(
-      'INSERT OR REPLACE INTO lists (id, name, icon, color, goal, deadline, deleted_at, sort, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [list.id, list.name, list.icon, list.color, list.goal, list.deadline, list.deletedAt ?? null, list.sort, list.createdAt],
+      'INSERT OR REPLACE INTO lists (id, name, icon, color, goal, deadline, deleted_at, completed_at, sort, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [list.id, list.name, list.icon, list.color, list.goal, list.deadline, list.deletedAt ?? null, list.completedAt ?? null, list.sort, list.createdAt],
     );
   }
 
@@ -53,6 +55,7 @@ export class SqliteListRepository implements ListRepository {
     if (patch.color !== undefined) { sets.push('color = ?'); args.push(patch.color); }
     if (patch.goal !== undefined) { sets.push('goal = ?'); args.push(patch.goal); }
     if (patch.deadline !== undefined) { sets.push('deadline = ?'); args.push(patch.deadline); }
+    if (patch.completedAt !== undefined) { sets.push('completed_at = ?'); args.push(patch.completedAt); }
     if (patch.deletedAt !== undefined) { sets.push('deleted_at = ?'); args.push(patch.deletedAt); }
     if (patch.sort !== undefined) { sets.push('sort = ?'); args.push(patch.sort); }
     if (sets.length === 0) return;

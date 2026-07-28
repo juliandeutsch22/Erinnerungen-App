@@ -134,8 +134,8 @@ describe('Backup', () => {
     expect(restoredNotes[0].deletedAt).toBeNull();
   });
 
-  it('Roundtrip: Projekt-Ziel und Deadline bleiben erhalten', async () => {
-    await getListRepository().create({ id: 'p1', name: 'Umzug', icon: 'briefcase', color: '#5B6CFF', goal: 'Bis Ende Juli umziehen', deadline: '2026-07-31', sort: 2, createdAt: '2026-07-01T08:00:00.000Z' });
+  it('Roundtrip: Projekt-Ziel, Deadline und „abgeschlossen" bleiben erhalten', async () => {
+    await getListRepository().create({ id: 'p1', name: 'Umzug', icon: 'briefcase', color: '#5B6CFF', goal: 'Bis Ende Juli umziehen', deadline: '2026-07-31', completedAt: '2026-07-30T18:00:00.000Z', sort: 2, createdAt: '2026-07-01T08:00:00.000Z' });
     const json = await exportToJsonString(noPhotos, new Date('2026-07-03T12:00:00.000Z'));
 
     __setListRepositoryForTests(new InMemoryListRepository());
@@ -144,6 +144,7 @@ describe('Backup', () => {
     const p = (await getListRepository().getAll()).find((l) => l.id === 'p1')!;
     expect(p.goal).toBe('Bis Ende Juli umziehen');
     expect(p.deadline).toBe('2026-07-31');
+    expect(p.completedAt).toBe('2026-07-30T18:00:00.000Z');
   });
 
   it('Roundtrip: Smart-Filter und Fotos (mit Datei-IO) werden wiederhergestellt', async () => {

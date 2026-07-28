@@ -32,7 +32,7 @@ import {
 import type { List, Task } from '@/data/types';
 import { applyFilter } from '@/lib/taskFilters';
 import { addDays, deadlineLabel, formatDueDate, toDateStr, todayStr } from '@/lib/dates';
-import { isOpen, listProgress } from '@/lib/taskLogic';
+import { isOpen, listProgress, projectDeadlineLabel, projectState } from '@/lib/taskLogic';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { useSettings } from '@/theme/settings.store';
 import { useColors } from '@/theme/ThemeProvider';
@@ -140,7 +140,8 @@ export default function ListenScreen() {
             const Icon = listIcon(l.icon);
             const isProject = !!(l.goal || l.deadline);
             const prog = progressByList.get(l.id);
-            const deadlineOverdue = !!l.deadline && l.deadline < today && (prog?.ratio ?? 0) < 1;
+            // Ein ruhendes Projekt ist nie überfällig — zentrale Regel, siehe taskLogic.
+            const deadlineOverdue = !!l.deadline && l.deadline < today && projectState(l, prog ?? { done: 0, total: 0 }) === 'laeuft';
             return (
               <PressableScale
                 key={l.id}
@@ -177,7 +178,7 @@ export default function ListenScreen() {
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                           <CalendarClock size={11} color={deadlineOverdue ? colors.indigo : colors.text3} strokeWidth={2} />
                           <Type variant="caption" tone={deadlineOverdue ? 'indigo' : 'text3'} numberOfLines={1}>
-                            {(prog?.ratio ?? 0) >= 1 && (prog?.total ?? 0) > 0 ? 'Abgeschlossen' : deadlineLabel(l.deadline, today)}
+                            {projectDeadlineLabel(l, prog ?? { done: 0, total: 0 }, today)}
                           </Type>
                         </View>
                       )}

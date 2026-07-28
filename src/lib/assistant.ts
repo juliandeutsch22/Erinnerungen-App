@@ -545,8 +545,10 @@ export function buildAppContext(input: {
     .slice(0, CTX_TASK_LIMIT)
     .map(taskLine);
 
+  // Abgeschlossene Projekte gehören nicht in den Überblick — sonst schlägt der
+  // Verwalter Verschiebungen für etwas vor, das der Nutzer beendet hat.
   const projectLines = lists
-    .filter((l) => l.id !== 'default')
+    .filter((l) => l.id !== 'default' && !l.completedAt)
     .map((l) => {
       const extras = [l.goal ? `Ziel: ${l.goal}` : '', l.deadline ? `Deadline: ${l.deadline}` : ''].filter(Boolean);
       return `- ${l.name}${extras.length ? ` (${extras.join(' · ')})` : ''}`;

@@ -2,7 +2,7 @@
 // Smart-Ansicht: 'geplant' (chronologisch gruppiert) / 'alle' (nach Liste).
 // Offene zuerst (fällige oben), Erledigt-Sektion einklappbar (30-Tage-Fenster).
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowUpDown, CalendarClock, ChevronLeft, Pencil, Plus, Share2 } from 'lucide-react-native';
+import { ArrowUpDown, CalendarClock, CheckCheck, ChevronLeft, Pencil, Plus, RotateCcw, Share2 } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { View } from 'react-native';
 
@@ -23,11 +23,11 @@ import { TaskEditorSheet } from '@/components/TaskEditorSheet';
 import { TaskQuickSheet } from '@/components/TaskQuickSheet';
 import { TaskRow } from '@/components/TaskRow';
 import { Type } from '@/components/Type';
-import { useCompleteTask, useLists, useReopenTask, useTasks } from '@/data/queries';
+import { useCompleteList, useCompleteTask, useLists, useReopenList, useReopenTask, useTasks } from '@/data/queries';
 import type { Task } from '@/data/types';
 import { deadlineLabel, todayStr } from '@/lib/dates';
-import { byTimeThenCreation, groupPlanned, isOpen, listProgress, recentlyCompleted } from '@/lib/taskLogic';
-import { hapticSelect } from '@/lib/haptics';
+import { byTimeThenCreation, groupPlanned, isOpen, listProgress, projectDeadlineLabel, projectState, recentlyCompleted } from '@/lib/taskLogic';
+import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { shareText } from '@/lib/share';
 import { listToShareText } from '@/lib/shareText';
 import { useColors } from '@/theme/ThemeProvider';
@@ -41,6 +41,8 @@ export default function ListeDetailScreen() {
   const { data: lists } = useLists();
   const complete = useCompleteTask();
   const reopen = useReopenTask();
+  const completeList = useCompleteList();
+  const reopenList = useReopenList();
 
   const [editorTask, setEditorTask] = useState<Task | null | undefined>(undefined);
   const [rescheduleTask, setRescheduleTask] = useState<Task | null>(null);
@@ -77,7 +79,9 @@ export default function ListeDetailScreen() {
   const completed = useMemo(() => recentlyCompleted(scoped, today), [scoped, today]);
   const progress = useMemo(() => listProgress(scoped), [scoped]);
   const isProject = !!(list && (list.goal || list.deadline));
-  const deadlineOverdue = !!list?.deadline && list.deadline < today && progress.ratio < 1;
+  // Ruht das Projekt (abgeschlossen oder alles erledigt), mahnt nichts mehr.
+  const deadlineOverdue =
+    !!list?.deadline && list.deadline < today && projectState(list, progress) === 'laeuft';
   const plannedGroups = useMemo(() => (id === 'geplant' ? groupPlanned(scoped, today) : []), [id, scoped, today]);
 
   const title = id === 'geplant' ? 'Geplant' : id === 'alle' ? 'Alle' : (list?.name ?? 'Liste');
@@ -155,12 +159,34 @@ export default function ListeDetailScreen() {
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                   <CalendarClock size={13} color={deadlineOverdue ? colors.indigo : colors.text3} strokeWidth={2} />
                   <Type variant="caption" tone={deadlineOverdue ? 'indigo' : 'text3'}>
-                    {progress.ratio >= 1 && progress.total > 0 ? 'Abgeschlossen' : deadlineLabel(list.deadline, today)}
+                    {projectDeadlineLabel(list, progress, today)}
                   </Type>
                 </View>
               )}
             </View>
             {progress.total > 0 && <ProgressLine ratio={progress.ratio} color={list.color} height={4} />}
+            {/* Abschließen — ein Projekt darf zu Ende gehen. Danach ruht es:
+                keine Deadline-Mahnung mehr, kein Punkt im Kalender. Bewusst
+                eine Handlung des Nutzers, nicht automatisch bei 100 %: man
+                fügt oft noch etwas hinzu. */}
+            <PressableScale
+              accessibilityLabel={list.completedAt ? 'Projekt wieder aufnehmen' : 'Projekt abschließen'}
+              onPress={() => {
+                hapticSuccess();
+                if (list.completedAt) reopenList.mutate(list.id);
+                else completeList.mutate(list.id);
+              }}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: Spacing.xs }}
+            >
+              {list.completedAt ? (
+                <RotateCcw size={14} color={colors.text3} strokeWidth={2} />
+              ) : (
+                <CheckCheck size={14} color={colors.teal} strokeWidth={2} />
+              )}
+              <Type variant="label" tone={list.completedAt ? 'text3' : 'teal'}>
+                {list.completedAt ? 'Wieder aufnehmen' : 'Projekt abschließen'}
+              </Type>
+            </PressableScale>
           </View>
         )}
       </Reveal>

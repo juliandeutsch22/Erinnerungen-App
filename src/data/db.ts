@@ -103,7 +103,7 @@ export function getDb(): Promise<SQLiteDatabase> {
           /* Spalte existiert bereits */
         }
       }
-      for (const col of ['goal TEXT', 'deadline TEXT', 'deleted_at TEXT']) {
+      for (const col of ['goal TEXT', 'deadline TEXT', 'deleted_at TEXT', 'completed_at TEXT']) {
         try {
           await db.execAsync(`ALTER TABLE lists ADD COLUMN ${col};`);
         } catch {

@@ -30,6 +30,7 @@ import { useCompleteTask, useLists, useReopenTask, useTasks } from '@/data/queri
 import type { Task } from '@/data/types';
 import type { List } from '@/data/types';
 import { bucketEventsByDay, deadlinesByDay } from '@/lib/calendarLogic';
+import { listProgress, projectShowsDeadline } from '@/lib/taskLogic';
 import { buildDayTimeline } from '@/lib/dayTimeline';
 import { deadlineLabel, formatDayHeading, parseDateStr, todayStr } from '@/lib/dates';
 import { deviceCalendarAvailable, type DeviceEvent, ensureCalendarPermission } from '@/lib/deviceCalendar';
@@ -96,7 +97,18 @@ export default function KalenderScreen() {
   }, [tasks, from, to]);
 
   // Vernetzung: Listen mit Deadline sind Projekte — der Kalender zeigt sie jetzt.
-  const deadlineDays = useMemo(() => deadlinesByDay(lists ?? [], from, to), [lists, from, to]);
+  // Nur LAUFENDE Projekte gehören in den Kalender. Vorher landete hier auch ein
+  // Projekt, in dem längst alles erledigt war — mit „x Tage überfällig" darunter.
+  const laufendeListen = useMemo(() => {
+    const byList = new Map<string, Task[]>();
+    for (const t of tasks ?? []) {
+      const arr = byList.get(t.listId) ?? [];
+      arr.push(t);
+      byList.set(t.listId, arr);
+    }
+    return (lists ?? []).filter((l) => projectShowsDeadline(l, listProgress(byList.get(l.id) ?? [])));
+  }, [lists, tasks]);
+  const deadlineDays = useMemo(() => deadlinesByDay(laufendeListen, from, to), [laufendeListen, from, to]);
   const dayDeadlines = deadlineDays.get(selected) ?? [];
 
   const markers = useMemo(() => {

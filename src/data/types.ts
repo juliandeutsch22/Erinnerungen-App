@@ -42,6 +42,10 @@ export type List = {
   deletedAt?: string | null; // ISO
   sort: number;
   createdAt: string; // ISO
+  /** Abgeschlossen (ISO), null = läuft. Ein abgeschlossenes Projekt mahnt
+   *  nicht mehr: keine Deadline-Anzeige, kein Punkt im Kalender.
+   *  Optional, damit Alt-Daten ohne das Feld gültig bleiben. */
+  completedAt?: string | null;
 };
 
 export type Task = {

@@ -1,6 +1,7 @@
 // taskLogic.test.ts — Überfällig-Ableitung, Abhak-Semantik, Gruppierungen.
 import type { Task } from '@/data/types';
-import { adoptOverdueToToday, groupPlanned, listProgress, groupToday, groupUpcomingDays, isDueToday, isOverdue, recentlyCompleted, resolveCompletion } from './taskLogic';
+import type { List } from '@/data/types';
+import { adoptOverdueToToday, groupPlanned, listProgress, groupToday, groupUpcomingDays, isDueToday, isOverdue, recentlyCompleted, resolveCompletion, projectState, projectDeadlineLabel, projectShowsDeadline } from './taskLogic';
 
 const TODAY = '2026-07-03';
 
@@ -200,5 +201,41 @@ describe('resolveCompletion — flexible Wiederholungen', () => {
   it('ohne Wiederholung bleibt alles wie bisher', () => {
     const r = resolveCompletion({ dueDate: '2026-07-27', rrule: null, rruleUntil: null }, '2026-07-27', at);
     expect(r.completedAt).toBe(at.toISOString());
+  });
+});
+
+describe('Projekt-Zustand — das gemeldete „überfällig" trotz erledigt', () => {
+  const proj = (over: Partial<List> = {}): List => ({
+    id: 'p1', name: 'Umzug', icon: 'inbox', color: '#2B5FA6', goal: null,
+    deadline: '2026-07-20', sort: 1, createdAt: '2026-07-01T08:00:00.000Z', ...over,
+  });
+  const heute = '2026-07-27';
+
+  it('läuft, solange noch etwas offen ist', () => {
+    expect(projectState(proj(), { done: 1, total: 3 })).toBe('laeuft');
+    expect(projectDeadlineLabel(proj(), { done: 1, total: 3 }, heute)).toBe('7 Tage überfällig');
+  });
+
+  it('sagt NICHT „überfällig", wenn alles erledigt ist — genau der gemeldete Fehler', () => {
+    expect(projectState(proj(), { done: 3, total: 3 })).toBe('alles-erledigt');
+    expect(projectDeadlineLabel(proj(), { done: 3, total: 3 }, heute)).toBe('Alles erledigt');
+  });
+
+  it('ein abgeschlossenes Projekt ruht — auch mit offenen Aufgaben', () => {
+    const zu = proj({ completedAt: '2026-07-25T10:00:00.000Z' });
+    expect(projectState(zu, { done: 1, total: 5 })).toBe('abgeschlossen');
+    expect(projectDeadlineLabel(zu, { done: 1, total: 5 }, heute)).toBe('Abgeschlossen');
+  });
+
+  it('taucht im Kalender nur auf, solange es läuft', () => {
+    expect(projectShowsDeadline(proj(), { done: 1, total: 3 })).toBe(true);
+    expect(projectShowsDeadline(proj(), { done: 3, total: 3 })).toBe(false);
+    expect(projectShowsDeadline(proj({ completedAt: '2026-07-25T10:00:00.000Z' }), { done: 0, total: 0 })).toBe(false);
+    expect(projectShowsDeadline(proj({ deletedAt: '2026-07-25T10:00:00.000Z' }), { done: 0, total: 0 })).toBe(false);
+    expect(projectShowsDeadline(proj({ deadline: null }), { done: 0, total: 0 })).toBe(false);
+  });
+
+  it('ein leeres Projekt mit Deadline mahnt weiterhin — da ist ja nichts erledigt', () => {
+    expect(projectState(proj(), { done: 0, total: 0 })).toBe('laeuft');
   });
 });
