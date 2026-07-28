@@ -1,7 +1,7 @@
 // assistant.test.ts — Prompt-Bau, Antwort-Extraktion, Fehlertexte.
 import type { ChatMessage, Task } from '@/data/types';
 
-import { buildAppContext,  buildBraindumpContext, buildRequestBody, createSseParser, describeError, describeSchritte, extractActions, extractChunkText, extractText, pickModelsFromList, promptChips, resolveListId, sanitizeChatTitle, SYSTEM_PROMPT, subtasksFromSchritte, describeExtras, describeAenderung, MEMORY_LIMIT, resolveTaskHandle, taskHandle, ASSISTANT_TOOLS, extractCalls, runAssistantTool, type ToolData, MAX_TOOL_ROUNDS, actionDueDate, hasCapturableActions, SCHRITTE_LIMIT, IMAGE_LIMIT, type AssistantImage, systemPrompt } from './assistant';
+import { buildAppContext,  buildBraindumpContext, buildRequestBody, createSseParser, describeError, describeSchritte, extractActions, extractChunkText, extractText, pickModelsFromList, promptChips, resolveListId, sanitizeChatTitle, SYSTEM_PROMPT, subtasksFromSchritte, describeExtras, describeAenderung, MEMORY_LIMIT, resolveTaskHandle, taskHandle, ASSISTANT_TOOLS, extractCalls, runAssistantTool, type ToolData, MAX_TOOL_ROUNDS, actionDueDate, hasCapturableActions, SCHRITTE_LIMIT, IMAGE_LIMIT, type AssistantImage, systemPrompt, usesNewConfigDialect, tuneForModel, MODEL_CHAIN, LITE_CHAIN } from './assistant';
 
 const msg = (role: 'user' | 'assistant', content: string, at: string): ChatMessage => ({
   id: `m-${at}`, chatId: 'c1', role, content, createdAt: at,
@@ -614,5 +614,59 @@ describe('Erfassen-Modus (kurzer Prompt, JSON-Zwang)', () => {
     const { clean, actions } = extractActions('Klingt gut, das trage ich so ein.');
     expect(clean).toBe('Klingt gut, das trage ich so ein.');
     expect(actions).toBeNull();
+  });
+});
+
+describe('Zwei API-Dialekte (temperature ↔ thinkingLevel)', () => {
+  const cfgVon = (model: string, mode: 'voll' | 'erfassen', konservativ = false) => {
+    const body = buildRequestBody([msg('user', 'Milch kaufen', '1')], null, new Date('2026-07-28T09:00:00'), null, false, [], mode, mode === 'erfassen');
+    return (tuneForModel(body, model, konservativ) as { generationConfig: Record<string, unknown> }).generationConfig;
+  };
+
+  it('erkennt die Generation an der Versionsnummer', () => {
+    expect(usesNewConfigDialect('gemini-3.6-flash')).toBe(true);
+    expect(usesNewConfigDialect('gemini-3.5-flash-lite')).toBe(true);
+    expect(usesNewConfigDialect('gemini-3.1-flash-lite')).toBe(false);
+    expect(usesNewConfigDialect('gemini-2.5-flash')).toBe(false);
+    // Aliasse ohne Versionsnummer zeigen immer auf das aktuelle Modell.
+    expect(usesNewConfigDialect('gemini-flash-latest')).toBe(true);
+  });
+
+  it('schickt nie beide Fassungen gleichzeitig', () => {
+    const neu = cfgVon('gemini-3.6-flash', 'erfassen');
+    expect(neu.temperature).toBeUndefined();
+    expect(neu.thinkingConfig).toEqual({ thinkingLevel: 'minimal' });
+
+    const alt = cfgVon('gemini-2.5-flash', 'erfassen');
+    expect(alt.temperature).toBe(0.4);
+    expect(alt.thinkingConfig).toBeUndefined();
+  });
+
+  it('„minimal" nur beim Erfassen — Chat und Verwalter dürfen denken', () => {
+    expect(cfgVon('gemini-3.6-flash', 'voll').thinkingConfig).toBeUndefined();
+  });
+
+  it('lässt den Rest der Konfiguration unangetastet', () => {
+    const neu = cfgVon('gemini-3.6-flash', 'erfassen');
+    expect(neu.maxOutputTokens).toBe(1200);
+    expect(neu.responseMimeType).toBe('application/json');
+  });
+
+  it('konservativ lässt beide Fassungen weg — die Notlösung nach einem 400er', () => {
+    const nackt = cfgVon('gemini-3.6-flash', 'erfassen', true);
+    expect(nackt.temperature).toBeUndefined();
+    expect(nackt.thinkingConfig).toBeUndefined();
+    // Was die Antwort FORMT, bleibt: sonst käme Prosa statt des Aktions-Blocks.
+    expect(nackt.responseMimeType).toBe('application/json');
+    expect(nackt.maxOutputTokens).toBe(1200);
+  });
+
+  it('die neueste ID steht vorn, die alten bleiben als Netz darunter', () => {
+    expect(MODEL_CHAIN[0]).toBe('gemini-3.6-flash');
+    expect(LITE_CHAIN[0]).toBe('gemini-3.5-flash-lite');
+    // Das Netz muss bleiben: Google zieht IDs zurück, dann trägt die Kette.
+    expect(MODEL_CHAIN).toContain('gemini-flash-latest');
+    expect(LITE_CHAIN).toContain('gemini-flash-lite-latest');
+    expect(MODEL_CHAIN.length).toBeGreaterThan(2);
   });
 });

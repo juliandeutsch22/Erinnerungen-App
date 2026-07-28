@@ -544,6 +544,36 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
       ändern, abwählen, übernehmen) prüfbar statt behauptet. Ohne die Variable
       bleibt die Vorschau exakt wie vorher; nativ hat sie keinerlei Wirkung.
 
+33. **Zwei API-Dialekte in EINEM Anfrage-Körper** (v1.46.1) — ab der
+    3.5er-Generation sind `temperature`/`topP`/`topK` abgekündigt; gesteuert wird
+    über `thinkingConfig.thinkingLevel`. Beides zusammen zu schicken ist ein
+    Formfehler, und ein Formfehler kommt als **HTTP 400** zurück — das gilt in
+    `callChain` als SCHLÜSSEL-Fehler und stoppt die Kette sofort. Ein falsch
+    geratener Dialekt wäre also kein langsamerer, sondern ein TOTER Assistent.
+    Deshalb:
+    · Der Körper trägt **beide** Fassungen; erst `callModel()` streicht die
+      falsche (`tuneForModel`) — dort steht das Modell fest, beim Bauen nicht.
+    · `usesNewConfigDialect()` liest die Version aus der ID (≥ 3.5 = neu).
+      Aliasse ohne Version (`gemini-flash-latest`) gelten als neu, weil sie
+      nach vorn zeigen.
+    · **Netz:** Kommt trotzdem 400, geht EIN nackter Versuch ohne jede
+      Feinsteuerung raus; klappt er, bleibt es für den Rest des App-Laufs dabei
+      (`konservativeConfig`). Google dreht diese Felder mit jeder Generation —
+      die App darf daran nicht sterben. Playwright prüft beide Fälle.
+    · `thinkingLevel: 'minimal'` nur im `'erfassen'`-Modus. Sortieren ist kein
+      Nachdenken; Chat und Verwalter behalten die volle Denkzeit.
+    **Wenn der Assistent nach einem Google-Update spürbar langsamer wird**, ist
+    die erste Frage, ob das Netz gegriffen hat — die Feinsteuerung fällt dann
+    still weg. Die Modell-Zeile in den Einstellungen ist der schnellste Blick.
+
+34. **Die Modell-Zeile in den Einstellungen** (v1.46.1) — „Antworten über …
+    · Sortieren über …". Klingt nach Kosmetik, hat aber beim ersten Anschalten
+    sofort eine Lücke gezeigt: `assistantModel` blieb leer, weil `preferLite`
+    die Hauptkette gar nicht anfasst. Beide IDs werden deshalb GETRENNT gemerkt
+    und getrennt angezeigt; dass zuerst nur eine dasteht, ist normal.
+    Bewusst nur Anzeige, keine Auswahl: eine Modell-Wahl wäre eine Einstellung,
+    die man pflegen muss, und die Kette macht es ohnehin besser.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

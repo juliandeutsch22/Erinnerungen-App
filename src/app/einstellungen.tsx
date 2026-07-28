@@ -87,6 +87,8 @@ export default function EinstellungenScreen() {
   const setSavedFilters = useSettings((s) => s.setSavedFilters);
   const setDayIntentions = useSettings((s) => s.setDayIntentions);
   const assistantMemory = useSettings((s) => s.assistantMemory);
+  const assistantModel = useSettings((s) => s.assistantModel);
+  const assistantLiteModel = useSettings((s) => s.assistantLiteModel);
   const setAssistantMemory = useSettings((s) => s.setAssistantMemory);
   const appLockEnabled = useSettings((s) => s.appLockEnabled);
   const setAppLockEnabled = useSettings((s) => s.setAppLockEnabled);
@@ -550,6 +552,22 @@ export default function EinstellungenScreen() {
           {geminiApiKey.length > 0 && (
             <Type variant="caption" tone="teal" style={{ marginTop: Spacing.sm }}>
               Assistent aktiv — Einstieg über ✨ auf „Heute" oder aus einem Termin heraus.
+            </Type>
+          )}
+          {/* Welches Modell wirklich antwortet. Google zieht IDs zurück, die App
+              weicht dann still auf die nächste aus — ohne diese Zeile merkt man
+              nie, dass man seit Monaten auf einem alten Modell sitzt.
+              Beide getrennt: Sortieren (Braindump, Diktat) läuft absichtlich über
+              das kleine Modell und rührt die Hauptkette nie an — es ist also
+              normal, dass zuerst nur eines der beiden dasteht. */}
+          {(assistantModel.length > 0 || assistantLiteModel.length > 0) && (
+            <Type variant="caption" tone="text3" style={{ marginTop: Spacing.xs }} tabular>
+              {[
+                assistantModel.length > 0 ? `Antworten über ${assistantModel}` : '',
+                assistantLiteModel.length > 0 ? `Sortieren über ${assistantLiteModel}` : '',
+              ]
+                .filter(Boolean)
+                .join(' · ')}
             </Type>
           )}
 

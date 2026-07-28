@@ -11,9 +11,10 @@ import type { DeviceEvent } from '@/lib/deviceCalendar';
 // einzelne feste ID, sondern Kandidaten-Ketten: die „-latest"-Aliasse zeigen immer
 // auf das aktuelle Modell, die versionierten IDs sind das Netz darunter. Greift
 // keine, fragt discoverModels() beim Dienst nach, was der Schlüssel wirklich kann.
-const MODEL_CHAIN = ['gemini-3.5-flash', 'gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash'];
-/** Kleinere Lite-Kette, wenn das Tageskontingent des Hauptmodells erschöpft ist (429). */
-const LITE_CHAIN = ['gemini-3.1-flash-lite', 'gemini-flash-lite-latest', 'gemini-2.5-flash-lite', 'gemini-2.0-flash-lite'];
+export const MODEL_CHAIN = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash'];
+/** Kleinere Lite-Kette: zuerst bei preferLite (Sortieren), sonst wenn das
+ *  Tageskontingent des Hauptmodells erschöpft ist (429). */
+export const LITE_CHAIN = ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-flash-lite-latest', 'gemini-2.5-flash-lite', 'gemini-2.0-flash-lite'];
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 // Streaming läuft über denselben Dienst, nur als Server-Sent-Events —
 // der Status kommt VOR dem Body, darum funktioniert die ganze Ketten-Logik
@@ -877,7 +878,14 @@ export function buildRequestBody(
     contents,
     ...(withTools ? { tools: [{ functionDeclarations: ASSISTANT_TOOLS }] } : {}),
     generationConfig: {
+      // ZWEI Dialekte in EINEM Körper — siehe tuneForModel(): welcher davon
+      // wirklich rausgeht, entscheidet erst callModel(), weil erst dort das
+      // Modell feststeht. „temperature" ist die alte Steuerung, „thinkingConfig"
+      // die neue; zusammen verschickt wäre beides ein Formfehler.
       temperature: 0.4,
+      // Erfassen ist Sortieren, kein Nachdenken — wo es die neue Generation
+      // versteht, spart „minimal" die teuerste Phase der Antwort.
+      ...(mode === 'erfassen' ? { thinkingConfig: { thinkingLevel: 'minimal' } } : {}),
       maxOutputTokens: 1200,
       // JSON-Zwang: Gemini liefert dann garantiert den Aktions-Block als reines
       // JSON — der zweite Anlauf („du hast den Block vergessen") entfällt, und
@@ -1011,6 +1019,41 @@ function getStreamFetch(): typeof fetch {
   return streamFetchImpl;
 }
 
+// ——— Zwei API-Dialekte, ein Anfrage-Körper ———
+// Ab der 3.5er-Generation sind „temperature"/„topP"/„topK" abgekündigt; gesteuert
+// wird stattdessen über „thinkingConfig.thinkingLevel". Beides gleichzeitig zu
+// schicken ist ein Formfehler — und der käme als HTTP 400 zurück, was in
+// callChain als SCHLÜSSEL-Fehler gilt und die ganze Kette stoppt. Deshalb trägt
+// der Körper beide Fassungen, und erst callModel() streicht die falsche: dort
+// steht das Modell fest, beim Bauen des Körpers noch nicht.
+const NEUER_DIALEKT_AB = 3 * 1000 + 5; // gemini-3.5
+
+/** Versteht dieses Modell den neuen Dialekt? Aliasse ohne Versionsnummer
+ *  („gemini-flash-latest") zeigen nach vorn und gelten deshalb als neu. */
+export function usesNewConfigDialect(model: string): boolean {
+  const m = /gemini-(\d+)(?:\.(\d+))?/.exec(model);
+  if (!m) return true;
+  return Number(m[1]) * 1000 + Number(m[2] ?? 0) >= NEUER_DIALEKT_AB;
+}
+
+/** Hat eine Anfrage wegen der Feinsteuerung 400 kassiert, wird für den Rest des
+ *  App-Laufs ganz auf sie verzichtet. Lieber ohne Feinsteuerung antworten als
+ *  gar nicht — und lieber einmal lernen als bei jeder Anfrage neu anecken. */
+let konservativeConfig = false;
+
+/** Den Körper auf EINEN Dialekt zurechtstutzen. `konservativ` lässt beide
+ *  Fassungen weg — das ist die Notlösung, die jedes Modell akzeptiert. */
+export function tuneForModel(body: unknown, model: string, konservativ = false): unknown {
+  if (typeof body !== 'object' || body === null) return body;
+  const b = body as Record<string, unknown>;
+  const cfg = b.generationConfig;
+  if (typeof cfg !== 'object' || cfg === null) return body;
+  const { temperature, topP, topK, thinkingConfig, ...rest } = cfg as Record<string, unknown>;
+  const neu = konservativ ? {} : usesNewConfigDialect(model) ? { thinkingConfig } : { temperature, topP, topK };
+  // Undefinierte Schlüssel fliegen beim Serialisieren ohnehin raus.
+  return { ...b, generationConfig: { ...rest, ...neu } };
+}
+
 async function callModel(model: string, apiKey: string, body: unknown, stream = false): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -1020,7 +1063,7 @@ async function callModel(model: string, apiKey: string, body: unknown, stream = 
     return await doFetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify(tuneForModel(body, model, konservativeConfig)),
       signal: controller.signal,
     });
   } catch {
@@ -1189,6 +1232,18 @@ async function requestWithFallbacks(apiKey: string, body: unknown, stream: boole
     }
   }
   let { res, model } = await callChain(MODEL_CHAIN, workingModel, apiKey, body, stream);
+
+  // 400 heißt „so nicht" — meist der Schlüssel, es kann aber auch unsere
+  // Feinsteuerung sein (die Dialekte wandern mit jeder Modell-Generation).
+  // Weil 400 die Kette stoppt, wäre das sonst ein toter Assistent statt einer
+  // etwas langsameren Antwort. Also EIN nackter Versuch ohne Feinsteuerung —
+  // klappt er, gilt das für den Rest des App-Laufs.
+  if (res.status === 400 && !konservativeConfig) {
+    konservativeConfig = true;
+    const nackt = await callModel(model, apiKey, body, stream);
+    if (nackt.ok) res = nackt;
+    else konservativeConfig = false;
+  }
 
   // Alle bekannten IDs sind 404 → beim Dienst nachfragen, was es wirklich gibt.
   if (res.status === 404) {
