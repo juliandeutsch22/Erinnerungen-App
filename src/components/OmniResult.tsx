@@ -11,7 +11,7 @@
 // „Übernehmen" wird nichts geschrieben.
 import { Check, X } from 'lucide-react-native';
 import React from 'react';
-import { View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 
 import { Glass } from '@/components/Glass';
 import { MarkdownText } from '@/components/MarkdownText';
@@ -150,7 +150,16 @@ export function OmniResult({
                   {schliessen}
                 </View>
               )}
-              <View style={{ gap: 2 }}>
+              {/* Scrollbereich statt Deckelung: die Karte schwebt über der
+                  Eingabe und darf nicht ungebremst wachsen — aber abschneiden
+                  wäre schlechter, man soll ALLES sehen können, bevor man
+                  bestätigt. */}
+              <ScrollView
+                style={{ maxHeight: 210 }}
+                nestedScrollEnabled
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ gap: 2 }}
+              >
                 {zeilen.map((z) => {
                   const aus = deselected.has(z.key);
                   const inhalt = (
@@ -196,7 +205,7 @@ export function OmniResult({
                     </View>
                   );
                 })}
-              </View>
+              </ScrollView>
               <PressableScale
                 accessibilityLabel="Vorschlag übernehmen"
                 onPress={gewaehlt > 0 ? onApply : undefined}

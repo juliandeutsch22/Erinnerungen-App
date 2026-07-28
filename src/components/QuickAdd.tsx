@@ -19,7 +19,7 @@
 // das Feld, man sieht das Gesagte vor dem Abschicken), Vorschläge einzeln
 // abwählen und zurechtrücken — und die Weiche ÜBERSTIMMEN: langer Druck auf
 // den Knopf schickt die Eingabe den jeweils anderen Weg.
-import { CalendarDays, Clock, Plus, Repeat, Sparkles, X } from 'lucide-react-native';
+import { CalendarDays, Check, Clock, Plus, Repeat, Sparkles, X } from 'lucide-react-native';
 import React, { useMemo, useRef, useState } from 'react';
 import { TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -111,6 +111,15 @@ export function QuickAdd({
   const [ueberstimmt, setUeberstimmt] = useState(false);
   const [diktiert, setDiktiert] = useState(false);
   const diktatBasis = useRef('');
+  /** Kurze Quittung an der Stelle, wo eben noch die Karte stand — sonst
+   *  verschwindet sie einfach und man muss blind vertrauen. */
+  const [quittung, setQuittung] = useState<string | null>(null);
+  const quittungTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const zeigeQuittung = (text: string) => {
+    if (quittungTimer.current) clearTimeout(quittungTimer.current);
+    setQuittung(text);
+    quittungTimer.current = setTimeout(() => setQuittung(null), 3000);
+  };
 
   const today = todayStr();
   const parsed = useMemo(() => parseQuickAdd(text, today), [text, today]);
@@ -207,8 +216,9 @@ export function QuickAdd({
       termine: actions.termine.filter((_, i) => !deselected.has(`t${i}`)),
       notizen: actions.notizen.filter((_, i) => !deselected.has(`n${i}`)),
     };
+    let res;
     try {
-      await applyAssistantActions(gewaehlt, {
+      res = await applyAssistantActions(gewaehlt, {
         lists: lists ?? [],
         tasks: tasks ?? [],
         today,
@@ -226,6 +236,15 @@ export function QuickAdd({
       return;
     }
     clearRun(RUN_ZEILE);
+    setDeselected(new Set());
+    const teile = [
+      res.projekte > 0 ? `${res.projekte} ${res.projekte === 1 ? 'Projekt' : 'Projekte'}` : '',
+      res.aenderungen > 0 ? `${res.aenderungen} ${res.aenderungen === 1 ? 'Änderung' : 'Änderungen'}` : '',
+      res.aufgaben > 0 ? `${res.aufgaben} ${res.aufgaben === 1 ? 'Aufgabe' : 'Aufgaben'}` : '',
+      res.termine > 0 ? `${res.termine} ${res.termine === 1 ? 'Termin' : 'Termine'}` : '',
+      res.notizen > 0 ? `${res.notizen} ${res.notizen === 1 ? 'Notiz' : 'Notizen'}` : '',
+    ].filter(Boolean);
+    zeigeQuittung(teile.length > 0 ? `${teile.join(', ')} übernommen.` : 'Nichts zu übernehmen.');
   };
 
   // Einmal rechnen: der Knopf verrät damit VOR dem Tippen, was passieren wird.
@@ -236,6 +255,9 @@ export function QuickAdd({
   // Was der Knopf ZEIGT — inklusive eines etwaigen Überstimmens.
   const gehtLokal = weicheJetzt.ziel === 'lokal';
   const zeigtLokal = ueberstimmt ? !gehtLokal : gehtLokal;
+  // Der Chip erscheint nur, wenn es überhaupt eine Wahl gibt: mit Text im Feld
+  // und mit Schlüssel. Ohne Schlüssel führt nur ein Weg irgendwohin.
+  const zeigtWegChip = text.trim().length > 0 && apiKey.length > 0;
 
   const chips: { key: keyof Removed; icon: typeof Clock; label: string }[] = [];
   if (dueDate) chips.push({ key: 'date', icon: CalendarDays, label: formatDueDate(dueDate, today) });
@@ -259,6 +281,19 @@ export function QuickAdd({
         }}
       >
         <View style={{ width: '100%', maxWidth: MAX_CONTENT_WIDTH, gap: Spacing.xs }}>
+          {!run && quittung && (
+            <PopIn>
+              <Glass
+                variant="pill"
+                intensity={85}
+                style={[Shadow.sm, { alignSelf: 'flex-start' }]}
+                contentStyle={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: Spacing.sm + 2 }}
+              >
+                <Check size={13} color={colors.teal} strokeWidth={2.6} />
+                <Type variant="caption" tone="teal">{quittung}</Type>
+              </Glass>
+            </PopIn>
+          )}
           {run && (
             <PopIn>
               <OmniResult
@@ -277,8 +312,46 @@ export function QuickAdd({
               />
             </PopIn>
           )}
-          {chips.length > 0 && (
+          {(chips.length > 0 || zeigtWegChip) && (
             <View style={{ flexDirection: 'row', gap: Spacing.xs, justifyContent: 'flex-start', paddingLeft: Spacing.sm }}>
+              {/* Der Weg-Chip sagt SICHTBAR, wohin die Eingabe geht, und ist
+                  antippbar. Eine versteckte Geste (langer Druck) wäre in einer
+                  App, deren Prämisse „nichts zu lernen" ist, ein Widerspruch:
+                  wer sie vergisst, für den gibt es die Funktion nicht mehr. */}
+              {zeigtWegChip && (
+                <PopIn>
+                  <PressableScale
+                    accessibilityLabel={
+                      zeigtLokal ? 'Stattdessen den Assistenten fragen' : 'Stattdessen als Aufgabe anlegen'
+                    }
+                    onPress={() => {
+                      hapticSelect();
+                      setUeberstimmt((v) => !v);
+                    }}
+                  >
+                    <Glass
+                      variant="pill"
+                      style={Shadow.sm}
+                      contentStyle={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: Spacing.xs,
+                        paddingVertical: 6,
+                        paddingHorizontal: Spacing.sm + 2,
+                      }}
+                    >
+                      {zeigtLokal ? (
+                        <Plus size={12} color={colors.text3} strokeWidth={2.2} />
+                      ) : (
+                        <Sparkles size={12} color={colors.teal} strokeWidth={2.2} />
+                      )}
+                      <Type variant="caption" tone={zeigtLokal ? 'text3' : 'teal'}>
+                        {zeigtLokal ? 'wird angelegt' : 'geht an den Assistenten'}
+                      </Type>
+                    </Glass>
+                  </PressableScale>
+                </PopIn>
+              )}
               {chips.map((c) => (
                 <PopIn key={c.key}>
                   <PressableScale
@@ -336,19 +409,19 @@ export function QuickAdd({
               accessibilityLabel="Schnell hinzufügen"
               style={[{ flex: 1, fontSize: T.md, color: colors.text, paddingVertical: 2 }, webNoOutline]}
             />
-            {/* Leeres Feld → sprechen. Das Diktat FÜLLT die Zeile, statt sofort
-                loszuschicken: so sieht man das Gesagte, kann es korrigieren,
-                und der Knopf verrät weiterhin, wohin es geht. */}
-            {text.trim().length === 0 && (
-              <MicButton
-                size={30}
-                onStart={() => {
-                  diktatBasis.current = text;
-                }}
-                onText={(transkript) => setText((diktatBasis.current ? `${diktatBasis.current.trimEnd()} ` : '') + transkript)}
-                onListeningChange={setDiktiert}
-              />
-            )}
+            {/* Das Mikrofon bleibt IMMER stehen — auch mit Text im Feld. Sonst
+                könnte man nur anfangen zu sprechen, aber nichts nachlegen und
+                nichts nachsprechen, wenn die Erkennung daneben lag; genau das
+                ist beim Diktieren der häufigste Fall. Das Gesagte wird an den
+                vorhandenen Stand angehängt. */}
+            <MicButton
+              size={30}
+              onStart={() => {
+                diktatBasis.current = text;
+              }}
+              onText={(transkript) => setText((diktatBasis.current ? `${diktatBasis.current.trimEnd()} ` : '') + transkript)}
+              onListeningChange={setDiktiert}
+            />
             {text.trim().length > 0 && (
               <PopIn>
                 <PressableScale
@@ -356,15 +429,6 @@ export function QuickAdd({
                   // Plus = wird angelegt, Funke = der Assistent sieht es an.
                   accessibilityLabel={zeigtLokal ? 'Aufgabe anlegen' : 'An den Assistenten geben'}
                   onPress={() => submit(ueberstimmt)}
-                  // Langer Druck dreht die Entscheidung für DIESE eine Eingabe.
-                  onLongPress={
-                    apiKey.length > 0
-                      ? () => {
-                          hapticSelect();
-                          setUeberstimmt((v) => !v);
-                        }
-                      : undefined
-                  }
                   style={{
                     width: 30,
                     height: 30,

@@ -778,11 +778,33 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
     · **Abwählen und zurechtrücken.** Kästchen wählt ab, Text öffnet denselben
       `ActionEditSheet` wie im Braindump. Vorher musste man alles verwerfen und
       neu tippen, wenn einer von drei Vorschlägen nicht stimmte.
-    · **Die Weiche überstimmen.** Langer Druck auf den Knopf schickt die
-      Eingabe den ANDEREN Weg — für genau diese eine Eingabe, und beim nächsten
-      Tastendruck ist es wieder gelöst. **Bewusst kein dauerhafter Schalter:**
-      das wäre ein versteckter Modus, und Modi loszuwerden war der ganze Punkt.
-      Ohne Schlüssel greift das Überstimmen nicht (es gäbe kein Ziel).
+    · **Die Weiche überstimmen** — über einen SICHTBAREN, antippbaren Chip
+      („wird angelegt" / „geht an den Assistenten") in derselben Zeile wie die
+      Parser-Chips. Er gilt für genau diese eine Eingabe und ist beim nächsten
+      Tastendruck wieder gelöst; **bewusst kein dauerhafter Schalter**, das
+      wäre ein versteckter Modus, und Modi loszuwerden war der ganze Punkt.
+      Ohne Schlüssel erscheint er nicht (es gäbe kein Ziel).
+      ⚠️ Der erste Anlauf (v1.53.0) war ein LANGER DRUCK auf den Knopf. Das war
+      falsch und wurde in v1.53.1 ersatzlos entfernt: eine versteckte Geste, die
+      die Bedeutung des Hauptknopfes umdreht, widerspricht der Prämisse „nichts
+      zu lernen" — wer sie vergisst, für den existiert die Funktion nicht mehr.
+      **Keine unsichtbaren Gesten in dieser App.**
+
+43. **UX-Nachprüfung der Zeile** (v1.53.1) — auf die Frage „macht das
+    bedienungstechnisch überhaupt Sinn?" hin gefunden, alles vom selben Muster:
+    beim Bauen auf die Mechanik geschaut, zu wenig auf die Bedienung.
+    · **Das Mikrofon verschwand, sobald Text im Feld stand.** Man konnte also
+      anfangen zu sprechen, aber nichts nachlegen und nichts nachsprechen, wenn
+      die Erkennung daneben lag — der häufigste Fall beim Diktieren. Es steht
+      jetzt IMMER in der Zeile und hängt Gesagtes an den vorhandenen Stand an.
+      (Die Logik dafür gab es schon, sie konnte nur nie greifen.)
+    · **Nach „Übernehmen" kam keine Rückmeldung.** Die Karte verschwand, fertig
+      — und die Rückgängig-Leiste greift hier bewusst nicht. Jetzt steht dort
+      drei Sekunden lang eine Quittung („1 Projekt, 6 Aufgaben, 1 Notiz
+      übernommen."), wie im Braindump.
+    · **Die Karte wuchs ungebremst.** Bei acht Vorschlägen schob sie sich über
+      die Eingabe. Jetzt Scrollbereich (210 px) statt Deckelung: abschneiden
+      wäre schlechter, man soll ALLES sehen können, bevor man bestätigt.
     Weiterhin OHNE: Bilder und eine Rückfrage-Runde (jede Anfrage ist ein
     Einzelschuss ohne Gedächtnis). Braindump, Chat und Sprach-Sheet bestehen
     unverändert weiter — sie sind optional statt notwendig, und das war das Ziel.
