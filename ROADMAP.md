@@ -48,6 +48,58 @@ bewusst auf „Tags über alles", sonst entstehen zwei halbe Netze. Und der
 **Tagesplan als echte Zeitblöcke** (Sorted³) — erst, wenn sich der Verwalter
 bewährt hat.
 
+## 2b. Beschlossen: Eine Zeile für alles `[JS · groß]`
+
+**Vom Nutzer angenommen (Juli 2026, nach v1.50.1) — als Nächstes dran.**
+
+*Das Problem:* Stoa hat VIER Türen für Text — die Eingabezeile auf „Heute"
+(lokaler Parser), den Braindump, den Chat und das Sprach-Sheet. Bevor man ein
+Wort geschrieben hat, muss man sich schon entschieden haben, welche Art von
+Gedanke das ist. Diese Entscheidung ist die eigentliche Reibung: sie kommt vor
+dem Denken, nicht danach.
+
+*Die Idee:* EINE Zeile, unten, immer da. Man tippt oder spricht hinein, was
+auch immer — und die App findet heraus, was es war. Kein Modus wird gewählt.
+
+- „Milch kaufen morgen 10 Uhr" → sofort angelegt (lokal, offline, ohne Schlüssel)
+- „Was steht morgen an?" → Antwort direkt unter der Zeile, KEIN Chat entsteht
+- „Verschieb den Zahnarzt auf Freitag" → Änderungskarte, ein Tipp bestätigt
+- „Wo war der Beleg vom Baumarkt?" → findet die Notiz und verlinkt sie
+- Drei Absätze durcheinander → wird sortiert wie heute im Braindump
+
+*Die Eskalationsleiter — sie ist der Kern und darf nicht verdreht werden:*
+1. Der lokale Parser (`quickAddParser.ts`) sieht ZUERST hin. Saubere Aufgabe →
+   anlegen. Null Millisekunden, kein Netz, kein Schlüssel. **Ohne Assistent
+   bleibt die App exakt so nutzbar wie heute** — das ist nicht verhandelbar.
+2. Erst wenn das nicht aufgeht, geht es an den Assistenten (App-Überblick,
+   Werkzeuge, Handles).
+3. Alles Schreibende kommt als Karte mit Bestätigung zurück. Nie still.
+
+*Mehrdeutigkeit:* „Zahnarzt Freitag" — anlegen oder verschieben? Regel: klarer
+Parser-Treffer gewinnt das Anlegen, alles andere fragt. Ein Fehlgriff kostet
+nie Daten, höchstens einen Tipp (und seit v1.50.0 gibt es Rückgängig).
+
+*Warum es zählt:* Es ist die einzige Idee der Sammlung, die die App nicht
+VOLLER, sondern EINFACHER macht — vier Türen werden zu einer. Sie braucht kaum
+neues Datenmodell und nutzt fast alles aus v1.35–v1.50: Parser, Werkzeuge,
+Handles, `applyActions`, Bestätigungskarte, Lauf-Store, `ActionEditSheet`.
+Braindump und Chat bleiben bestehen — sie werden optional statt notwendig.
+
+*Neu zu bauen:* der Weichensteller (lokal, billig) und ein Ergebnisbereich
+unter der Zeile.
+
+**Ebenfalls angenommen, kleiner:** *Vorbereitung, die von selbst kommt*
+`[JS · mittel]` — zwei Tage vor einem größeren Termin („Flug nach Rom",
+„Wohnungsübergabe") liegt eine Karte da: Packliste vorbereiten? Vorher
+erinnern? Ein Tipp. Man hat nichts eingerichtet und nichts gelernt — die App
+hat den Termin gelesen, den sie ohnehin sieht. Bestätigt wird trotzdem immer.
+
+**Zurückgestellt, Substanz aber gut:** *„Ich habe 20 Minuten"* `[JS · groß]` —
+ein Knopf, man sagt wie viel Zeit man hat, es kommen drei Dinge, die wirklich
+hineinpassen. Braucht eine grobe Dauer an der Aufgabe (kurz/mittel/lang), die
+der Assistent beim Erfassen mitschätzt; `findFreeSlots` liefert die Lücke aus
+dem Kalender. Speist auch „Das Maß des Tages" (§4).
+
 ## 3. Vernetzungen — das größte ungehobene Potenzial
 
 Die Features sind gut, aber sie wissen zu wenig voneinander. Hier liegt am
