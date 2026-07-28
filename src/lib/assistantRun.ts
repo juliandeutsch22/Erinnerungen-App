@@ -38,6 +38,7 @@ export type AssistantRun = {
 /** Feste Schlüssel für die Bildschirme mit genau einem Lauf. */
 export const RUN_BRAINDUMP = 'braindump';
 export const RUN_VERWALTER = 'verwalter';
+export const RUN_QUICKVOICE = 'quickvoice';
 /** Chats haben je einen eigenen Lauf. */
 export const runKeyForChat = (chatId: string) => `chat:${chatId}`;
 

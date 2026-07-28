@@ -123,19 +123,17 @@ export default function BraindumpScreen() {
         content: dump || 'Lies das Foto und mach daraus Aufgaben, Termine und Notizen.',
         createdAt: new Date().toISOString(),
       };
-      let acc = '';
-      const answer = await askAssistant(
-        apiKey,
-        [msg],
-        buildBraindumpContext(dateLabel, false, listNames),
-        memory,
-        (delta) => {
-          acc += delta;
-          deltaRun(RUN_BRAINDUMP, delta);
-        },
-        null,
+      const answer = await askAssistant(apiKey, [msg], buildBraindumpContext(dateLabel, false, listNames), memory, {
+        // Erfassen braucht weder Werkzeuge noch Änderungs-Regeln — der kürzere
+        // Prompt kommt schneller zurück. JSON-Zwang macht den Aktions-Block
+        // verbindlich, deshalb entfällt der Zweitversuch fast immer. Und das
+        // Sortieren selbst ist keine Denkaufgabe: kleines Modell zuerst.
+        mode: 'erfassen',
+        json: true,
+        preferLite: true,
         images,
-      );
+        onDelta: (delta) => deltaRun(RUN_BRAINDUMP, delta),
+      });
       let parsed = extractActions(answer).actions;
       // Manche Modelle vergessen den Block — EIN strikter Zweitversuch, der ihn erzwingt.
       // „aenderungen" kann hier niemand anwenden (kein App-Überblick, keine
@@ -143,7 +141,11 @@ export default function BraindumpScreen() {
       // stünde da eine Vorschlagskarte ohne Zeilen mit totem Knopf.
       if (parsed && !hasCapturableActions(parsed)) parsed = null;
       if (!parsed) {
-        const retry = await askAssistant(apiKey, [msg], buildBraindumpContext(dateLabel, true, listNames), memory, undefined, null, images);
+        const retry = await askAssistant(apiKey, [msg], buildBraindumpContext(dateLabel, true, listNames), memory, {
+          mode: 'erfassen',
+          json: true,
+          images,
+        });
         const zweiter = extractActions(retry).actions;
         parsed = zweiter && hasCapturableActions(zweiter) ? zweiter : null;
       }

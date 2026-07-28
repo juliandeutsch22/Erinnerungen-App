@@ -106,18 +106,10 @@ export default function VerwalterScreen() {
       // Werkzeuge sind hier ausdrücklich erlaubt: Der Verwalter soll in ein
       // Projekt hineinsehen dürfen, statt aus dem gekappten Überblick zu raten.
       const toolData: ToolData = { tasks: tasks ?? [], lists: lists ?? [], notes: [], today };
-      let acc = '';
-      const answer = await askAssistant(
-        apiKey,
-        [msg],
-        [buildWeekPlanContext(today), appContext].join('\n\n'),
-        memory,
-        (delta) => {
-          acc += delta;
-          deltaRun(RUN_VERWALTER, delta);
-        },
+      const answer = await askAssistant(apiKey, [msg], [buildWeekPlanContext(today), appContext].join('\n\n'), memory, {
         toolData,
-      );
+        onDelta: (delta) => deltaRun(RUN_VERWALTER, delta),
+      });
       const { clean, actions: parsed } = extractActions(answer);
       finishRun(RUN_VERWALTER, { clean, actions: parsed });
       setDeselected(new Set());

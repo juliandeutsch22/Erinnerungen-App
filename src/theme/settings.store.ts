@@ -48,6 +48,11 @@ type SettingsState = {
    *  („Besorgungen kommen in die Liste Erledigungen"). Geht bei jedem Aufruf
    *  mit. Die App lernt hier NICHTS von selbst — das ist der Unterschied. */
   assistantMemory: string;
+  /** Zuletzt nachweislich funktionierendes Gemini-Modell (voll bzw. „lite").
+   *  Nur ein Tempo-Merkzettel: ohne ihn läuft die erste Anfrage nach jedem
+   *  Kaltstart die Kandidatenkette ab, und jede tote ID kostet eine Rundreise. */
+  assistantModel: string;
+  assistantLiteModel: string;
   /** true, sobald der persistierte Zustand geladen wurde (verhindert Flash). */
   _hasHydrated: boolean;
   setThemePref: (p: ThemePref) => void;
@@ -77,6 +82,7 @@ type SettingsState = {
   /** Ersetzt alle Tages-Sätze am Stück — nur für die Wiederherstellung. */
   setDayIntentions: (dayIntentions: Record<string, { text: string; done: boolean }>) => void;
   setAssistantMemory: (v: string) => void;
+  setAssistantModel: (model: string, lite: boolean) => void;
 };
 
 export const useSettings = create<SettingsState>()(
@@ -99,6 +105,8 @@ export const useSettings = create<SettingsState>()(
       assistantContextEnabled: true,
       dayIntentions: {},
       assistantMemory: '',
+      assistantModel: '',
+      assistantLiteModel: '',
       _hasHydrated: false,
       setThemePref: (themePref) => set({ themePref }),
       setMotionPref: (motionPref) => set({ motionPref }),
@@ -145,6 +153,7 @@ export const useSettings = create<SettingsState>()(
         }),
       setDayIntentions: (dayIntentions) => set({ dayIntentions }),
       setAssistantMemory: (assistantMemory) => set({ assistantMemory }),
+      setAssistantModel: (model, lite) => set(lite ? { assistantLiteModel: model } : { assistantModel: model }),
     }),
     {
       name: 'stille.settings',
@@ -167,6 +176,8 @@ export const useSettings = create<SettingsState>()(
         assistantContextEnabled: s.assistantContextEnabled,
         dayIntentions: s.dayIntentions,
         assistantMemory: s.assistantMemory,
+        assistantModel: s.assistantModel,
+        assistantLiteModel: s.assistantLiteModel,
         // geminiApiKey bewusst NICHT persistieren — Quelle ist die Keychain.
       }),
       // state ist der rehydrierte Store inkl. Actions → kein Bezug auf useSettings

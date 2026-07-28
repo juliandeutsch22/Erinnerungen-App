@@ -1,7 +1,7 @@
 // assistant.test.ts — Prompt-Bau, Antwort-Extraktion, Fehlertexte.
 import type { ChatMessage, Task } from '@/data/types';
 
-import { buildAppContext,  buildBraindumpContext, buildRequestBody, createSseParser, describeError, describeSchritte, extractActions, extractChunkText, extractText, pickModelsFromList, promptChips, resolveListId, sanitizeChatTitle, SYSTEM_PROMPT, subtasksFromSchritte, describeExtras, describeAenderung, MEMORY_LIMIT, resolveTaskHandle, taskHandle, ASSISTANT_TOOLS, extractCalls, runAssistantTool, type ToolData, MAX_TOOL_ROUNDS, actionDueDate, hasCapturableActions, SCHRITTE_LIMIT, IMAGE_LIMIT, type AssistantImage } from './assistant';
+import { buildAppContext,  buildBraindumpContext, buildRequestBody, createSseParser, describeError, describeSchritte, extractActions, extractChunkText, extractText, pickModelsFromList, promptChips, resolveListId, sanitizeChatTitle, SYSTEM_PROMPT, subtasksFromSchritte, describeExtras, describeAenderung, MEMORY_LIMIT, resolveTaskHandle, taskHandle, ASSISTANT_TOOLS, extractCalls, runAssistantTool, type ToolData, MAX_TOOL_ROUNDS, actionDueDate, hasCapturableActions, SCHRITTE_LIMIT, IMAGE_LIMIT, type AssistantImage, systemPrompt } from './assistant';
 
 const msg = (role: 'user' | 'assistant', content: string, at: string): ChatMessage => ({
   id: `m-${at}`, chatId: 'c1', role, content, createdAt: at,
@@ -564,5 +564,55 @@ describe('Bildkanal', () => {
   it('der Prompt sagt, dass nichts dazugeraten werden darf', () => {
     expect(SYSTEM_PROMPT).toContain('BILDER');
     expect(SYSTEM_PROMPT).toContain('rate nichts dazu');
+  });
+});
+
+describe('Erfassen-Modus (kurzer Prompt, JSON-Zwang)', () => {
+  const voll = systemPrompt('voll');
+  const erfassen = systemPrompt('erfassen');
+
+  it('lässt weg, was beim reinen Erfassen niemand anwenden kann', () => {
+    // Ohne App-Überblick gibt es keine Handles — Änderungs- und Werkzeug-Regeln
+    // wären dort nur Ballast, den jede Anfrage mitbezahlt.
+    expect(erfassen).not.toContain('aenderungen');
+    expect(erfassen).not.toContain('aufgaben_suchen');
+    expect(voll).toContain('aenderungen');
+    expect(voll).toContain('aufgaben_suchen');
+  });
+
+  it('behält, was zum Erfassen nötig ist — Rolle, Aktions-Block, Bilder', () => {
+    expect(erfassen).toContain('AKTIONEN');
+    expect(erfassen).toContain('BILDER');
+    expect(erfassen.length).toBeLessThan(voll.length);
+  });
+
+  it('SYSTEM_PROMPT bleibt der volle Prompt (Bestandsschutz)', () => {
+    expect(SYSTEM_PROMPT).toBe(voll);
+  });
+
+  it('json:true erzwingt das Antwort-Schema, sonst bleibt der Aufbau unverändert', () => {
+    const cfg = (json: boolean) =>
+      (buildRequestBody([msg('user', 'Milch kaufen', '1')], null, new Date('2026-07-27T09:00:00'), null, false, [], 'erfassen', json) as {
+        generationConfig: Record<string, unknown>;
+      }).generationConfig;
+    expect(cfg(false).responseMimeType).toBeUndefined();
+    expect(cfg(false).responseSchema).toBeUndefined();
+    expect(cfg(true).responseMimeType).toBe('application/json');
+    expect(cfg(true).responseSchema).toBeTruthy();
+  });
+
+  it('extractActions liest auch rohes JSON ohne umschließenden Block', () => {
+    // Im JSON-Zwang kommt keine Prosa und keine ```-Klammer zurück.
+    const roh = JSON.stringify({ aufgaben: [{ titel: 'Milch kaufen', datum: '2026-07-28' }], notizen: ['Idee'] });
+    const { clean, actions } = extractActions(roh);
+    expect(clean).toBe('');
+    expect(actions!.aufgaben).toEqual([expect.objectContaining({ titel: 'Milch kaufen', datum: '2026-07-28' })]);
+    expect(actions!.notizen).toEqual(['Idee']);
+  });
+
+  it('normale Prosa bleibt Prosa — kein Fehlalarm durch den JSON-Weg', () => {
+    const { clean, actions } = extractActions('Klingt gut, das trage ich so ein.');
+    expect(clean).toBe('Klingt gut, das trage ich so ein.');
+    expect(actions).toBeNull();
   });
 });

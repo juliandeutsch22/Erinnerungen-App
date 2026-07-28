@@ -514,17 +514,13 @@ export default function ChatScreen() {
       const toolData: ToolData | null = assistantContextEnabled
         ? { tasks: tasks ?? [], lists: lists ?? [], notes: notes ?? [], today }
         : null;
-      const answer = await askAssistant(
-        apiKey,
-        history,
-        combined,
-        memory,
-        (delta) => {
+      const answer = await askAssistant(apiKey, history, combined, memory, {
+        toolData,
+        onDelta: (delta) => {
           deltaRun(runKey, delta);
           scrollRef.current?.scrollToEnd({ animated: false });
         },
-        toolData,
-      );
+      });
       const saved = await appendMessage.mutateAsync({ chatId: id, role: 'assistant', content: answer });
       clearOnMessageId.current = saved.id;
       // Die Antwort ist gespeichert — der Lauf hat seinen Zweck erfuellt und

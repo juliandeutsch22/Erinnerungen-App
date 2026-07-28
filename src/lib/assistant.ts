@@ -35,20 +35,44 @@ export const IMAGE_LIMIT = 3;
  *  Wird NICHT gespeichert — es lebt genau eine Anfrage lang. */
 export type AssistantImage = { mimeType: string; data: string };
 
-export const SYSTEM_PROMPT =
+// ——— System-Prompt in Abschnitten. ———
+// Er geht bei JEDER Anfrage mit und ist über die Releases stark gewachsen —
+// Bilder, Nachsehen, Ändern, Schritte, Wiederholungen, Projekte. Das kostet
+// Zeit bis zum ersten Wort, und zwar auch dort, wo die Regeln gar nicht gelten:
+// Der Braindump kann nichts ändern und hat keine Werkzeuge, bekam die Regeln
+// dafür aber trotzdem. Deshalb wird der Prompt seit v1.46.0 je nach
+// Einstiegspunkt zusammengesetzt.
+
+const P_ROLLE =
   'Du bist der Assistent der App „Stoa" — einer ruhigen deutschen Erinnerungs-, ' +
-  'Kalender- und Notizen-App. Antworte auf Deutsch, knapp und konkret. ' +
+  'Kalender- und Notizen-App. Antworte auf Deutsch, knapp und konkret. ';
+
+const P_REISE =
   'Wenn Reisedaten und ein Ort bekannt sind und der Nutzer nach Unterkünften, ' +
   'Restaurants o. Ä. fragt: gib konkrete Kriterien/Empfehlungen UND fertige ' +
   'Such-Links (z. B. https://www.airbnb.de/s/ORT/homes?checkin=YYYY-MM-DD&checkout=YYYY-MM-DD ' +
   'oder https://www.booking.com/searchresults.de.html?ss=ORT&checkin=YYYY-MM-DD&checkout=YYYY-MM-DD). ' +
   'Du hast KEINEN Live-Internetzugriff — sage das ehrlich, wenn aktuelle Preise/' +
   'Verfügbarkeiten gefragt sind, und liefere stattdessen die besten Links und Kriterien. ' +
-  'Nutze schlichtes Markdown (Listen, **fett**), keine Tabellen. ' +
+  'Nutze schlichtes Markdown (Listen, **fett**), keine Tabellen. ';
+
+const P_AKTIONEN_KOPF =
   'AKTIONEN: Wenn der Nutzer dich bittet, Aufgaben/Erinnerungen, Termine oder eine Checkliste ' +
   'ANZULEGEN (z. B. „mach mir daraus Aufgaben", „trag das als Termin ein", „erstelle eine Packliste"), ' +
-  'hänge ans ENDE deiner Antwort GENAU EINEN Block in diesem Format an:\n' +
-  '```stoa-aktionen\n{"aufgaben":[{"titel":"…","datum":"YYYY-MM-DD","zeit":"HH:MM","schritte":["…"],"wiederholung":"weekly","tags":["…"],"notiz":"…"}],"termine":[{"titel":"…","datum":"YYYY-MM-DD","start":"HH:MM","ende":"HH:MM","notiz":"…"}],"listen":[{"name":"…","ziel":"…","deadline":"YYYY-MM-DD"}],"aenderungen":[{"handle":"abc123","erledigt":true,"datum":"YYYY-MM-DD","zeit":"HH:MM","titel":"…","liste":"…","papierkorb":true}],"checkliste":["…"],"notizen":["…"]}\n```\n' +
+  'hänge ans ENDE deiner Antwort GENAU EINEN Block in diesem Format an:\n```stoa-aktionen\n';
+
+// Die Vorlage nennt nur, was am jeweiligen Einstiegspunkt auch anwendbar ist.
+// Beim reinen Erfassen fehlen „aenderungen" (keine Handles) und „checkliste"
+// (kein Chat zu einer Notiz) — ein Feld zu zeigen, das hinterher verworfen
+// wird, lädt das Modell nur ein, es zu füllen.
+const AKTIONEN_JSON_VOLL =
+  '{"aufgaben":[{"titel":"…","datum":"YYYY-MM-DD","zeit":"HH:MM","schritte":["…"],"wiederholung":"weekly","tags":["…"],"notiz":"…"}],"termine":[{"titel":"…","datum":"YYYY-MM-DD","start":"HH:MM","ende":"HH:MM","notiz":"…"}],"listen":[{"name":"…","ziel":"…","deadline":"YYYY-MM-DD"}],"aenderungen":[{"handle":"abc123","erledigt":true,"datum":"YYYY-MM-DD","zeit":"HH:MM","titel":"…","liste":"…","papierkorb":true}],"checkliste":["…"],"notizen":["…"]}';
+
+const AKTIONEN_JSON_ERFASSEN =
+  '{"aufgaben":[{"titel":"…","datum":"YYYY-MM-DD","zeit":"HH:MM","schritte":["…"],"wiederholung":"weekly","tags":["…"],"notiz":"…"}],"termine":[{"titel":"…","datum":"YYYY-MM-DD","start":"HH:MM","ende":"HH:MM","notiz":"…"}],"listen":[{"name":"…","ziel":"…","deadline":"YYYY-MM-DD"}],"notizen":["…"]}';
+
+const P_AKTIONEN_RUMPF =
+  '\n```\n' +
   '„aufgaben" sind zu ERLEDIGENDE Handlungen (anrufen, kaufen, vorbereiten), datum/zeit optional. ' +
   '„wiederholung" nur bei ausdrücklich wiederkehrenden Dingen: "daily", "weekly", "monthly", "yearly", ' +
   'oder mit Abstand "every:2w" (alle 2 Wochen; d=Tage, w=Wochen, m=Monate, y=Jahre), ' +
@@ -64,19 +88,37 @@ export const SYSTEM_PROMPT =
   'voneinander erledigt werden (verschiedene Orte, verschiedene Tage, verschiedene Anlässe). ' +
   '„termine" sind feste Verabredungen zu einem Zeitpunkt (Arzttermin, Meeting, Kino, Zug, Geburtstag) — ' +
   'sie landen im Gerätekalender; datum ist Pflicht, start/ende optional (ohne start = ganztägig). ' +
-  'Im Zweifel: fester Zeitpunkt/Verabredung → Termin, etwas zu TUN → Aufgabe. ' +
-  '„checkliste" nur, wenn der Chat zu einer Notiz gehört; ' +
-  '„notizen" für Gedanken/Ideen ohne Handlung (erste Zeile wird der Titel). ' +
+  'Im Zweifel: fester Zeitpunkt/Verabredung → Termin, etwas zu TUN → Aufgabe. ';
+
+const P_CHECKLISTE = '„checkliste" nur, wenn der Chat zu einer Notiz gehört; ';
+
+const P_NOTIZEN = '„notizen" für Gedanken/Ideen ohne Handlung (erste Zeile wird der Titel). ';
+
+function pAktionen(mode: PromptMode): string {
+  return (
+    P_AKTIONEN_KOPF +
+    (mode === 'erfassen' ? AKTIONEN_JSON_ERFASSEN : AKTIONEN_JSON_VOLL) +
+    P_AKTIONEN_RUMPF +
+    (mode === 'erfassen' ? '' : P_CHECKLISTE) +
+    P_NOTIZEN
+  );
+}
+
+const P_BILDER =
   'BILDER: Ist ein Bild dabei, LIES es — abfotografierte Zettel, Einkaufslisten, Aushänge, ' +
   'Briefe, Whiteboards. Übernimm nur, was wirklich draufsteht, und rate nichts dazu; ' +
   'was du nicht entziffern kannst, lässt du weg oder sagst es. Aus dem Gelesenen werden ' +
   'wie sonst auch Aufgaben, Termine und Notizen — eine abfotografierte Einkaufsliste ist ' +
-  'EINE Aufgabe mit „schritte". ' +
+  'EINE Aufgabe mit „schritte". ';
+
+const P_NACHSEHEN =
   'NACHSEHEN: Reicht der App-Überblick nicht, benutze die Werkzeuge statt zu raten — ' +
   'aufgaben_suchen (auch erledigte, auch außerhalb des Überblicks), liste_inhalt (eine Liste ' +
   'vollständig), notiz_lesen (der Überblick zeigt nur Notiz-TITEL, nie den Inhalt). ' +
   'Erfinde nie Einträge, die du nicht gesehen hast — lieber nachschlagen oder ehrlich sagen, ' +
-  'dass du es nicht weißt. ' +
+  'dass du es nicht weißt. ';
+
+const P_AENDERN =
   'ÄNDERN: „aenderungen" bearbeitet BESTEHENDE Aufgaben („verschieb das auf Montag", ' +
   '„hak die drei ab", „schieb das in die Liste Umzug"). „handle" ist das Kürzel in eckigen ' +
   'Klammern aus dem App-Überblick — NUR dort gesehene Handles verwenden, nie erfundene, ' +
@@ -85,6 +127,70 @@ export const SYSTEM_PROMPT =
   'ENDGÜLTIG LÖSCHEN KANNST DU NICHT — biete es auch nicht an. ' +
   'Ohne App-Überblick (keine Handles sichtbar) gibt es keine „aenderungen". ' +
   'Nutze den Block NUR bei einer ausdrücklichen Anlege- oder Änderungs-Bitte, nie ungefragt.';
+
+/** Antwort-Schema für den JSON-Zwang. Bewusst nur die Felder, die beim reinen
+ *  ERFASSEN gebraucht werden — Änderungen und Checklisten gibt es dort nicht. */
+const ACTION_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    aufgaben: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          titel: { type: 'STRING' },
+          datum: { type: 'STRING' },
+          zeit: { type: 'STRING' },
+          liste: { type: 'STRING' },
+          notiz: { type: 'STRING' },
+          wiederholung: { type: 'STRING' },
+          tags: { type: 'ARRAY', items: { type: 'STRING' } },
+          schritte: { type: 'ARRAY', items: { type: 'STRING' } },
+        },
+        required: ['titel'],
+      },
+    },
+    termine: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          titel: { type: 'STRING' },
+          datum: { type: 'STRING' },
+          start: { type: 'STRING' },
+          ende: { type: 'STRING' },
+          notiz: { type: 'STRING' },
+        },
+        required: ['titel', 'datum'],
+      },
+    },
+    listen: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: { name: { type: 'STRING' }, ziel: { type: 'STRING' }, deadline: { type: 'STRING' } },
+        required: ['name'],
+      },
+    },
+    notizen: { type: 'ARRAY', items: { type: 'STRING' } },
+  },
+} as const;
+
+/** Was der Assistent an dieser Stelle überhaupt darf — daraus folgt der Prompt. */
+export type PromptMode =
+  /** Chat/Verwalter: alles, inklusive Nachsehen und Ändern. */
+  | 'voll'
+  /** Braindump/Sprach-Sheet: nur erfassen. Kein Ändern (keine Handles), keine
+   *  Werkzeuge (kein App-Überblick), keine Reise-Links (kein Gespräch). */
+  | 'erfassen';
+
+export function systemPrompt(mode: PromptMode = 'voll'): string {
+  if (mode === 'erfassen') return P_ROLLE + pAktionen(mode) + P_BILDER;
+  return P_ROLLE + P_REISE + pAktionen(mode) + P_BILDER + P_NACHSEHEN + P_AENDERN;
+}
+
+/** Der vollständige Prompt — Bestandsschutz für Tests und Aufrufer. */
+export const SYSTEM_PROMPT = systemPrompt('voll');
 
 /** Braindump: ein Wurf unsortierter Gedanken → NUR der Aktions-Block. */
 export function buildBraindumpContext(todayLabel: string, strict = false, listen: string[] = []): string {
@@ -280,11 +386,23 @@ function parseSchritte(raw: unknown): string[] | undefined {
 /** Trennt den Aktions-Block vom Anzeigetext (tolerant gegen kaputtes JSON). */
 export function extractActions(text: string): { clean: string; actions: AssistantAction | null } {
   const m = ACTION_RE.exec(text);
-  if (!m) return { clean: text, actions: null };
+  // Im JSON-Zwang (responseSchema) gibt es keinen umschließenden Block, sondern
+  // NUR das JSON — dann ist die ganze Antwort der Aktions-Block und es bleibt
+  // kein Anzeigetext übrig.
+  if (!m) {
+    const roh = text.trim();
+    if (!roh.startsWith('{')) return { clean: text, actions: null };
+    return { clean: '', actions: parseActionJson(roh) };
+  }
   const clean = text.replace(ACTION_RE, '').trim();
   // Modelle setzen gelegentlich ECHTE Zeilenumbrüche in JSON-Strings —
   // erster Versuch roh, zweiter mit escapten Newlines.
-  const jsonText = m[1].trim();
+  return { clean, actions: parseActionJson(m[1].trim()) };
+}
+
+/** Der eigentliche Parser — tolerant gegen echte Zeilenumbrüche in JSON-Strings
+ *  (die liefern Modelle regelmäßig) und gegen jedes fehlende Feld. */
+function parseActionJson(jsonText: string): AssistantAction | null {
   let raw: Record<string, unknown>;
   try {
     raw = JSON.parse(jsonText) as Record<string, unknown>;
@@ -292,7 +410,7 @@ export function extractActions(text: string): { clean: string; actions: Assistan
     try {
       raw = JSON.parse(jsonText.replace(/\r?\n/g, '\\n')) as Record<string, unknown>;
     } catch {
-      return { clean, actions: null };
+      return null;
     }
   }
   try {
@@ -375,10 +493,10 @@ export function extractActions(text: string): { clean: string; actions: Assistan
       checkliste.length === 0 &&
       notizen.length === 0
     )
-      return { clean, actions: null };
-    return { clean, actions: { aufgaben, termine, listen, aenderungen, checkliste, notizen } };
+      return null;
+    return { aufgaben, termine, listen, aenderungen, checkliste, notizen };
   } catch {
-    return { clean, actions: null };
+    return null;
   }
 }
 
@@ -724,6 +842,10 @@ export function buildRequestBody(
   withTools = false,
   /** Bilder zur LETZTEN Nutzer-Nachricht (Zettel abfotografieren). */
   images: AssistantImage[] = [],
+  /** Welche Prompt-Abschnitte gelten hier? */
+  mode: PromptMode = 'voll',
+  /** Antwort als reines JSON erzwingen (Aktions-Block ohne Prosa). */
+  json = false,
 ): unknown {
   const dateLine =
     `Heute ist ${now.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}, ` +
@@ -735,7 +857,7 @@ export function buildRequestBody(
   // eingefügter Roman nicht jeden Aufruf verteuert.
   const note = memory?.trim().slice(0, MEMORY_LIMIT) ?? '';
   const system =
-    `${SYSTEM_PROMPT}\n\n${dateLine}` +
+    `${systemPrompt(mode)}\n\n${dateLine}` +
     (note ? `\n\nMERKZETTEL des Nutzers — seine festen Vorgaben, immer beachten:\n${note}` : '') +
     (context ? `\n\nKontext aus der App:\n${context}` : '');
   const contents = messages.slice(-HISTORY_LIMIT).map((m) => ({
@@ -754,7 +876,16 @@ export function buildRequestBody(
     systemInstruction: { parts: [{ text: system }] },
     contents,
     ...(withTools ? { tools: [{ functionDeclarations: ASSISTANT_TOOLS }] } : {}),
-    generationConfig: { temperature: 0.4, maxOutputTokens: 1200 },
+    generationConfig: {
+      temperature: 0.4,
+      maxOutputTokens: 1200,
+      // JSON-Zwang: Gemini liefert dann garantiert den Aktions-Block als reines
+      // JSON — der zweite Anlauf („du hast den Block vergessen") entfällt, und
+      // es entstehen weniger Ausgabe-Token. Preis: keine Prosa mehr, also auch
+      // kein sinnvoll anzeigbarer Streaming-Text. Nur dort einschalten, wo die
+      // Antwort ohnehin eine Vorschlagskarte ist.
+      ...(json ? { responseMimeType: 'application/json', responseSchema: ACTION_SCHEMA } : {}),
+    },
   };
 }
 
@@ -976,6 +1107,34 @@ async function discoverModels(apiKey: string): Promise<{ model: string | null; l
 let workingModel: string | null = null;
 let workingLite: string | null = null;
 
+/** Wird gerufen, sobald ein Modell nachweislich funktioniert — der Aufrufer
+ *  kann es persistieren. Ohne das läuft nach JEDEM Kaltstart die erste Anfrage
+ *  ggf. die ganze Kandidatenkette ab, und jedes tote Modell ist eine volle
+ *  Rundreise. Als Injektion, damit dieses Modul den Store nicht kennen muss. */
+let persistModel: ((model: string, lite: boolean) => void) | null = null;
+
+export function setModelPersister(fn: (model: string, lite: boolean) => void): void {
+  persistModel = fn;
+}
+
+/** Beim Start bekannte Modelle vorgeben (aus den Einstellungen). */
+export function primeWorkingModel(model: string | null, lite: string | null = null): void {
+  if (model) workingModel = model;
+  if (lite) workingLite = lite;
+}
+
+function setWorkingModel(model: string): void {
+  if (workingModel === model) return;
+  workingModel = model;
+  persistModel?.(model, false);
+}
+
+function setWorkingLite(model: string): void {
+  if (workingLite === model) return;
+  workingLite = model;
+  persistModel?.(model, true);
+}
+
 /** Kette abklappern. Weitergezogen wird bei 404 (Modell weg/umbenannt), 5xx
  *  („überlastet" — jedes Modell hat eigene Kapazität) und Timeout/Netzfehler.
  *  Auth-Fehler (400/401/403) und 429 stoppen sofort — die gelten für den
@@ -1015,19 +1174,32 @@ const RETRY_DELAY_MS = 1500;
 /** EINE Anfrage samt aller Ausweichwege: Kandidaten-Kette, Modell-Discovery bei
  *  404, Lite-Kette bei 429/5xx und ein später Wiederholungsversuch bei Überlast.
  *  Herausgelöst, damit die Werkzeug-Schleife jede Runde dieselben Netze bekommt. */
-async function requestWithFallbacks(apiKey: string, body: unknown, stream: boolean): Promise<Response> {
+async function requestWithFallbacks(apiKey: string, body: unknown, stream: boolean, preferLite = false): Promise<Response> {
+  // Sortier-Aufgaben brauchen kein Denken: das kleine Modell ist schneller und
+  // hat ein eigenes Kontingent. Klappt es nicht, geht es normal weiter.
+  if (preferLite) {
+    try {
+      const lite = await callChain(LITE_CHAIN, workingLite, apiKey, body, stream);
+      if (lite.res.ok) {
+        setWorkingLite(lite.model);
+        return lite.res;
+      }
+    } catch {
+      /* egal — die Hauptkette ist ohnehin der nächste Schritt */
+    }
+  }
   let { res, model } = await callChain(MODEL_CHAIN, workingModel, apiKey, body, stream);
 
   // Alle bekannten IDs sind 404 → beim Dienst nachfragen, was es wirklich gibt.
   if (res.status === 404) {
     const found = await discoverModels(apiKey);
-    if (found.lite) workingLite = found.lite;
+    if (found.lite) setWorkingLite(found.lite);
     if (found.model) {
       model = found.model;
       res = await callModel(model, apiKey, body, stream);
     }
   }
-  if (res.ok) workingModel = model;
+  if (res.ok) setWorkingModel(model);
 
   // Kontingent erschöpft ODER alles überlastet → die Lite-Kette hat eigenes
   // Kontingent und eigene Kapazität.
@@ -1036,7 +1208,7 @@ async function requestWithFallbacks(apiKey: string, body: unknown, stream: boole
       const lite = await callChain(LITE_CHAIN, workingLite, apiKey, body, stream);
       if (lite.res.ok) {
         res = lite.res;
-        workingLite = lite.model;
+        setWorkingLite(lite.model);
       } else if (res.status === 429 && lite.res.status !== 404) {
         res = lite.res;
       }
@@ -1063,6 +1235,24 @@ async function requestWithFallbacks(apiKey: string, body: unknown, stream: boole
  *  über die Lite-Kette. Wirft Error mit deutscher Meldung.
  *  Mit `onDelta` läuft die Anfrage als Stream: der Text kommt Stück für Stück
  *  beim Aufrufer an, zurückgegeben wird am Ende der Gesamttext. */
+/** Alles Optionale einer Anfrage an EINER Stelle — die Signatur war mit sieben
+ *  Stellungs-Parametern nicht mehr lesbar, und jeder neue hätte sie verschlimmert. */
+export type AskOptions = {
+  /** Streaming: jedes Textstück, sobald es eintrifft. */
+  onDelta?: (delta: string) => void;
+  /** Daten für die (lesenden) Werkzeuge. Fehlt/null = keine Werkzeuge. */
+  toolData?: ToolData | null;
+  /** Bilder zur aktuellen Nachricht. */
+  images?: AssistantImage[];
+  /** Welche Prompt-Abschnitte gelten (Default: alles). */
+  mode?: PromptMode;
+  /** Antwort als reines JSON erzwingen — nur wo eine Vorschlagskarte folgt. */
+  json?: boolean;
+  /** Kleines Modell ZUERST versuchen. Für Sortier-Aufgaben, die kein Denken
+   *  brauchen: spürbar schneller und mit eigenem Kontingent. */
+  preferLite?: boolean;
+};
+
 export async function askAssistant(
   apiKey: string,
   messages: ChatMessage[],
@@ -1070,22 +1260,21 @@ export async function askAssistant(
   /** Merkzettel des Nutzers (Einstellungen). Bewusst PFLICHT-Parameter: so kann
    *  ihn keine Aufrufstelle stillschweigend vergessen — tsc meldet es. */
   memory: string | null,
-  onDelta?: (delta: string) => void,
-  /** Daten für die (lesenden) Werkzeuge. null = keine Werkzeuge deklarieren,
-   *  d. h. exakt das Verhalten von vorher — so bleibt der Braindump unberührt. */
-  toolData?: ToolData | null,
-  /** Bilder zur aktuellen Nachricht (Zettel/Aushang abfotografieren). */
-  images?: AssistantImage[],
+  opts: AskOptions = {},
 ): Promise<string> {
+  const { onDelta, toolData, images, mode = 'voll', json = false, preferLite = false } = opts;
   const stream = onDelta !== undefined;
-  const base = buildRequestBody(messages, context, new Date(), memory, !!toolData, images ?? []) as Record<string, unknown>;
+  const base = buildRequestBody(messages, context, new Date(), memory, !!toolData, images ?? [], mode, json) as Record<
+    string,
+    unknown
+  >;
   const baseContents = base.contents as unknown[];
   // Zusatz-Runden: der Modell-Zug (functionCall) und unsere Antwort darauf.
   const extra: unknown[] = [];
 
   for (let round = 0; ; round += 1) {
     const body = { ...base, contents: [...baseContents, ...extra] };
-    const res = await requestWithFallbacks(apiKey, body, stream);
+    const res = await requestWithFallbacks(apiKey, body, stream, preferLite);
     if (!res.ok) throw new Error(describeError(res.status));
 
     const calls: ToolCall[] = [];
@@ -1093,9 +1282,9 @@ export async function askAssistant(
     if (onDelta) {
       text = await readSse(res, onDelta, (c) => calls.push(...c));
     } else {
-      const json: unknown = await res.json();
-      calls.push(...extractCalls(json));
-      text = extractText(json) ?? '';
+      const jsonBody: unknown = await res.json();
+      calls.push(...extractCalls(jsonBody));
+      text = extractText(jsonBody) ?? '';
     }
 
     // Keine Werkzeug-Wünsche (oder Runden aufgebraucht) → das ist die Antwort.

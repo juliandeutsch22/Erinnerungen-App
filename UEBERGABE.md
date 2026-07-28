@@ -441,8 +441,9 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
     dieser Verdreifachung. Die Mutationen werden hereingereicht → rein und
     testbar; die Reihenfolge (Projekte → Änderungen → Neues) ist durch Tests
     festgenagelt. **Neue Bildschirme mit Aktions-Karte benutzen das hier.**
-    Migriert sind Verwalter und Braindump; Chat und Sprach-Sheet haben ihre
-    eigene Fassung noch — beim nächsten Anfassen nachziehen.
+    Migriert sind Verwalter, Braindump und das Sprach-Sheet; nur der Chat hat
+    seine eigene Fassung noch (er braucht als einziger die Handles/Änderungen) —
+    beim nächsten Anfassen nachziehen.
 
 25. **Projekte lassen sich ABSCHLIESSEN** (`List.completedAt`, v1.41.0) — und
     damit ist der gemeldete Fehler weg: Im Kalender stand „x Tage überfällig"
@@ -502,6 +503,46 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
     und las sich wie eine vierte — es gehört aber zur App, nicht zum Tag.
     **Wer hier etwas hinzufügt, muss sich entscheiden, auf welche der drei
     Ebenen es gehört** — sonst wird es wieder eine Reihe aus allem.
+
+31. **Tempo statt Warten** (v1.46.0) — der Assistent kam nicht deshalb spät,
+    weil er langsam denkt, sondern weil er an jedem Einstiegspunkt dasselbe
+    schwere Gepäck trug. Vier Hebel, alle rein lokal (kein Server, keine Kosten):
+    · **Prompt nach Einstiegspunkt** (`systemPrompt(mode)`): `'erfassen'`
+      (Braindump, Sprach-Sheet) lässt Reise-Links, Werkzeug- und Änderungs-
+      Regeln WEG — dort gibt es weder App-Überblick noch Handles, die Regeln
+      wären also nur Ballast, den jede Anfrage mitbezahlt. Auch die JSON-Vorlage
+      selbst ist kürzer (`AKTIONEN_JSON_ERFASSEN`, ohne `aenderungen`/
+      `checkliste`): ein gezeigtes Feld lädt zum Füllen ein. `SYSTEM_PROMPT`
+      bleibt als voller Prompt bestehen, Tests halten beide Fassungen fest.
+    · **JSON-Zwang** (`responseMimeType` + `ACTION_SCHEMA`): wo die Antwort
+      ohnehin eine Vorschlagskarte ist, kommt der Aktions-Block garantiert —
+      der strikte Zweitversuch („du hast den Block vergessen") entfällt damit
+      fast immer, und es entstehen weniger Ausgabe-Token. Preis: keine Prosa,
+      also kein anzeigbarer Streaming-Text. **Nur dort einschalten, wo niemand
+      auf Sätze wartet** — im Chat wäre es falsch.
+    · **Kleines Modell zuerst** (`preferLite`): Sortieren ist keine Denkaufgabe.
+      Klappt die Lite-Kette nicht, geht es normal weiter.
+    · **Gemerktes Modell** (`assistantModel`/`assistantLiteModel` im Settings-
+      Store, `primeWorkingModel`/`setModelPersister` in `_layout.tsx`): ohne das
+      klappert die erste Anfrage nach JEDEM Kaltstart die Kandidatenkette ab,
+      und jede tote ID ist eine volle Rundreise. Bewusst NICHT im Backup — das
+      ist ein Tempo-Merkzettel des Geräts, kein Inhalt.
+
+32. **Der Sprach-Schnellzugriff kann jetzt dasselbe wie Braindump/Chat**
+    (v1.46.0) — Lauf im Store (`RUN_QUICKVOICE`, überlebt das Schließen des
+    Sheets), änderbare Vorschläge, Anwenden über `applyAssistantActions`.
+    Zwei bewusste Unterschiede und eine Naht:
+    · **Keine Bilder.** Man fotografiert nicht, während man spricht.
+    · Der Editor öffnet **nicht als zweites Sheet über dem ersten** — das
+      Sprach-Sheet tritt zurück (`visible={visible && !edit}`). Zwei
+      gleichzeitige RN-Modals sind auf dem Gerät heikel; hier gibt es nichts zu
+      gewinnen, was das Risiko wert wäre.
+    · **`__stoaDictationDemo`** (dictation.ts): Der Browser kann Apples
+      Spracherkennung nicht nachstellen, deshalb endete die Playwright-Tour des
+      Sprach-Wegs bisher beim „ich höre zu". Ist die Variable ein Text, liefert
+      die WEB-Vorschau ihn als Transkript — damit ist der ganze Weg (sortieren,
+      ändern, abwählen, übernehmen) prüfbar statt behauptet. Ohne die Variable
+      bleibt die Vorschau exakt wie vorher; nativ hat sie keinerlei Wirkung.
 
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 

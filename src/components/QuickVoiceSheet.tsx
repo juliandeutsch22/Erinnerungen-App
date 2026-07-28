@@ -9,21 +9,30 @@
 // Aufbau: QuickVoiceView ist rein präsentativ (pro Zustand ein Bild, im Web
 // screenshot-bar); QuickVoiceSheet hält Zustand + Diktat + Assistent und rendert
 // die View im (absturzsicheren) BottomSheet.
+//
+// Gleicher Stand wie Braindump und Chat: der Lauf lebt im Store
+// (lib/assistantRun.ts), überlebt also das Schließen des Sheets; Vorschläge
+// lassen sich vor dem Übernehmen zurechtrücken (ActionEditSheet); angewendet
+// wird zentral über lib/applyActions. Bilder gibt es hier bewusst NICHT — man
+// fotografiert nicht, während man spricht.
 import { CalendarDays, Check, Mic, RotateCcw, Sparkles } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { AppState, Linking, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 
+import { ActionEditSheet, type EditTarget } from '@/components/ActionEditSheet';
 import { BottomSheet } from '@/components/BottomSheet';
 import { GlassButton } from '@/components/GlassButton';
 import { PressableScale } from '@/components/PressableScale';
 import { Type } from '@/components/Type';
 import { useCreateAssistantEvents } from '@/data/calendarQueries';
 import { useCreateNote } from '@/data/noteQueries';
-import { useCreateList, useCreateTask, useLists } from '@/data/queries';
+import { useCompleteTask, useCreateList, useCreateTask, useDeleteTask, useLists, useUpdateTask } from '@/data/queries';
 import type { ChatMessage } from '@/data/types';
-import { type AssistantAction, askAssistant, buildBraindumpContext, actionDueDate, describeExtras, describeSchritte, extractActions, hasCapturableActions, resolveListId, subtasksFromSchritte } from '@/lib/assistant';
+import { type AssistantAction, askAssistant, buildBraindumpContext, describeExtras, describeSchritte, extractActions, hasCapturableActions } from '@/lib/assistant';
+import { applyAssistantActions } from '@/lib/applyActions';
+import { RUN_QUICKVOICE, useAssistantRuns } from '@/lib/assistantRun';
 import { formatDueDate, parseDateStr, todayStr } from '@/lib/dates';
 import { useDictation } from '@/lib/dictation';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
@@ -85,6 +94,7 @@ export function QuickVoiceView({
   denied = false,
   hasEvents = false,
   onToggleItem,
+  onEditItem,
   onSpeakAgain,
   onSpeakFresh,
   onOpenSettings,
@@ -105,6 +115,8 @@ export function QuickVoiceView({
   /** Im Ergebnis wurden Termine angelegt → „Im Kalender ansehen" anbieten. */
   hasEvents?: boolean;
   onToggleItem?: (key: string) => void;
+  /** Auf den Text tippen rückt den Vorschlag zurecht (Projekte ausgenommen). */
+  onEditItem?: (key: string) => void;
   /** Ergänzen (anhängen) — auch: Aufnahme früher beenden, Fehler erneut. */
   onSpeakAgain?: () => void;
   /** Neu — verwirft das Erkannte und hört frisch zu. */
@@ -202,12 +214,15 @@ export function QuickVoiceView({
   }
 
   // result
-  const items: { key: string; title: string; sub?: string; kind: 'Aufgabe' | 'Termin' | 'Notiz' | 'Projekt' }[] = [
+  const items: { key: string; title: string; sub?: string; kind: 'Aufgabe' | 'Termin' | 'Notiz' | 'Projekt'; editable: boolean }[] = [
     ...(actions?.listen ?? []).map((l, i) => ({
       key: `l${i}`,
       title: l.name,
       sub: [l.ziel ?? '', l.deadline ? `bis ${formatDueDate(l.deadline, today)}` : ''].filter(Boolean).join(' · ') || undefined,
       kind: 'Projekt' as const,
+      // Ein Projekt ist das Dach, kein Einzelvorschlag — dafür gibt es keinen
+      // Schnell-Editor; abwählen genügt.
+      editable: false,
     })),
     ...(actions?.aufgaben ?? []).map((a, i) => ({
       key: `a${i}`,
@@ -219,14 +234,16 @@ export function QuickVoiceView({
           .filter(Boolean)
           .join(' · ') || undefined,
       kind: 'Aufgabe' as const,
+      editable: true,
     })),
     ...(actions?.termine ?? []).map((t, i) => ({
       key: `t${i}`,
       title: t.titel,
       sub: `${formatDueDate(t.datum, today)}${t.start ? ` · ${t.start}${t.ende ? `–${t.ende}` : ''}` : ' · ganztägig'}`,
       kind: 'Termin' as const,
+      editable: true,
     })),
-    ...(actions?.notizen ?? []).map((n, i) => ({ key: `n${i}`, title: n.split('\n')[0], kind: 'Notiz' as const })),
+    ...(actions?.notizen ?? []).map((n, i) => ({ key: `n${i}`, title: n.split('\n')[0], kind: 'Notiz' as const, editable: true })),
   ];
 
   return (
@@ -234,19 +251,25 @@ export function QuickVoiceView({
       {transcript.trim().length > 0 && (
         <Type variant="body" tone="text3" style={{ fontStyle: 'italic' }}>„{transcript.trim()}"</Type>
       )}
-      <Type variant="eyebrow" tone="teal">Erkannt — antippen wählt ab</Type>
+      <Type variant="eyebrow" tone="teal">Erkannt — Kästchen wählt ab, Text ändert</Type>
       <View style={{ gap: 2 }}>
         {items.map((it) => {
           const off = deselected.has(it.key);
           const round = it.kind === 'Notiz';
+          const zeile = (
+            <>
+              <Type variant="body" numberOfLines={1}>{it.title}</Type>
+              {it.sub && <Type variant="caption" tone="text3" tabular>{it.sub}</Type>}
+            </>
+          );
           return (
-            <PressableScale
+            <View
               key={it.key}
-              accessibilityLabel={`${it.kind} ${it.title} ${off ? 'wieder auswählen' : 'abwählen'}`}
-              onPress={() => onToggleItem?.(it.key)}
               style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.xs + 1, opacity: off ? 0.4 : 1 }}
             >
-              <View
+              <PressableScale
+                accessibilityLabel={`${it.kind} ${it.title} ${off ? 'wieder auswählen' : 'abwählen'}`}
+                onPress={() => onToggleItem?.(it.key)}
                 style={{
                   width: 18,
                   height: 18,
@@ -259,13 +282,21 @@ export function QuickVoiceView({
                 }}
               >
                 {!off && <Check size={12} color="#FFFFFF" strokeWidth={3} />}
-              </View>
-              <View style={{ flex: 1 }}>
-                <Type variant="body" numberOfLines={1}>{it.title}</Type>
-                {it.sub && <Type variant="caption" tone="text3" tabular>{it.sub}</Type>}
-              </View>
+              </PressableScale>
+              {it.editable ? (
+                <PressableScale
+                  accessibilityLabel={`${it.kind} ${it.title} ändern`}
+                  onPress={() => onEditItem?.(it.key)}
+                  pressedScale={0.99}
+                  style={{ flex: 1 }}
+                >
+                  {zeile}
+                </PressableScale>
+              ) : (
+                <View style={{ flex: 1 }}>{zeile}</View>
+              )}
               <Type variant="caption" tone="text3">{it.kind}</Type>
-            </PressableScale>
+            </View>
           );
         })}
         {items.length === 0 && (
@@ -299,6 +330,9 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
   const router = useRouter();
   const createTask = useCreateTask();
   const createList = useCreateList();
+  const updateTask = useUpdateTask();
+  const completeTask = useCompleteTask();
+  const deleteTask = useDeleteTask();
   const createNote = useCreateNote();
   const createEvents = useCreateAssistantEvents();
   const { data: lists } = useLists();
@@ -307,12 +341,23 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
   const [phase, setPhase] = useState<QuickVoicePhase>('listening');
   const [interim, setInterim] = useState('');
   const [transcript, setTranscript] = useState('');
-  const [actions, setActions] = useState<AssistantAction | null>(null);
   const [deselected, setDeselected] = useState<Set<string>>(new Set());
-  const [error, setError] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
   const [summary, setSummary] = useState('');
   const [createdEvents, setCreatedEvents] = useState(0);
-  const [stream, setStream] = useState('');
+  const [edit, setEdit] = useState<EditTarget | null>(null);
+
+  // Der Lauf lebt im Store, nicht im Sheet — schließt man das Sheet, während
+  // der Assistent sortiert, läuft er weiter und liegt beim Öffnen fertig da.
+  const run = useAssistantRuns((s) => s.runs[RUN_QUICKVOICE]);
+  const beginRun = useAssistantRuns((s) => s.begin);
+  const deltaRun = useAssistantRuns((s) => s.delta);
+  const finishRun = useAssistantRuns((s) => s.finish);
+  const failRun = useAssistantRuns((s) => s.fail);
+  const clearRun = useAssistantRuns((s) => s.clear);
+  const actions = run?.status === 'done' ? run.actions : null;
+  const stream = run?.stream ?? '';
+  const error = (run?.status === 'error' ? run.error : null) ?? localError;
 
   const interimRef = useRef('');
   const transcriptRef = useRef('');
@@ -330,15 +375,19 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
 
   const sort = async (dump: string) => {
     setPhase('thinking');
-    setError(null);
-    setStream('');
+    setLocalError(null);
+    beginRun(RUN_QUICKVOICE, 'Diktat');
     try {
       const listNames = (lists ?? []).filter((l) => !l.deletedAt).map((l) => l.name);
       const msg: ChatMessage = { id: 'qv', chatId: 'qv', role: 'user', content: dump, createdAt: new Date().toISOString() };
-      let acc = '';
-      const answer = await askAssistant(apiKey, [msg], buildBraindumpContext(dateLabel, false, listNames), memory, (delta) => {
-        acc += delta;
-        setStream(acc);
+      const answer = await askAssistant(apiKey, [msg], buildBraindumpContext(dateLabel, false, listNames), memory, {
+        // Wie im Braindump: kurzer Prompt, verbindlicher JSON-Block, kleines
+        // Modell zuerst. Bilder gibt es hier bewusst nicht — man fotografiert
+        // nicht, während man spricht.
+        mode: 'erfassen',
+        json: true,
+        preferLite: true,
+        onDelta: (delta) => deltaRun(RUN_QUICKVOICE, delta),
       });
       let parsed = extractActions(answer).actions;
       // „aenderungen" kann hier niemand anwenden (kein App-Überblick, keine
@@ -346,23 +395,33 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
       // stünde da eine Vorschlagskarte ohne Zeilen mit totem Knopf.
       if (parsed && !hasCapturableActions(parsed)) parsed = null;
       if (!parsed) {
-        const retry = await askAssistant(apiKey, [msg], buildBraindumpContext(dateLabel, true, listNames), memory);
+        const retry = await askAssistant(apiKey, [msg], buildBraindumpContext(dateLabel, true, listNames), memory, {
+          mode: 'erfassen',
+          json: true,
+        });
         const zweiter = extractActions(retry).actions;
         parsed = zweiter && hasCapturableActions(zweiter) ? zweiter : null;
       }
       if (!parsed) {
-        setError(`Konnte es nicht sortieren. Antwort: ${extractActions(answer).clean}`);
-        setPhase('error');
+        failRun(RUN_QUICKVOICE, `Konnte es nicht sortieren. Antwort: ${extractActions(answer).clean}`);
       } else {
-        setActions(parsed);
+        finishRun(RUN_QUICKVOICE, { clean: '', actions: parsed });
         setDeselected(new Set());
-        setPhase('result');
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unbekannter Fehler.');
-      setPhase('error');
+      failRun(RUN_QUICKVOICE, e instanceof Error ? e.message : 'Unbekannter Fehler.');
     }
   };
+
+  // Der Store führt die Phase — auch dann, wenn das Ergebnis eintrifft, während
+  // niemand hinsieht. Nach clearRun() (Übernehmen/Neu) greift er nicht mehr.
+  useEffect(() => {
+    if (!visible || !run) return;
+    if (run.status === 'running') setPhase('thinking');
+    else if (run.status === 'done') setPhase('result');
+    else setPhase('error');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, run?.status]);
 
   // Eine beendete Äußerung (Sprechpause) → anhängen und automatisch sortieren.
   useEffect(() => {
@@ -384,14 +443,15 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
   // Beim Öffnen: Zustand zurücksetzen und sofort zuhören. Beim Schließen: stoppen.
   useEffect(() => {
     if (visible) {
+      // Liegt noch ein Lauf von vorhin da (man hat zwischendurch zugemacht),
+      // wird er gezeigt statt weggeworfen — die Phase setzt der Effekt oben.
+      if (useAssistantRuns.getState().runs[RUN_QUICKVOICE]) return undefined;
       setPhase('listening');
       setInterim('');
       setTranscript('');
-      setActions(null);
       setDeselected(new Set());
-      setError(null);
+      setLocalError(null);
       setSummary('');
-      setStream('');
       interimRef.current = '';
       transcriptRef.current = '';
       started.current = false;
@@ -427,7 +487,7 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
       return;
     }
     setPhase('listening');
-    setError(null);
+    setLocalError(null);
     if (available) toggle();
   };
 
@@ -437,10 +497,9 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
     transcriptRef.current = '';
     setInterim('');
     setTranscript('');
-    setActions(null);
+    clearRun(RUN_QUICKVOICE);
     setDeselected(new Set());
-    setError(null);
-    setStream('');
+    setLocalError(null);
     setPhase('listening');
     if (available && !listening) toggle();
   };
@@ -463,63 +522,40 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
   const confirm = async () => {
     if (!actions) return;
     hapticSuccess();
-    let tasks = 0;
-    let notes = 0;
-    // Projekte zuerst, damit „liste" einer Aufgabe darauf zeigen kann.
-    const frisch: { id: string; name: string }[] = [];
-    for (let i = 0; i < actions.listen.length; i += 1) {
-      if (deselected.has(`l${i}`)) continue;
-      const l = actions.listen[i];
-      // Befund aus der Fehlersuche: Gibt es die Liste schon, wird sie
-      // WIEDERVERWENDET statt ein zweites Mal angelegt. Das Modell soll laut
-      // Prompt nur neue vorschlagen, hält sich aber nicht immer daran.
-      const bestehend = resolveListId(l.name, lists ?? [], '');
-      if (bestehend) {
-        frisch.push({ id: bestehend, name: l.name });
-        continue;
-      }
-      const created = await createList.mutateAsync({
-        name: l.name,
-        icon: 'inbox',
-        color: LIST_COLORS[((lists?.length ?? 0) + i) % LIST_COLORS.length],
-        goal: l.ziel ?? null,
-        deadline: l.deadline ?? null,
-      });
-      frisch.push({ id: created.id, name: created.name });
-    }
-    const alleListen = [...(lists ?? []), ...frisch];
-    for (let i = 0; i < actions.aufgaben.length; i += 1) {
-      if (deselected.has(`a${i}`)) continue;
-      const a = actions.aufgaben[i];
-      await createTask.mutateAsync({
-        listId: resolveListId(a.liste, alleListen),
-        title: a.titel,
-        note: a.notiz ?? null,
-        dueDate: actionDueDate(a, today),
-        dueTime: a.zeit ?? null,
-        rrule: a.wiederholung ?? null,
-        tags: a.tags ?? [],
-        subtasks: subtasksFromSchritte(a.schritte),
-      });
-      tasks += 1;
-    }
-    for (let i = 0; i < actions.notizen.length; i += 1) {
-      if (deselected.has(`n${i}`)) continue;
-      await createNote.mutateAsync({ body: actions.notizen[i] });
-      notes += 1;
-    }
-    const termine = actions.termine.filter((_, i) => !deselected.has(`t${i}`));
-    const events = termine.length > 0 ? await createEvents(termine) : 0;
+    // Anwenden liegt zentral in lib/applyActions — dieselbe Reihenfolge und
+    // dieselben Schutzregeln wie im Braindump und beim Verwalter.
+    const gewaehlt: AssistantAction = {
+      ...actions,
+      listen: actions.listen.filter((_, i) => !deselected.has(`l${i}`)),
+      aufgaben: actions.aufgaben.filter((_, i) => !deselected.has(`a${i}`)),
+      termine: actions.termine.filter((_, i) => !deselected.has(`t${i}`)),
+      notizen: actions.notizen.filter((_, i) => !deselected.has(`n${i}`)),
+      aenderungen: [],
+    };
+    const res = await applyAssistantActions(gewaehlt, {
+      lists: lists ?? [],
+      tasks: [],
+      today,
+      createList: (input) => createList.mutateAsync(input),
+      createTask: (input) => createTask.mutateAsync(input),
+      createNote: (body) => createNote.mutateAsync({ body }),
+      updateTask: (id, patch) => updateTask.mutateAsync({ id, patch }),
+      completeTask: (t) => completeTask.mutateAsync(t),
+      trashTask: (id) => deleteTask.mutateAsync(id),
+      createEvents: (termine) => createEvents(termine),
+      colorAt: (i) => LIST_COLORS[i % LIST_COLORS.length],
+    });
     const parts: string[] = [];
-    if (frisch.length > 0) parts.push(`${frisch.length} ${frisch.length === 1 ? 'Projekt' : 'Projekte'}`);
-    if (tasks > 0) parts.push(`${tasks} ${tasks === 1 ? 'Aufgabe' : 'Aufgaben'}`);
-    if (events > 0) parts.push(`${events} ${events === 1 ? 'Termin im Kalender' : 'Termine im Kalender'}`);
-    if (notes > 0) parts.push(`${notes} ${notes === 1 ? 'Notiz' : 'Notizen'}`);
+    if (res.projekte > 0) parts.push(`${res.projekte} ${res.projekte === 1 ? 'Projekt' : 'Projekte'}`);
+    if (res.aufgaben > 0) parts.push(`${res.aufgaben} ${res.aufgaben === 1 ? 'Aufgabe' : 'Aufgaben'}`);
+    if (res.termine > 0) parts.push(`${res.termine} ${res.termine === 1 ? 'Termin im Kalender' : 'Termine im Kalender'}`);
+    if (res.notizen > 0) parts.push(`${res.notizen} ${res.notizen === 1 ? 'Notiz' : 'Notizen'}`);
     setSummary(`${parts.join(' und ') || 'Nichts'} angelegt.`);
-    setCreatedEvents(events);
+    setCreatedEvents(res.termine);
+    clearRun(RUN_QUICKVOICE);
     setPhase('done');
     // Mit Terminen bleibt das „Erledigt" stehen (Tipp „Im Kalender ansehen"); sonst schnell weiter.
-    if (events === 0) setTimeout(onClose, 1100);
+    if (res.termine === 0) setTimeout(onClose, 1100);
   };
 
   const title =
@@ -543,29 +579,52 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
       </GlassButton>
     ) : undefined;
 
+  // Auf den Text tippen öffnet den Schnell-Editor. Bewusst NICHT als zweites
+  // Sheet über dem ersten: zwei gleichzeitige RN-Modals sind auf dem Gerät
+  // heikel — das Sprach-Sheet tritt so lange zurück.
+  const openEdit = (key: string) => {
+    hapticSelect();
+    const index = Number(key.slice(1));
+    if (key.startsWith('a')) setEdit({ kind: 'aufgabe', index });
+    else if (key.startsWith('t')) setEdit({ kind: 'termin', index });
+    else if (key.startsWith('n')) setEdit({ kind: 'notiz', index });
+  };
+
   return (
-    <BottomSheet visible={visible} onClose={onClose} title={title} footer={footer}>
-      <QuickVoiceView
-        phase={phase}
-        interim={interim}
-        transcript={transcript}
-        stream={stream}
-        actions={actions}
-        deselected={deselected}
-        error={error}
-        summary={summary}
-        today={today}
-        denied={denied}
-        hasEvents={createdEvents > 0}
-        onToggleItem={toggleItem}
-        onSpeakAgain={speakAgain}
-        onSpeakFresh={speakFresh}
-        onOpenSettings={() => void Linking.openSettings()}
-        onOpenCalendar={() => {
-          onClose();
-          router.push('/kalender');
-        }}
-      />
-    </BottomSheet>
+    <>
+      <BottomSheet visible={visible && !edit} onClose={onClose} title={title} footer={footer}>
+        <QuickVoiceView
+          phase={phase}
+          interim={interim}
+          transcript={transcript}
+          stream={stream}
+          actions={actions}
+          deselected={deselected}
+          error={error}
+          summary={summary}
+          today={today}
+          denied={denied}
+          hasEvents={createdEvents > 0}
+          onToggleItem={toggleItem}
+          onEditItem={openEdit}
+          onSpeakAgain={speakAgain}
+          onSpeakFresh={speakFresh}
+          onOpenSettings={() => void Linking.openSettings()}
+          onOpenCalendar={() => {
+            onClose();
+            router.push('/kalender');
+          }}
+        />
+      </BottomSheet>
+      {edit && actions && (
+        <ActionEditSheet
+          target={edit}
+          actions={actions}
+          lists={lists ?? []}
+          onClose={() => setEdit(null)}
+          onSave={(next) => finishRun(RUN_QUICKVOICE, { clean: run?.clean ?? '', actions: next })}
+        />
+      )}
+    </>
   );
 }

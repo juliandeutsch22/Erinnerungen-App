@@ -23,6 +23,7 @@ import { TimeField } from '@/components/TimeField';
 import { Type } from '@/components/Type';
 import type { List } from '@/data/types';
 import type { AssistantAction } from '@/lib/assistant';
+import { formatDueDate, todayStr } from '@/lib/dates';
 import { hapticSelect } from '@/lib/haptics';
 import { webNoOutline } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
@@ -128,7 +129,9 @@ export function ActionEditSheet({
                 style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
               >
                 <Type variant="label" tone="text2">Datum</Type>
-                <Type variant="label" tone={datum ? 'teal' : 'text3'}>{datum ?? 'Keins'}</Type>
+                <Type variant="label" tone={datum ? 'teal' : 'text3'} tabular>
+                  {datum ? formatDueDate(datum, todayStr()) : 'Keins'}
+                </Type>
               </PressableScale>
               {zeigeDatum && (
                 <View style={{ borderRadius: R.lg, borderWidth: 1, borderColor: colors.chipBorder, backgroundColor: colors.bg2, padding: Spacing.sm }}>

@@ -12,6 +12,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AppLockGate } from '@/components/AppLockGate';
 import { setOnTasksChanged } from '@/data/queries';
+import { primeWorkingModel, setModelPersister } from '@/lib/assistant';
 import { isAutoBackupDue, runAutoBackup } from '@/lib/autoBackup';
 import { runOrphanDocumentSweep } from '@/lib/orphanDocuments';
 import { getSecureKey, setSecureKey } from '@/lib/secureKey';
@@ -44,6 +45,18 @@ function RootStack() {
   // Erinnerungs-Engine: bei App-Start + nach jeder Datenänderung wird das
   // Planungsfenster neu aufgebaut (64er-Limit, Fahrplan §5). No-Op im Web.
   const hydrated = useSettings((s) => s._hasHydrated);
+
+  // Tempo-Merkzettel des Assistenten: das zuletzt funktionierende Modell wird
+  // vorgegeben und künftige Funde werden gemerkt. Ohne das klappert JEDE erste
+  // Anfrage nach einem Kaltstart die Kandidatenkette ab. Erst nach der
+  // Hydration, sonst überschreibt der geladene Zustand den frischen Fund.
+  useEffect(() => {
+    if (!hydrated) return;
+    const s = useSettings.getState();
+    primeWorkingModel(s.assistantModel || null, s.assistantLiteModel || null);
+    setModelPersister((model, lite) => useSettings.getState().setAssistantModel(model, lite));
+  }, [hydrated]);
+
   useEffect(() => {
     if (!hydrated) return;
     void (async () => {

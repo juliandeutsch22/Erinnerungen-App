@@ -29,6 +29,19 @@ function mod(): SpeechModule {
 type ResultEvent = { results?: { transcript?: string }[]; isFinal?: boolean };
 
 /**
+ * Nur für die Web-Vorschau: Ist `globalThis.__stoaDictationDemo` ein Text, wird
+ * er als Transkript geliefert. Der Browser kann Apples Spracherkennung nicht
+ * nachstellen — ohne diese Naht endet die Browser-Tour des Sprach-Zugriffs beim
+ * „ich höre zu", und der Weg dahinter (sortieren, ändern, übernehmen) wäre nur
+ * behauptet statt geprüft. Ist nichts gesetzt, bleibt die Vorschau exakt wie
+ * bisher stumm; nativ hat das keinerlei Wirkung.
+ */
+function webDemoTranscript(): string {
+  const g = globalThis as { __stoaDictationDemo?: unknown };
+  return typeof g.__stoaDictationDemo === 'string' ? g.__stoaDictationDemo : '';
+}
+
+/**
  * Diktat-Steuerung für ein Textfeld. `onStart` merkt sich den Feldstand, bevor
  * gesprochen wird; `onText` liefert das (kumulative) Transkript der laufenden
  * Äußerung — der Aufrufer hängt es an den gemerkten Stand. Nativ echt; im Web
@@ -82,6 +95,8 @@ export function useDictation(opts: { onStart?: () => void; onText: (transcript: 
     if (!native) {
       // Web-Vorschau: nur der visuelle Zustand, keine echte Erkennung.
       setListening(true);
+      const demo = webDemoTranscript();
+      if (demo) setTimeout(() => onText(demo, false), 150);
       return;
     }
     try {
