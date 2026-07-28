@@ -411,15 +411,69 @@ export default function HeuteScreen() {
       scrollHandle={scrollHandle}
     >
       <Reveal>
-        <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+        {/* Kopfzeile 1 — der RAHMEN: Datum links, Einstellungen rechts. Das
+            Zahnrad stand vorher in einer Reihe mit Mikrofon, Assistent und
+            Plus und sah damit aus wie eine vierte Tageshandlung. Es ist aber
+            keine: es gehört zur App, nicht zum Tag. Oben neben dem Datum ist
+            es da, wenn man es sucht, und sonst still. */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Type variant="eyebrow" tone="text3">{dateLine}</Type>
+          <PressableScale
+            accessibilityLabel="Einstellungen öffnen"
+            onPress={() => router.push('/einstellungen')}
+            style={{ padding: Spacing.xs, marginRight: -Spacing.xs }}
+          >
+            <Settings size={17} color={colors.text3} strokeWidth={2} />
+          </PressableScale>
+        </View>
+
+        {/* Kopfzeile 2 — die HANDLUNGEN des Tages, auf einer Linie mit der
+            Begrüßung statt am unteren Rand des ganzen Kopfes. */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm, marginTop: Spacing.xs }}>
           {/* flex:1 + adjustsFontSize: Begrüßung kann nie abgeschnitten werden. */}
-          <View style={{ gap: Spacing.xs, flex: 1, paddingRight: Spacing.sm }}>
-            <Type variant="eyebrow" tone="text3">{dateLine}</Type>
+          <View style={{ flex: 1 }}>
             <Type variant="title" numberOfLines={1} adjustsFontSizeToFit>{greeting}</Type>
-            {/* Der Bogen — Morgenseite: DIESELBE dritte Zeile trägt entweder den
-                gesetzten Satz, morgens die Einladung, sonst die Zusammenfassung.
-                Keine zusätzliche Fläche, der Screen wird kein Stück länger.
-                (Der Abend antwortet ab 18 Uhr in der Abendkarte.) */}
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            {apiKey.length > 0 && dictationAvailable && (
+              <PressableScale
+                accessibilityLabel="Dem Assistenten diktieren"
+                onPress={openVoice}
+                style={{ padding: Spacing.sm }}
+              >
+                <Mic size={20} color={colors.text3} strokeWidth={2} />
+              </PressableScale>
+            )}
+            <PressableScale
+              accessibilityLabel={laeuft ? 'Assistent öffnen — es läuft noch etwas' : 'Assistent öffnen'}
+              onPress={() => router.push('/chats')}
+              style={{ padding: Spacing.sm }}
+            >
+              <Sparkles size={20} color={laeuft ? colors.teal : colors.text3} strokeWidth={2} />
+              {/* Laeuft im Hintergrund noch eine Anfrage, sagt ein ruhiger Punkt
+                  Bescheid — sonst weiss man nicht, dass es sich lohnt
+                  zurueckzukommen. Kein Zaehler, kein Text. */}
+              {laeuft && (
+                <View style={{ position: 'absolute', top: 6, right: 6 }}>
+                  <PulseDot color={colors.teal} size={6} />
+                </View>
+              )}
+            </PressableScale>
+            <PressableScale
+              accessibilityLabel="Neue Aufgabe"
+              onPress={() => setEditorTask(null)}
+              style={{ padding: Spacing.sm, marginRight: -Spacing.sm }}
+            >
+              <Plus size={22} color={colors.teal} strokeWidth={2.2} />
+            </PressableScale>
+          </View>
+        </View>
+
+        {/* Kopfzeile 3 — der BOGEN, jetzt über die volle Breite statt neben den
+            Symbolen eingezwängt. Trägt den gesetzten Satz, morgens die
+            Einladung, sonst die Zusammenfassung.
+            (Der Abend antwortet ab 18 Uhr in der Abendkarte.) */}
+        <View style={{ gap: 2, marginTop: Spacing.xs }}>
             {intention || hour < 11 ? (
               <PressableScale
                 accessibilityLabel={intention ? 'Ausrichtung ändern' : 'Ausrichtung für heute setzen'}
@@ -458,47 +512,6 @@ export default function HeuteScreen() {
                 </Type>
               </PressableScale>
             )}
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            {apiKey.length > 0 && dictationAvailable && (
-              <PressableScale
-                accessibilityLabel="Dem Assistenten diktieren"
-                onPress={openVoice}
-                style={{ padding: Spacing.sm }}
-              >
-                <Mic size={20} color={colors.text3} strokeWidth={2} />
-              </PressableScale>
-            )}
-            <PressableScale
-              accessibilityLabel={laeuft ? 'Assistent öffnen — es läuft noch etwas' : 'Assistent öffnen'}
-              onPress={() => router.push('/chats')}
-              style={{ padding: Spacing.sm }}
-            >
-              <Sparkles size={20} color={laeuft ? colors.teal : colors.text3} strokeWidth={2} />
-              {/* Laeuft im Hintergrund noch eine Anfrage, sagt ein ruhiger Punkt
-                  Bescheid — sonst weiss man nicht, dass es sich lohnt
-                  zurueckzukommen. Kein Zaehler, kein Text. */}
-              {laeuft && (
-                <View style={{ position: 'absolute', top: 6, right: 6 }}>
-                  <PulseDot color={colors.teal} size={6} />
-                </View>
-              )}
-            </PressableScale>
-            <PressableScale
-              accessibilityLabel="Neue Aufgabe"
-              onPress={() => setEditorTask(null)}
-              style={{ padding: Spacing.sm }}
-            >
-              <Plus size={22} color={colors.teal} strokeWidth={2.2} />
-            </PressableScale>
-            <PressableScale
-              accessibilityLabel="Einstellungen öffnen"
-              onPress={() => router.push('/einstellungen')}
-              style={{ padding: Spacing.sm }}
-            >
-              <Settings size={21} color={colors.text3} strokeWidth={2} />
-            </PressableScale>
-          </View>
         </View>
       </Reveal>
 

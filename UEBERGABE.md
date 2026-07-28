@@ -495,6 +495,14 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
     Der geänderte Block wird über `finishRun` zurückgeschrieben — der Store ist
     die einzige Quelle, auch beim Bearbeiten.
 
+30. **Kopf von „Heute" — drei Ebenen statt einer Reihe** (v1.45.0):
+    Zeile 1 = RAHMEN (Datum · Einstellungen), Zeile 2 = HANDLUNGEN des Tages
+    (Begrüßung · Mikrofon/Assistent/Plus), Zeile 3 = der BOGEN über die volle
+    Breite. Das Zahnrad stand vorher in einer Reihe mit den drei Tagesaktionen
+    und las sich wie eine vierte — es gehört aber zur App, nicht zum Tag.
+    **Wer hier etwas hinzufügt, muss sich entscheiden, auf welche der drei
+    Ebenen es gehört** — sonst wird es wieder eine Reihe aus allem.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**
