@@ -48,9 +48,11 @@ bewusst auf „Tags über alles", sonst entstehen zwei halbe Netze. Und der
 **Tagesplan als echte Zeitblöcke** (Sorted³) — erst, wenn sich der Verwalter
 bewährt hat.
 
-## 2b. Beschlossen: Eine Zeile für alles `[JS · groß]`
+## 2b. Eine Zeile für alles `[JS · groß]`
 
-**Vom Nutzer angenommen (Juli 2026, nach v1.50.1) — als Nächstes dran.**
+**Stufe 1 umgesetzt in v1.52.0** (siehe UEBERGABE §8.42). Offen geblieben:
+Einzelabwahl und Schnell-Editor der Vorschläge in der Zeile, Bilder, und die
+Frage, ob Braindump und Chat langfristig verschwinden dürfen.
 
 *Das Problem:* Stoa hat VIER Türen für Text — die Eingabezeile auf „Heute"
 (lokaler Parser), den Braindump, den Chat und das Sprach-Sheet. Bevor man ein

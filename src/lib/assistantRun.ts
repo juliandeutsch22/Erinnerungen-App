@@ -44,6 +44,8 @@ export type AssistantRun = {
 export const RUN_BRAINDUMP = 'braindump';
 export const RUN_VERWALTER = 'verwalter';
 export const RUN_QUICKVOICE = 'quickvoice';
+/** Die EINE Zeile über der Tab-Leiste. */
+export const RUN_ZEILE = 'zeile';
 /** Chats haben je einen eigenen Lauf. */
 export const runKeyForChat = (chatId: string) => `chat:${chatId}`;
 

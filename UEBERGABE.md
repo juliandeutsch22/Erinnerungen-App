@@ -740,6 +740,40 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
     · Der Android-Vordergrund trägt eine HELLE Letter — er liegt auf `#1F4467`.
     · Erzeugt von `scratchpad/sigma.py`; bei einer Überarbeitung dort ansetzen.
 
+42. **Eine Zeile für alles — Stufe 1** (`lib/inputRoute.ts` + `QuickAdd.tsx` +
+    `components/OmniResult.tsx`, v1.52.0). Stoa hatte VIER Türen für Text, und
+    man musste sich VOR dem Tippen für eine entscheiden — diese Entscheidung
+    kam vor dem Denken und war die eigentliche Reibung. Jetzt tippt man in die
+    Zeile, und `routeInput` entscheidet.
+    · **Die Eskalationsleiter ist die Kernregel und darf nicht verdreht
+      werden:** Der lokale Parser sieht ZUERST hin. Saubere Aufgabe → anlegen,
+      ohne Netz, ohne Schlüssel, ohne Wartezeit. Ist `assistentVerfuegbar`
+      false, bleibt ALLES lokal — eine Zeile, die ohne Netz nichts mehr täte,
+      wäre ein Rückschritt gegenüber dem Zustand davor. Ein Test hält das fest.
+    · **Fragewörter und Befehle zählen NUR am Satzanfang.** Der deutsche
+      Imperativ steht vorn: „Verschieb den Zahnarzt" ist ein Auftrag,
+      „Zahnarzt verschieben" eine Aufgabe, die man sich notiert. An dieser
+      einen Unterscheidung hängt die ganze Weiche — wer die Regexe anfasst,
+      muss sie mitnehmen (Tests dazu sind da).
+    · Der teuerste Fehler wäre NICHT, eine Frage für eine Aufgabe zu halten
+      (eine seltsame Aufgabe, ein Tipp auf Rückgängig), sondern jede harmlose
+      Notiz an den Assistenten zu schicken — das kostet Wartezeit und
+      Kontingent für etwas, das der Parser in Mikrosekunden kann. Deshalb prüft
+      die Mehrzahl der Tests, dass etwas LOKAL bleibt.
+    · Der Knopf verrät die Entscheidung VOR dem Tippen: Plus = wird angelegt,
+      Funke = geht an den Assistenten.
+    · Der Lauf liegt im Store (`RUN_ZEILE`), überlebt also Bildschirmwechsel.
+      Angewendet wird über `applyAssistantActions` — nichts wird ohne Tipp
+      geschrieben, auch hier nicht.
+    · `QuickAdd` bekommt die Termine von „Heute" HEREINGEREICHT statt sie neu
+      zu holen (der Bildschirm hat sie ohnehin). Wird die Zeile je auf einem
+      zweiten Bildschirm gezeigt, muss der das auch tun — sonst beantwortet sie
+      dort Kalenderfragen schlechter.
+    **Stufe 1 bewusst OHNE:** Einzelabwahl und Schnell-Editor der Vorschläge
+    (dafür gibt es den Braindump) und ohne Bilder. Braindump, Chat und
+    Sprach-Sheet bleiben unverändert bestehen — sie sind jetzt optional statt
+    notwendig, und genau das war das Ziel.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

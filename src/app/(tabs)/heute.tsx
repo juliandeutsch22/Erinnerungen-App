@@ -636,7 +636,9 @@ export default function HeuteScreen() {
     </Screen>
 
     {/* Quick-Add klebt über der Tab-Bar — Gedanke rein, Kopf frei (§1). */}
-    <QuickAdd />
+    {/* Die Zeile bekommt die Termine, die dieser Bildschirm ohnehin geladen
+        hat — so kann sie Fragen beantworten, ohne sie erneut zu holen. */}
+    <QuickAdd events={events ?? []} calendarDenied={!calGranted} />
     <QuickVoiceSheet visible={voiceOpen} onClose={() => setVoiceOpen(false)} apiKey={apiKey} />
     <BottomSheet
       visible={intentionSheet}
