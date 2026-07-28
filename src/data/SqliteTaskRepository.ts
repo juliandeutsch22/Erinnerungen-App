@@ -59,7 +59,7 @@ export class SqliteTaskRepository implements TaskRepository {
     await db.runAsync(
       `INSERT OR REPLACE INTO tasks
          (id, list_id, title, note, due_date, due_time, rrule, rrule_until, start_date, expires_on, evening, flagged, completed_at, notification_id, created_at, sort, tags, subtasks, event_id, deleted_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         task.id, task.listId, task.title, task.note, task.dueDate, task.dueTime,
         task.rrule, task.rruleUntil ?? null, task.startDate ?? null, task.expiresOn ?? null, task.evening ? 1 : 0, task.flagged ? 1 : 0, task.completedAt, task.notificationId,

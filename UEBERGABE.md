@@ -683,6 +683,51 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
       eine Entscheidung und wird nicht stillschweigend verschoben. Gilt im
       Editor UND im Aktions-Block (`actionDueDate`).
 
+39. **Das schwerste Versäumnis dieser Sessions: SQLite wird NIE ausgeführt**
+    (gefunden v1.51.0, kaputt seit v1.42.0). Im `INSERT` der Aufgaben stand ab
+    v1.42.0 EIN Fragezeichen zu viel — 20 Spalten, 21 Platzhalter. Auf dem
+    Gerät hat SQLite damit **jedes Anlegen einer Aufgabe abgelehnt**, acht
+    Releases lang. tsc: grün. 300 Tests: grün. Playwright: grün. Denn:
+    · **Die gesamte Verifikations-Pipeline läuft im Web, und dort sind alle
+      Repositories InMemory.** Kein einziger SQL-String wird je ausgeführt.
+      Das ist die größte blinde Stelle des Projekts — größer als „nativ ist im
+      Web nicht prüfbar" (§8.5), weil es sich wie geprüfter Code ANFÜHLT.
+    · Gegenmittel: `data/sqliteSchema.test.ts` liest alle `Sqlite*.ts` als TEXT
+      und vergleicht Spalten mit Platzhaltern; außerdem, dass jede beschriebene
+      Tabelle im Schema steht. Grob, aber es fängt genau diese Klasse. Der Test
+      wurde gegengeprüft: Fehler wieder einbauen → rot.
+    · **Wer eine SQL-Zeichenkette anfasst, verlässt sich auf nichts anderes.**
+    · Zweiter Teil des Befunds: Das Scheitern war **stumm**. `apply()` hatte
+      kein try/catch, die abgewiesene Zusage lief ins Leere — der Knopf tat
+      scheinbar nichts, die Vorschlagskarte blieb stehen, keine Meldung. Alle
+      vier Anwenden-Stellen (Braindump, Sprach-Sheet, Chat, Verwalter) zeigen
+      den Fehler jetzt an; ein Test hält fest, dass `applyAssistantActions`
+      Fehler NICHT verschluckt. Ohne diesen zweiten Teil hätte der erste noch
+      länger überlebt.
+
+40. **Der Fortschrittsbalken war der lauteste Fleck der App** (v1.51.0, vom
+    Nutzer gemeldet). Bei 100 % ein satter Farbblock über die volle Kartenbreite,
+    bei 0 % eine leere graue Rinne — beides auf einer Marmortafel Fremdkörper.
+    · Die Rinne ist jetzt eine Kerbe im Stein (`colors.sunk`, derselbe Token wie
+      `InsetField`), die Füllung liegt darin und ist tonal (Farbe bei 70 %).
+    · Auf der Listen-Übersicht wird sie NUR bei 0 < Fortschritt < 1 gezeigt:
+      bei 0 ist nichts geschehen, bei 100 % steht „Alles erledigt" ohnehin
+      darunter. Ein Balken, der nichts sagt, ist nur Farbe.
+
+41. **Neues App-Icon: Σ als Inschrift** (v1.51.0). Das alte war ein Häkchen im
+    Mäander-Ring — bei 40 px (der Größe, in der man es täglich sieht) blieb davon
+    ein unscharfer blauer Ring, und ein Häkchen sagt „Aufgaben-App", nicht
+    „Stoa". Zudem widersprach der geschlossene Mäander-Ring der eigenen
+    Leitplanke („Schmuck, kein Raster", AGENTS.md).
+    · **Cormorant Garamond enthält KEIN Griechisch** — ein Σ käme dort als
+      leerer Kasten. Das Icon nutzt deshalb FreeSerif (gleiche Haltung: hoher
+      Strichkontrast, echte Serifen). Wer das je ändert: erst prüfen, ob die
+      Schrift das Zeichen hat, sonst rendert PIL still „NO GLYPH".
+    · Untergrund ist die ECHTE Marmor-Kachel der App; das Relief kippt zwischen
+      den Fassungen wie in `Type.tsx` (hell = eingeschnitten, dunkel = erhaben).
+    · Der Android-Vordergrund trägt eine HELLE Letter — er liegt auf `#1F4467`.
+    · Erzeugt von `scratchpad/sigma.py`; bei einer Überarbeitung dort ansetzen.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

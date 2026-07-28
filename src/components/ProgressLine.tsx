@@ -26,9 +26,13 @@ export function ProgressLine({ ratio, color, height = 3 }: {
 
   const fill = useAnimatedStyle(() => ({ width: `${p.value * 100}%` }));
 
+  // Die Rinne ist eine Kerbe im Stein (`sunk`), die Füllung liegt DARIN und ist
+  // tonal statt vollfarbig. Vorher war der Balken bei 100 % ein satter Farbblock
+  // über die volle Breite — auf einer Marmortafel liest sich das wie Farbe, die
+  // jemand aufgetragen hat, nicht wie ein Teil der Platte.
   return (
-    <View style={{ height, borderRadius: 999, backgroundColor: colors.chip, overflow: 'hidden' }}>
-      <Animated.View style={[{ height, borderRadius: 999, backgroundColor: color ?? colors.teal }, fill]} />
+    <View style={{ height, borderRadius: 999, backgroundColor: colors.sunk, overflow: 'hidden' }}>
+      <Animated.View style={[{ height, borderRadius: 999, backgroundColor: `${color ?? colors.teal}B3` }, fill]} />
     </View>
   );
 }

@@ -426,7 +426,10 @@ export default function ChatScreen() {
     // Braindump, beim Verwalter und im Sprach-Sheet. Der Chat war der letzte
     // Bildschirm mit eigener Fassung; die Verdreifachung war beim letzten Mal
     // die Ursache für drei Fehler auf einmal.
-    await applyAssistantActions(selected, {
+    // Scheitert eine Mutation, MUSS das sichtbar werden — sonst tut der Knopf
+    // scheinbar nichts und niemand erfährt, warum.
+    try {
+      await applyAssistantActions(selected, {
       lists: lists ?? [],
       // NUR der Chat reicht Aufgaben herein — nur hier gibt es den
       // App-Überblick und damit Handles für „aenderungen".
@@ -440,8 +443,12 @@ export default function ChatScreen() {
       trashTask: (id) => deleteTask.mutateAsync(id),
       createEvents: (termine) => createEvents(termine),
       colorAt: (i) => LIST_COLORS[i % LIST_COLORS.length],
-      taskEventId: chat?.eventId ?? null,
-    });
+        taskEventId: chat?.eventId ?? null,
+      });
+    } catch (e) {
+      setError(`Konnte die Vorschläge nicht anlegen: ${e instanceof Error ? e.message : 'Unbekannter Fehler.'}`);
+      return;
+    }
     // Die Checkliste bleibt hier: sie braucht die verknüpfte Notiz und gibt es
     // nur im Chat — Braindump und Sprach-Sheet kennen sie gar nicht.
     if (selected.checkliste.length > 0) {

@@ -201,19 +201,29 @@ export default function BraindumpScreen() {
       // Der Braindump kann keine Änderungen anwenden (keine Handles).
       aenderungen: [],
     };
-    const res = await applyAssistantActions(gewaehlt, {
-      lists: lists ?? [],
-      tasks: [],
-      today,
-      createList: (input) => createList.mutateAsync(input),
-      createTask: (input) => createTask.mutateAsync(input),
-      createNote: (body) => createNote.mutateAsync({ body }),
-      updateTask: (id, patch) => updateTask.mutateAsync({ id, patch }),
-      completeTask: (t) => completeTask.mutateAsync(t),
-      trashTask: (id) => deleteTask.mutateAsync(id),
-      createEvents: (termine) => createEvents(termine),
-      colorAt: (i) => LIST_COLORS[i % LIST_COLORS.length],
-    });
+    // Scheitert eine Mutation, MUSS das sichtbar werden. Vorher lief die
+    // Zusage einfach ins Leere: der Knopf tat scheinbar nichts, die Karte blieb
+    // stehen, und niemand erfuhr warum (so blieb ein kaputtes SQL acht
+    // Releases lang unentdeckt).
+    let res;
+    try {
+      res = await applyAssistantActions(gewaehlt, {
+        lists: lists ?? [],
+        tasks: [],
+        today,
+        createList: (input) => createList.mutateAsync(input),
+        createTask: (input) => createTask.mutateAsync(input),
+        createNote: (body) => createNote.mutateAsync({ body }),
+        updateTask: (id, patch) => updateTask.mutateAsync({ id, patch }),
+        completeTask: (t) => completeTask.mutateAsync(t),
+        trashTask: (id) => deleteTask.mutateAsync(id),
+        createEvents: (termine) => createEvents(termine),
+        colorAt: (i) => LIST_COLORS[i % LIST_COLORS.length],
+      });
+    } catch (e) {
+      failRun(RUN_BRAINDUMP, `Konnte die Vorschläge nicht anlegen: ${e instanceof Error ? e.message : 'Unbekannter Fehler.'}`);
+      return;
+    }
     clearRun(RUN_BRAINDUMP);
     setText('');
     setImages([]);

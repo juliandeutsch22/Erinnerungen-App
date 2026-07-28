@@ -131,3 +131,18 @@ describe('applyAssistantActions', () => {
     expect(res).toEqual({ projekte: 1, aufgaben: 2, notizen: 1, termine: 1, aenderungen: 1 });
   });
 });
+
+describe('Fehler werden nicht verschluckt', () => {
+  // Die Bildschirme fangen sie ab und zeigen sie an. Würde applyAssistantActions
+  // still weiterlaufen, sähe der Nutzer eine Erfolgsmeldung für Dinge, die es
+  // nicht gibt — genau das war beim kaputten SQL acht Releases lang der Fall,
+  // nur ohne jede Meldung.
+  it('eine scheiternde Mutation lässt den ganzen Aufruf scheitern', async () => {
+    const kaputt = deps({
+      createTask: () => Promise.reject(new Error('tasks has 20 columns but 21 values were supplied')),
+    });
+    await expect(
+      applyAssistantActions({ ...leer, aufgaben: [{ titel: 'Keller aufräumen' }] }, kaputt.deps),
+    ).rejects.toThrow('21 values');
+  });
+});

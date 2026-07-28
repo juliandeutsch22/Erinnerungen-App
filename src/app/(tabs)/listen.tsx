@@ -174,7 +174,13 @@ export default function ListenScreen() {
                   {/* Projekt: dünne Fortschrittslinie + Deadline-Hinweis. */}
                   {isProject && (
                     <View style={{ gap: 4 }}>
-                      {prog && prog.total > 0 && <ProgressLine ratio={prog.ratio} color={l.color} />}
+                      {/* Nur zeigen, wenn die Linie etwas SAGT: bei 0 % ist noch
+                          nichts geschehen, bei 100 % steht „Alles erledigt"
+                          ohnehin darunter — ein voller Balken wiederholt es nur
+                          und ist der lauteste Fleck des Bildschirms. */}
+                      {prog && prog.total > 0 && prog.ratio > 0 && prog.ratio < 1 && (
+                        <ProgressLine ratio={prog.ratio} color={l.color} />
+                      )}
                       {l.deadline && (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                           <CalendarClock size={11} color={deadlineOverdue ? colors.indigo : colors.text3} strokeWidth={2} />

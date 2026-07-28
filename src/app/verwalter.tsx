@@ -139,19 +139,27 @@ export default function VerwalterScreen() {
       notizen: actions.notizen.filter((_, i) => !deselected.has(`n${i}`)),
       listen: actions.listen.filter((_, i) => !deselected.has(`l${i}`)),
     };
-    const res = await applyAssistantActions(gewaehlt, {
-      lists: lists ?? [],
-      tasks: tasks ?? [],
-      today,
-      createList: (input) => createList.mutateAsync(input),
-      createTask: (input) => createTask.mutateAsync(input),
-      createNote: (body) => createNote.mutateAsync({ body }),
-      updateTask: (id, patch) => updateTask.mutateAsync({ id, patch }),
-      completeTask: (t) => completeTask.mutateAsync(t),
-      trashTask: (id) => deleteTask.mutateAsync(id),
-      createEvents: (termine) => createEvents(termine),
-      colorAt: (i) => LIST_COLORS[i % LIST_COLORS.length],
-    });
+    // Scheitert eine Mutation, MUSS das sichtbar werden — sonst tut der Knopf
+    // scheinbar nichts und niemand erfährt, warum.
+    let res;
+    try {
+    res = await applyAssistantActions(gewaehlt, {
+        lists: lists ?? [],
+        tasks: tasks ?? [],
+        today,
+        createList: (input) => createList.mutateAsync(input),
+        createTask: (input) => createTask.mutateAsync(input),
+        createNote: (body) => createNote.mutateAsync({ body }),
+        updateTask: (id, patch) => updateTask.mutateAsync({ id, patch }),
+        completeTask: (t) => completeTask.mutateAsync(t),
+        trashTask: (id) => deleteTask.mutateAsync(id),
+        createEvents: (termine) => createEvents(termine),
+        colorAt: (i) => LIST_COLORS[i % LIST_COLORS.length],
+      });
+    } catch (e) {
+      failRun(RUN_VERWALTER, `Konnte es nicht übernehmen: ${e instanceof Error ? e.message : 'Unbekannter Fehler.'}`);
+      return;
+    }
     const teile = [
       res.aenderungen > 0 ? `${res.aenderungen} ${res.aenderungen === 1 ? 'Änderung' : 'Änderungen'}` : '',
       res.aufgaben > 0 ? `${res.aufgaben} ${res.aufgaben === 1 ? 'Aufgabe' : 'Aufgaben'}` : '',
