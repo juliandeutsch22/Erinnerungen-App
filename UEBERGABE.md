@@ -769,10 +769,23 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
       zu holen (der Bildschirm hat sie ohnehin). Wird die Zeile je auf einem
       zweiten Bildschirm gezeigt, muss der das auch tun — sonst beantwortet sie
       dort Kalenderfragen schlechter.
-    **Stufe 1 bewusst OHNE:** Einzelabwahl und Schnell-Editor der Vorschläge
-    (dafür gibt es den Braindump) und ohne Bilder. Braindump, Chat und
-    Sprach-Sheet bleiben unverändert bestehen — sie sind jetzt optional statt
-    notwendig, und genau das war das Ziel.
+    **Stufe 2 (v1.53.0)** macht die Zeile vollständig:
+    · **Sprechen.** Bei leerem Feld steht ein Mikrofon in der Zeile. Das Diktat
+      FÜLLT das Feld, statt sofort loszuschicken — man sieht das Gesagte, kann
+      es korrigieren, und der Knopf verrät weiterhin, wohin es geht. Damit ist
+      der Sprach-Schnellzugriff als eigener Bildschirm im Grunde überflüssig;
+      er bleibt vorerst bestehen, könnte aber der nächste Rückbau sein.
+    · **Abwählen und zurechtrücken.** Kästchen wählt ab, Text öffnet denselben
+      `ActionEditSheet` wie im Braindump. Vorher musste man alles verwerfen und
+      neu tippen, wenn einer von drei Vorschlägen nicht stimmte.
+    · **Die Weiche überstimmen.** Langer Druck auf den Knopf schickt die
+      Eingabe den ANDEREN Weg — für genau diese eine Eingabe, und beim nächsten
+      Tastendruck ist es wieder gelöst. **Bewusst kein dauerhafter Schalter:**
+      das wäre ein versteckter Modus, und Modi loszuwerden war der ganze Punkt.
+      Ohne Schlüssel greift das Überstimmen nicht (es gäbe kein Ziel).
+    Weiterhin OHNE: Bilder und eine Rückfrage-Runde (jede Anfrage ist ein
+    Einzelschuss ohne Gedächtnis). Braindump, Chat und Sprach-Sheet bestehen
+    unverändert weiter — sie sind optional statt notwendig, und das war das Ziel.
 
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 

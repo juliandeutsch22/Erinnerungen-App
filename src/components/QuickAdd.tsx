@@ -14,13 +14,20 @@
 // Die Reihenfolge ist nicht verhandelbar: Der lokale Parser sieht ZUERST hin.
 // Ohne Schlüssel bleibt die Zeile deshalb genau so nutzbar wie vorher —
 // erkannte Teile als Chips, Return legt an, kein Netz, keine Wartezeit.
+//
+// Seit v1.53.0 (Stufe 2) kann man in die Zeile auch SPRECHEN (das Diktat füllt
+// das Feld, man sieht das Gesagte vor dem Abschicken), Vorschläge einzeln
+// abwählen und zurechtrücken — und die Weiche ÜBERSTIMMEN: langer Druck auf
+// den Knopf schickt die Eingabe den jeweils anderen Weg.
 import { CalendarDays, Clock, Plus, Repeat, Sparkles, X } from 'lucide-react-native';
 import React, { useMemo, useRef, useState } from 'react';
 import { TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ActionEditSheet, type EditTarget } from '@/components/ActionEditSheet';
 import { Glass } from '@/components/Glass';
-import { OmniResult } from '@/components/OmniResult';
+import { MicButton } from '@/components/MicButton';
+import { OmniResult, omniZeilen } from '@/components/OmniResult';
 import { PopIn } from '@/components/PopIn';
 import { PressableScale } from '@/components/PressableScale';
 import { Type } from '@/components/Type';
@@ -32,10 +39,10 @@ import { DEFAULT_LIST_ID } from '@/data/ListRepository';
 import type { ChatMessage } from '@/data/types';
 import type { DeviceEvent } from '@/lib/deviceCalendar';
 import { applyAssistantActions } from '@/lib/applyActions';
-import { askAssistant, buildAppContext, extractActions, type ToolData } from '@/lib/assistant';
+import { type AssistantAction, askAssistant, buildAppContext, extractActions, type ToolData } from '@/lib/assistant';
 import { RUN_ZEILE, useAssistantRuns } from '@/lib/assistantRun';
 import { formatDueDate, todayStr } from '@/lib/dates';
-import { hapticSuccess } from '@/lib/haptics';
+import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { routeInput, type AssistentGrund } from '@/lib/inputRoute';
 import { parseQuickAdd } from '@/lib/quickAddParser';
 import { useKeyboardHeight } from '@/lib/useKeyboardHeight';
@@ -95,6 +102,15 @@ export function QuickAdd({
 
   const [text, setText] = useState('');
   const [removed, setRemoved] = useState<Removed>(NOTHING_REMOVED);
+  /** Abgewählte Vorschläge und der gerade offene Schnell-Editor. */
+  const [deselected, setDeselected] = useState<Set<string>>(new Set());
+  const [edit, setEdit] = useState<EditTarget | null>(null);
+  /** Weiche überstimmt? Gilt für genau diese Eingabe und wird beim Tippen
+   *  wieder gelöst — eine dauerhafte Umschaltung wäre ein versteckter Modus,
+   *  und Modi loszuwerden war der ganze Punkt. */
+  const [ueberstimmt, setUeberstimmt] = useState(false);
+  const [diktiert, setDiktiert] = useState(false);
+  const diktatBasis = useRef('');
 
   const today = todayStr();
   const parsed = useMemo(() => parseQuickAdd(text, today), [text, today]);
@@ -124,23 +140,31 @@ export function QuickAdd({
         onDelta: (d) => deltaRun(RUN_ZEILE, d),
       });
       const { clean, actions } = extractActions(antwort);
+      setDeselected(new Set());
       finishRun(RUN_ZEILE, { clean, actions });
     } catch (e) {
       failRun(RUN_ZEILE, e instanceof Error ? e.message : 'Unbekannter Fehler.');
     }
   };
 
-  const submit = () => {
+  const submit = (umkehren = false) => {
     const eingabe = text.trim();
     if (eingabe.length === 0) return;
-    const weiche = routeInput(eingabe, today, apiKey.length > 0);
+    const roh = routeInput(eingabe, today, apiKey.length > 0);
+    // Überstimmen dreht die Entscheidung — aber nie ins Netz, wenn es gar
+    // keinen Schlüssel gibt.
+    const nachAssistent = umkehren ? roh.ziel === 'lokal' : roh.ziel === 'assistent';
+    const weiche = nachAssistent && apiKey.length > 0 ? { ...roh, ziel: 'assistent' as const } : roh;
 
-    if (weiche.ziel === 'lokal') {
+    if (weiche.ziel === 'lokal' || !nachAssistent) {
+      const aufgabe = roh.ziel === 'lokal' ? roh.aufgabe : parsed;
       // Die im Feld abgewählten Chips gewinnen über den Parser.
-      createTask.mutate({ listId, title: weiche.aufgabe.title, dueDate, dueTime, rrule, tags: weiche.aufgabe.tags });
+      const titel = aufgabe.title || eingabe;
+      createTask.mutate({ listId, title: titel, dueDate, dueTime, rrule, tags: aufgabe.tags });
       hapticSuccess();
       setText('');
       setRemoved(NOTHING_REMOVED);
+      setUeberstimmt(false);
       // Fokus behalten — nächster Gedanke sofort rein (unter 3 Sekunden).
       inputRef.current?.focus();
       return;
@@ -148,15 +172,43 @@ export function QuickAdd({
 
     setText('');
     setRemoved(NOTHING_REMOVED);
-    void frage(eingabe, weiche.grund);
+    setUeberstimmt(false);
+    void frage(eingabe, roh.ziel === 'assistent' ? roh.grund : 'auftrag');
+  };
+
+  const toggleZeile = (key: string) => {
+    hapticSelect();
+    setDeselected((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  /** Schlüssel („a0") → Ziel des Schnell-Editors. */
+  const oeffneEditor = (key: string) => {
+    hapticSelect();
+    const index = Number(key.slice(1));
+    if (key.startsWith('a')) setEdit({ kind: 'aufgabe', index });
+    else if (key.startsWith('t')) setEdit({ kind: 'termin', index });
+    else if (key.startsWith('n')) setEdit({ kind: 'notiz', index });
   };
 
   const uebernehmen = async () => {
     const actions = run?.status === 'done' ? run.actions : null;
     if (!actions) return;
     hapticSuccess();
+    const gewaehlt: AssistantAction = {
+      ...actions,
+      listen: actions.listen.filter((_, i) => !deselected.has(`l${i}`)),
+      aenderungen: actions.aenderungen.filter((_, i) => !deselected.has(`x${i}`)),
+      aufgaben: actions.aufgaben.filter((_, i) => !deselected.has(`a${i}`)),
+      termine: actions.termine.filter((_, i) => !deselected.has(`t${i}`)),
+      notizen: actions.notizen.filter((_, i) => !deselected.has(`n${i}`)),
+    };
     try {
-      await applyAssistantActions(actions, {
+      await applyAssistantActions(gewaehlt, {
         lists: lists ?? [],
         tasks: tasks ?? [],
         today,
@@ -181,7 +233,9 @@ export function QuickAdd({
     () => routeInput(text.trim(), today, apiKey.length > 0),
     [text, today, apiKey],
   );
+  // Was der Knopf ZEIGT — inklusive eines etwaigen Überstimmens.
   const gehtLokal = weicheJetzt.ziel === 'lokal';
+  const zeigtLokal = ueberstimmt ? !gehtLokal : gehtLokal;
 
   const chips: { key: keyof Removed; icon: typeof Clock; label: string }[] = [];
   if (dueDate) chips.push({ key: 'date', icon: CalendarDays, label: formatDueDate(dueDate, today) });
@@ -212,8 +266,14 @@ export function QuickAdd({
                 grund={grund}
                 tasks={tasks ?? []}
                 today={today}
+                deselected={deselected}
+                onToggle={toggleZeile}
+                onEdit={oeffneEditor}
                 onApply={() => void uebernehmen()}
-                onDismiss={() => clearRun(RUN_ZEILE)}
+                onDismiss={() => {
+                  clearRun(RUN_ZEILE);
+                  setDeselected(new Set());
+                }}
               />
             </PopIn>
           )}
@@ -263,23 +323,48 @@ export function QuickAdd({
               value={text}
               onChangeText={(v) => {
                 setText(v);
+                setUeberstimmt(false);
                 if (v.length === 0) setRemoved(NOTHING_REMOVED);
               }}
-              placeholder={apiKey.length > 0 ? 'Was liegt an? Oder frag mich.' : 'Was liegt an?'}
+              placeholder={
+                diktiert ? 'Ich höre zu …' : apiKey.length > 0 ? 'Was liegt an? Oder frag mich.' : 'Was liegt an?'
+              }
               placeholderTextColor={colors.text3}
               returnKeyType="done"
               submitBehavior="submit"
-              onSubmitEditing={submit}
+              onSubmitEditing={() => submit()}
               accessibilityLabel="Schnell hinzufügen"
               style={[{ flex: 1, fontSize: T.md, color: colors.text, paddingVertical: 2 }, webNoOutline]}
             />
+            {/* Leeres Feld → sprechen. Das Diktat FÜLLT die Zeile, statt sofort
+                loszuschicken: so sieht man das Gesagte, kann es korrigieren,
+                und der Knopf verrät weiterhin, wohin es geht. */}
+            {text.trim().length === 0 && (
+              <MicButton
+                size={30}
+                onStart={() => {
+                  diktatBasis.current = text;
+                }}
+                onText={(transkript) => setText((diktatBasis.current ? `${diktatBasis.current.trimEnd()} ` : '') + transkript)}
+                onListeningChange={setDiktiert}
+              />
+            )}
             {text.trim().length > 0 && (
               <PopIn>
                 <PressableScale
                   // Das Symbol verrät VOR dem Tippen, was passieren wird:
                   // Plus = wird angelegt, Funke = der Assistent sieht es an.
-                  accessibilityLabel={gehtLokal ? 'Aufgabe anlegen' : 'An den Assistenten geben'}
-                  onPress={submit}
+                  accessibilityLabel={zeigtLokal ? 'Aufgabe anlegen' : 'An den Assistenten geben'}
+                  onPress={() => submit(ueberstimmt)}
+                  // Langer Druck dreht die Entscheidung für DIESE eine Eingabe.
+                  onLongPress={
+                    apiKey.length > 0
+                      ? () => {
+                          hapticSelect();
+                          setUeberstimmt((v) => !v);
+                        }
+                      : undefined
+                  }
                   style={{
                     width: 30,
                     height: 30,
@@ -289,7 +374,7 @@ export function QuickAdd({
                     justifyContent: 'center',
                   }}
                 >
-                  {gehtLokal ? (
+                  {zeigtLokal ? (
                     <Plus size={17} color="#FFFFFF" strokeWidth={2.6} />
                   ) : (
                     <Sparkles size={16} color="#FFFFFF" strokeWidth={2.4} />
@@ -300,6 +385,17 @@ export function QuickAdd({
           </Glass>
         </View>
       </View>
+      {/* Einen Vorschlag zurechtrücken, ohne ihn abzuwählen und neu zu tippen.
+          Derselbe Editor wie im Braindump. */}
+      {edit && run?.status === 'done' && run.actions && (
+        <ActionEditSheet
+          target={edit}
+          actions={run.actions}
+          lists={lists ?? []}
+          onClose={() => setEdit(null)}
+          onSave={(next) => finishRun(RUN_ZEILE, { clean: run.clean, actions: next })}
+        />
+      )}
     </View>
   );
 }

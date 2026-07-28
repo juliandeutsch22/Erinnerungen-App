@@ -5,11 +5,10 @@
 // Danach verschwindet es wieder — es ist kein Bildschirm, sondern eine
 // Rückmeldung.
 //
-// Bewusst OHNE Einzelabwahl: In dieser Zeile geht es um ein, zwei Dinge. Wer
-// abwählen oder zurechtrücken will, ist im Braindump besser aufgehoben; hier
-// zählt Tempo, und „Verwerfen" plus neu tippen ist schneller als Kästchen.
-// Die Leitplanke bleibt trotzdem gewahrt: Ohne Tipp auf „Übernehmen" wird
-// nichts geschrieben.
+// Seit v1.53.0 wie im Braindump: das KÄSTCHEN wählt ab, der TEXT öffnet den
+// Schnell-Editor. Stimmt einer von drei Vorschlägen nicht, muss man nicht mehr
+// alles verwerfen und neu tippen. Die Leitplanke bleibt: Ohne Tipp auf
+// „Übernehmen" wird nichts geschrieben.
 import { Check, X } from 'lucide-react-native';
 import React from 'react';
 import { View } from 'react-native';
@@ -27,36 +26,50 @@ import { MAX_CONTENT_WIDTH } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
 import { Shadow, Spacing } from '@/theme/theme.tokens';
 
-export type OmniZeile = { titel: string; unter?: string; art: string };
+export type OmniZeile = {
+  /** Schlüssel für die Abwahl — gleiche Sprache wie im Braindump. */
+  key: string;
+  titel: string;
+  unter?: string;
+  art: string;
+  /** Projekte und Änderungen haben keinen Schnell-Editor. */
+  editierbar: boolean;
+};
 
 /** Die Vorschläge als lesbare Zeilen — dieselbe Sprache wie im Braindump. */
 export function omniZeilen(a: AssistantAction, tasks: Task[], today: string): OmniZeile[] {
   return [
-    ...a.listen.map((l) => ({ titel: l.name, unter: l.ziel ?? undefined, art: 'Projekt' })),
-    ...a.aenderungen.map((c) => {
+    ...a.listen.map((l, i) => ({ key: `l${i}`, titel: l.name, unter: l.ziel ?? undefined, art: 'Projekt', editierbar: false })),
+    ...a.aenderungen.map((c, i) => {
       const t = resolveTaskHandle(c.handle, tasks);
       // Unbekanntes Handle ehrlich anzeigen — es wird beim Übernehmen
       // übersprungen, statt still zu verschwinden.
       return {
+        key: `x${i}`,
         titel: t ? t.title : 'Unbekannte Aufgabe',
         unter: t ? describeAenderung(c, (d) => formatDueDate(d, today)) : 'Nicht mehr gefunden — wird übersprungen',
         art: 'Änderung',
+        editierbar: false,
       };
     }),
-    ...a.aufgaben.map((t) => ({
+    ...a.aufgaben.map((t, i) => ({
+      key: `a${i}`,
       titel: t.titel,
       unter:
         [t.datum ? formatDueDate(t.datum, today) : '', t.zeit ?? '', t.liste ? `→ ${t.liste}` : '', describeSchritte(t.schritte) ?? '', describeExtras(t) ?? '']
           .filter(Boolean)
           .join(' · ') || undefined,
       art: 'Aufgabe',
+      editierbar: true,
     })),
-    ...a.termine.map((t) => ({
+    ...a.termine.map((t, i) => ({
+      key: `t${i}`,
       titel: t.titel,
       unter: `${formatDueDate(t.datum, today)}${t.start ? ` · ${t.start}` : ' · ganztägig'}`,
       art: 'Termin',
+      editierbar: true,
     })),
-    ...a.notizen.map((n) => ({ titel: n.split('\n')[0], art: 'Notiz' })),
+    ...a.notizen.map((n, i) => ({ key: `n${i}`, titel: n.split('\n')[0], art: 'Notiz', editierbar: true })),
   ];
 }
 
@@ -65,6 +78,9 @@ export function OmniResult({
   grund,
   tasks,
   today,
+  deselected,
+  onToggle,
+  onEdit,
   onApply,
   onDismiss,
 }: {
@@ -72,12 +88,17 @@ export function OmniResult({
   grund: AssistentGrund;
   tasks: Task[];
   today: string;
+  /** Abgewählte Vorschläge (Schlüssel aus `omniZeilen`). */
+  deselected: Set<string>;
+  onToggle: (key: string) => void;
+  onEdit: (key: string) => void;
   onApply: () => void;
   onDismiss: () => void;
 }) {
   const colors = useColors();
   const actions = run.status === 'done' ? run.actions : null;
   const zeilen = actions ? omniZeilen(actions, tasks, today) : [];
+  const gewaehlt = zeilen.filter((z) => !deselected.has(z.key)).length;
 
   const schliessen = (
     <PressableScale accessibilityLabel="Antwort schließen" onPress={onDismiss} style={{ padding: Spacing.xs }}>
@@ -125,25 +146,62 @@ export function OmniResult({
             <>
               {run.clean.trim().length === 0 && (
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Type variant="eyebrow" tone="teal">Vorschlag</Type>
+                  <Type variant="eyebrow" tone="teal">Vorschlag — Kästchen wählt ab, Text ändert</Type>
                   {schliessen}
                 </View>
               )}
               <View style={{ gap: 2 }}>
-                {zeilen.map((z, i) => (
-                  <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: 2 }}>
-                    <View style={{ flex: 1 }}>
+                {zeilen.map((z) => {
+                  const aus = deselected.has(z.key);
+                  const inhalt = (
+                    <>
                       <Type variant="body" numberOfLines={1}>{z.titel}</Type>
                       {z.unter && <Type variant="caption" tone="text3" numberOfLines={1} tabular>{z.unter}</Type>}
+                    </>
+                  );
+                  return (
+                    <View
+                      key={z.key}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: 2, opacity: aus ? 0.4 : 1 }}
+                    >
+                      <PressableScale
+                        accessibilityLabel={`${z.art} ${z.titel} ${aus ? 'wieder auswählen' : 'abwählen'}`}
+                        onPress={() => onToggle(z.key)}
+                        style={{
+                          width: 18,
+                          height: 18,
+                          borderRadius: z.art === 'Notiz' ? 9 : 5,
+                          borderWidth: 1.5,
+                          borderColor: aus ? colors.border3 : colors.teal,
+                          backgroundColor: aus ? 'transparent' : colors.teal,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        {!aus && <Check size={12} color="#FFFFFF" strokeWidth={3} />}
+                      </PressableScale>
+                      {z.editierbar ? (
+                        <PressableScale
+                          accessibilityLabel={`${z.art} ${z.titel} ändern`}
+                          onPress={() => onEdit(z.key)}
+                          pressedScale={0.99}
+                          style={{ flex: 1 }}
+                        >
+                          {inhalt}
+                        </PressableScale>
+                      ) : (
+                        <View style={{ flex: 1 }}>{inhalt}</View>
+                      )}
+                      <Type variant="caption" tone="text3">{z.art}</Type>
                     </View>
-                    <Type variant="caption" tone="text3">{z.art}</Type>
-                  </View>
-                ))}
+                  );
+                })}
               </View>
               <PressableScale
                 accessibilityLabel="Vorschlag übernehmen"
-                onPress={onApply}
+                onPress={gewaehlt > 0 ? onApply : undefined}
                 style={{
+                  opacity: gewaehlt > 0 ? 1 : 0.4,
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -156,7 +214,7 @@ export function OmniResult({
               >
                 <Check size={15} color="#FFFFFF" strokeWidth={2.6} />
                 <Type variant="label" style={{ color: '#FFFFFF' }}>
-                  {zeilen.length === 1 ? 'Übernehmen' : `${zeilen.length} übernehmen`}
+                  {gewaehlt === 1 ? 'Übernehmen' : `${gewaehlt} übernehmen`}
                 </Type>
               </PressableScale>
             </>
