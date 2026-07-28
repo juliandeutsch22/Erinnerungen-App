@@ -23,7 +23,9 @@ import { useCreateNote } from '@/data/noteQueries';
 import { useCompleteTask, useCreateList, useCreateTask, useDeleteTask, useLists, useUpdateTask } from '@/data/queries';
 import type { ChatMessage } from '@/data/types';
 import { askAssistant, type AssistantImage, buildBraindumpContext, IMAGE_LIMIT, actionDueDate, describeExtras, describeSchritte, extractActions, hasCapturableActions, resolveListId, subtasksFromSchritte, type AssistantAction } from '@/lib/assistant';
+import { ActionEditSheet, type EditTarget } from '@/components/ActionEditSheet';
 import { applyAssistantActions } from '@/lib/applyActions';
+import { RUN_BRAINDUMP, useAssistantRuns } from '@/lib/assistantRun';
 import { assistantCameraAvailable, assistantImagesAvailable, captureAssistantImage, pickAssistantImages } from '@/lib/assistantImage';
 import { formatDueDate, parseDateStr, todayStr } from '@/lib/dates';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
@@ -66,16 +68,24 @@ export default function BraindumpScreen() {
   const [images, setImages] = useState<AssistantImage[]>([]);
   const dictBaseRef = useRef('');
   const [dictating, setDictating] = useState(false);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [actions, setActions] = useState<AssistantAction | null>(null);
+  // Der Lauf lebt im Store, nicht im Bildschirm — deshalb ueberlebt er das
+  // Verlassen des Braindumps (siehe lib/assistantRun.ts).
+  const run = useAssistantRuns((s2) => s2.runs[RUN_BRAINDUMP]);
+  const beginRun = useAssistantRuns((s2) => s2.begin);
+  const deltaRun = useAssistantRuns((s2) => s2.delta);
+  const finishRun = useAssistantRuns((s2) => s2.finish);
+  const failRun = useAssistantRuns((s2) => s2.fail);
+  const clearRun = useAssistantRuns((s2) => s2.clear);
+  const pending = run?.status === 'running';
+  const error = run?.status === 'error' ? run.error : null;
+  const actions = run?.status === 'done' ? run.actions : null;
   // Abwählbare Vorschläge: 'a0', 'a1', … Aufgaben; 't0', … Termine; 'n0', … Notizen.
   const [deselected, setDeselected] = useState<Set<string>>(new Set());
   const [done, setDone] = useState<string | null>(null);
+  // Welcher Vorschlag wird gerade zurechtgerueckt?
+  const [edit, setEdit] = useState<EditTarget | null>(null);
   const [doneEvents, setDoneEvents] = useState(0);
-  // Der Assistent streamt bereits — sichtbar gemacht wirkt dieselbe Wartezeit
-  // deutlich kürzer als ein toter Spinner. Der Aktions-Block bleibt verborgen.
-  const [stream, setStream] = useState('');
+  const stream = run?.stream ?? '';
 
   // Punkt 5: Ist der Wurf genau EIN Link, geht er mit einem Tipp als „Notiz mit
   // Link" — ohne Assistent (Notiz-Body rendert die URL tappbar).
@@ -100,12 +110,9 @@ export default function BraindumpScreen() {
     const dump = text.trim();
     // Ein Foto allein genügt — der Zettel IST die Eingabe.
     if ((!dump && images.length === 0) || pending) return;
-    setPending(true);
-    setError(null);
-    setActions(null);
     setDone(null);
     setDoneEvents(0);
-    setStream('');
+    beginRun(RUN_BRAINDUMP, 'Braindump');
     try {
       const listNames = (lists ?? []).filter((l) => !l.deletedAt).map((l) => l.name);
       const dateLabel = `${parseDateStr(today).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} (${today})`;
@@ -124,7 +131,7 @@ export default function BraindumpScreen() {
         memory,
         (delta) => {
           acc += delta;
-          setStream(acc);
+          deltaRun(RUN_BRAINDUMP, delta);
         },
         null,
         images,
@@ -143,18 +150,16 @@ export default function BraindumpScreen() {
       if (!parsed) {
         // Auch der Zweitversuch scheiterte → die Roh-Antwort zeigen statt Sackgasse,
         // damit nichts verloren geht (der Nutzer sieht wenigstens die Einschätzung).
-        setError(
+        failRun(
+          RUN_BRAINDUMP,
           `Der Assistent konnte es nicht automatisch sortieren. Seine Antwort:\n\n${extractActions(answer).clean}`,
         );
       } else {
-        setActions(parsed);
+        finishRun(RUN_BRAINDUMP, { clean: extractActions(answer).clean, actions: parsed });
         setDeselected(new Set());
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unbekannter Fehler.');
-    } finally {
-      setPending(false);
-      setStream('');
+      failRun(RUN_BRAINDUMP, e instanceof Error ? e.message : 'Unbekannter Fehler.');
     }
   };
 
@@ -195,7 +200,7 @@ export default function BraindumpScreen() {
       createEvents: (termine) => createEvents(termine),
       colorAt: (i) => LIST_COLORS[i % LIST_COLORS.length],
     });
-    setActions(null);
+    clearRun(RUN_BRAINDUMP);
     setText('');
     setImages([]);
     setDoneEvents(res.termine);
@@ -379,7 +384,7 @@ export default function BraindumpScreen() {
 
           {actions && (
             <GlassPanel>
-              <Type variant="eyebrow" tone="teal">Vorschläge — antippen wählt ab</Type>
+              <Type variant="eyebrow" tone="teal">Vorschläge — Kästchen wählt ab, Text ändert</Type>
               <View style={{ marginTop: Spacing.sm, gap: 2 }}>
                 {/* Projekte stehen oben — sie sind das Dach, unter dem die
                     Aufgaben darunter einsortiert werden. */}
@@ -410,16 +415,26 @@ export default function BraindumpScreen() {
                 {actions.aufgaben.map((a, i) => {
                   const off = deselected.has(`a${i}`);
                   return (
-                    <PressableScale
+                    <View
                       key={`a${i}`}
-                      accessibilityLabel={`Aufgabe ${a.titel} ${off ? 'wieder auswählen' : 'abwählen'}`}
-                      onPress={() => toggle(`a${i}`)}
                       style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.xs + 1, opacity: off ? 0.4 : 1 }}
                     >
-                      <View style={{ width: 18, height: 18, borderRadius: 5, borderWidth: 1.5, borderColor: off ? colors.border3 : colors.teal, backgroundColor: off ? 'transparent' : colors.teal, alignItems: 'center', justifyContent: 'center' }}>
+                      <PressableScale
+                        accessibilityLabel={`Aufgabe ${a.titel} ${off ? 'wieder auswählen' : 'abwählen'}`}
+                        onPress={() => toggle(`a${i}`)}
+                        style={{ width: 18, height: 18, borderRadius: 5, borderWidth: 1.5, borderColor: off ? colors.border3 : colors.teal, backgroundColor: off ? 'transparent' : colors.teal, alignItems: 'center', justifyContent: 'center' }}
+                      >
                         {!off && <Check size={12} color="#FFFFFF" strokeWidth={3} />}
-                      </View>
-                      <View style={{ flex: 1 }}>
+                      </PressableScale>
+                      <PressableScale
+                        accessibilityLabel={`Aufgabe ${a.titel} ändern`}
+                        onPress={() => {
+                          hapticSelect();
+                          setEdit({ kind: 'aufgabe', index: i });
+                        }}
+                        pressedScale={0.99}
+                        style={{ flex: 1 }}
+                      >
                         <Type variant="body" numberOfLines={1}>{a.titel}</Type>
                         {(a.datum || a.zeit || a.liste) && (
                           <Type variant="caption" tone="text3" tabular>
@@ -436,51 +451,70 @@ export default function BraindumpScreen() {
                         {describeExtras(a) && (
                           <Type variant="caption" tone="text3" numberOfLines={1}>{describeExtras(a)}</Type>
                         )}
-                      </View>
+                      </PressableScale>
                       <Type variant="caption" tone="text3">Aufgabe</Type>
-                    </PressableScale>
+                    </View>
                   );
                 })}
                 {actions.termine.map((t, i) => {
                   const off = deselected.has(`t${i}`);
                   return (
-                    <PressableScale
+                    <View
                       key={`t${i}`}
-                      accessibilityLabel={`Termin ${t.titel} ${off ? 'wieder auswählen' : 'abwählen'}`}
-                      onPress={() => toggle(`t${i}`)}
                       style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.xs + 1, opacity: off ? 0.4 : 1 }}
                     >
-                      <View style={{ width: 18, height: 18, borderRadius: 5, borderWidth: 1.5, borderColor: off ? colors.border3 : colors.teal, backgroundColor: off ? 'transparent' : colors.teal, alignItems: 'center', justifyContent: 'center' }}>
+                      <PressableScale
+                        accessibilityLabel={`Termin ${t.titel} ${off ? 'wieder auswählen' : 'abwählen'}`}
+                        onPress={() => toggle(`t${i}`)}
+                        style={{ width: 18, height: 18, borderRadius: 5, borderWidth: 1.5, borderColor: off ? colors.border3 : colors.teal, backgroundColor: off ? 'transparent' : colors.teal, alignItems: 'center', justifyContent: 'center' }}>
                         {!off && <Check size={12} color="#FFFFFF" strokeWidth={3} />}
-                      </View>
-                      <View style={{ flex: 1 }}>
+                      </PressableScale>
+                      <PressableScale
+                        accessibilityLabel={`Termin ${t.titel} ändern`}
+                        onPress={() => {
+                          hapticSelect();
+                          setEdit({ kind: 'termin', index: i });
+                        }}
+                        pressedScale={0.99}
+                        style={{ flex: 1 }}
+                      >
                         <Type variant="body" numberOfLines={1}>{t.titel}</Type>
                         <Type variant="caption" tone="text3" tabular>
                           {formatDueDate(t.datum, today)}{t.start ? ` · ${t.start}${t.ende ? `–${t.ende}` : ''}` : ' · ganztägig'}
                         </Type>
-                      </View>
+                      </PressableScale>
                       <Type variant="caption" tone="text3">Termin</Type>
-                    </PressableScale>
+                    </View>
                   );
                 })}
                 {actions.notizen.map((n, i) => {
                   const off = deselected.has(`n${i}`);
                   return (
-                    <PressableScale
+                    <View
                       key={`n${i}`}
-                      accessibilityLabel={`Notiz ${n.split('\n')[0]} ${off ? 'wieder auswählen' : 'abwählen'}`}
-                      onPress={() => toggle(`n${i}`)}
                       style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.xs + 1, opacity: off ? 0.4 : 1 }}
                     >
-                      <View style={{ width: 18, height: 18, borderRadius: 9, borderWidth: 1.5, borderColor: off ? colors.border3 : colors.teal, backgroundColor: off ? 'transparent' : colors.teal, alignItems: 'center', justifyContent: 'center' }}>
+                      <PressableScale
+                        accessibilityLabel={`Notiz ${n.split('\n')[0]} ${off ? 'wieder auswählen' : 'abwählen'}`}
+                        onPress={() => toggle(`n${i}`)}
+                        style={{ width: 18, height: 18, borderRadius: 9, borderWidth: 1.5, borderColor: off ? colors.border3 : colors.teal, backgroundColor: off ? 'transparent' : colors.teal, alignItems: 'center', justifyContent: 'center' }}
+                      >
                         {!off && <Check size={12} color="#FFFFFF" strokeWidth={3} />}
-                      </View>
-                      <View style={{ flex: 1 }}>
+                      </PressableScale>
+                      <PressableScale
+                        accessibilityLabel={`Notiz ${n.split('\n')[0]} ändern`}
+                        onPress={() => {
+                          hapticSelect();
+                          setEdit({ kind: 'notiz', index: i });
+                        }}
+                        pressedScale={0.99}
+                        style={{ flex: 1 }}
+                      >
                         <Type variant="body" numberOfLines={1}>{n.split('\n')[0]}</Type>
                         {n.includes('\n') && <Type variant="caption" tone="text3" numberOfLines={1}>{n.split('\n').slice(1).join(' · ')}</Type>}
-                      </View>
+                      </PressableScale>
                       <Type variant="caption" tone="text3">Notiz</Type>
-                    </PressableScale>
+                    </View>
                   );
                 })}
               </View>
@@ -498,6 +532,16 @@ export default function BraindumpScreen() {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+      {/* Einen Vorschlag zurechtruecken, ohne ihn abzuwaehlen und neu anzulegen. */}
+      {edit && actions && (
+        <ActionEditSheet
+          target={edit}
+          actions={actions}
+          lists={lists ?? []}
+          onClose={() => setEdit(null)}
+          onSave={(next) => finishRun(RUN_BRAINDUMP, { clean: run?.clean ?? '', actions: next })}
+        />
+      )}
       <KeyboardDoneBar />
     </View>
   );

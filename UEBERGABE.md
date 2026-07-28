@@ -266,12 +266,17 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
    Das „Säule wandert beim Zurück-Wischen"-Thema ist damit bewusst NICHT über
    Transparenz gelöst — falls erneut angegangen, unbedingt zuerst am Gerät die
    Deckung bei Tab-/Stack-Wechseln prüfen.
-10. **Assistent-Generierung läuft IM Chat-Screen** (nicht in einen globalen
-   Store auslagern ohne Gerätetest): Ein entkoppelter zustand-Store (v1.24.0)
-   sollte laufende Antworten das Verlassen des Chats überleben lassen, stand aber
-   im Verdacht, am Gerät beim Absenden abzustürzen, und wurde in v1.24.1 auf die
-   bewährte In-Komponenten-Generierung zurückgesetzt. Wer das Feature erneut will:
-   erst am Gerät verifizieren, nicht nur im Web.
+10. ~~**Assistent-Generierung läuft IM Chat-Screen**~~ — **DIESER EINTRAG WAR
+   FALSCH.** Der entkoppelte Store (v1.24.0) wurde in v1.24.1 zurückgenommen,
+   weil er im Verdacht stand, den Chat am Gerät abstürzen zu lassen. Die
+   tatsächliche Ursache war das `Easing` aus react-native in einem
+   Reanimated-Worklet (gefunden in v1.27.2, siehe Warnkasten oben). Der Store
+   war unschuldig. Seit v1.44.0 gibt es ihn wieder (`lib/assistantRun.ts`) —
+   diesmal mit der Regel, die ihn sicher macht: **die laufende Funktion
+   schreibt ausschließlich in den Store, nie in Komponenten-State.** Ein
+   unmontierter Bildschirm ist damit kein Sonderfall, sondern nur ein Leser,
+   der gerade nicht da ist. Lehre fürs nächste Mal: Wenn ein Verdacht sich als
+   falsch erweist, gehört auch die daraus gezogene Regel widerrufen.
 11. **Sprach-Schnellzugriff** (`components/QuickVoiceSheet.tsx`, v1.25.0): Der
    Mic-Knopf auf „Heute" öffnet ein Sheet (im absturzsicheren `BottomSheet`, KEIN
    eigener GestureDetector), das sofort diktiert; eine Sprechpause (Diktat
@@ -473,6 +478,22 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
     · Die Überschrift heißt nur dann „Tagsüber", wenn es auch einen Abend gibt —
       sonst „Ohne Uhrzeit". Eine Unterscheidung ohne Gegenstück ist eine
       Behauptung.
+
+28. **Läufe überleben den Bildschirm** (`lib/assistantRun.ts`, v1.44.0) —
+    Braindump, Verwalter und Chat brechen nicht mehr ab, wenn man während der
+    Wartezeit woanders hingeht. Punkte, die nicht aufweichen dürfen:
+    · Die laufende Funktion schreibt NUR in den Store (siehe auch §8.10).
+    · Bewusst NICHT persistiert — ein Lauf überlebt keinen App-Neustart. Eine
+      halb fertige Anfrage nach einem Kaltstart fortzusetzen wäre eine Lüge.
+    · Späte Deltas nach `clear()` beleben keinen Geister-Lauf wieder.
+    · Auf „Heute" zeigt ein PulseDot am Assistenten-Symbol, dass noch etwas
+      läuft — sonst weiß man nicht, dass Zurückkommen sich lohnt.
+29. **Vorschläge sind änderbar** (`components/ActionEditSheet.tsx`, v1.44.0) —
+    im Braindump wählt das KÄSTCHEN ab, der TEXT öffnet den Editor (Titel,
+    Datum, Uhrzeit, Liste). Bewusst kein vollständiger Aufgaben-Editor: Tags,
+    Wiederholung und Schritte macht man danach in der echten Aufgabe.
+    Der geänderte Block wird über `finishRun` zurückgeschrieben — der Store ist
+    die einzige Quelle, auch beim Bearbeiten.
 
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 

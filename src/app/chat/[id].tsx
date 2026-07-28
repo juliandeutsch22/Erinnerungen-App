@@ -31,6 +31,7 @@ import { useCreateNote, useNotes, useUpdateNote } from '@/data/noteQueries';
 import { useCompleteTask, useCreateList, useCreateTask, useDeleteTask, useLists, useTasks, useUpdateTask } from '@/data/queries';
 import type { Chat, ChatMessage, Task } from '@/data/types';
 import { askAssistant, type AssistantAction, buildAppContext, buildNoteContext, buildTaskContext, type ChatLink, actionDueDate, describeAenderung, describeExtras, describeSchritte, extractActions, generateChatTitle, promptChips, resolveListId, resolveTaskHandle, subtasksFromSchritte, type ToolData } from '@/lib/assistant';
+import { runKeyForChat, useAssistantRuns } from '@/lib/assistantRun';
 import { addDays, formatDueDate, toDateStr, todayStr } from '@/lib/dates';
 import { hasCalendarPermission } from '@/lib/deviceCalendar';
 import { noteTitle } from '@/lib/noteLogic';
@@ -363,7 +364,7 @@ export default function ChatScreen() {
   const [dictating, setDictating] = useState(false);
   const [linkSheet, setLinkSheet] = useState(false);
   const [renameSheet, setRenameSheet] = useState(false);
-  const [pending, setPending] = useState(false);
+  const runKey = runKeyForChat(String(id ?? ''));
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedNoteIds, setSavedNoteIds] = useState<Set<string>>(new Set());
@@ -390,16 +391,20 @@ export default function ChatScreen() {
 
   // Streaming: der wachsende Antwort-Text. Er bleibt sichtbar, bis die
   // persistierte Nachricht im Verlauf angekommen ist — sonst blinkt der Übergang.
-  const [streamText, setStreamText] = useState<string | null>(null);
-  const streamRef = useRef('');
+  const run = useAssistantRuns((st) => st.runs[runKey]);
+  const beginRun = useAssistantRuns((st) => st.begin);
+  const deltaRun = useAssistantRuns((st) => st.delta);
+  const finishRun = useAssistantRuns((st) => st.finish);
+  const failRun = useAssistantRuns((st) => st.fail);
+  const clearRun = useAssistantRuns((st) => st.clear);
+  const pending = run?.status === 'running';
+  const streamText = pending && run.stream.length > 0 ? run.stream : null;
   // Sobald der Nutzer selbst umbenennt, hält der Auto-Titel für immer still.
   const userRenamedRef = useRef(false);
   const clearOnMessageId = useRef<string | null>(null);
   useEffect(() => {
     if (clearOnMessageId.current && (messages ?? []).some((m) => m.id === clearOnMessageId.current)) {
       clearOnMessageId.current = null;
-      streamRef.current = '';
-      setStreamText(null);
     }
   }, [messages]);
 
@@ -490,9 +495,8 @@ export default function ChatScreen() {
   /** Antwort holen für einen gegebenen Verlauf (send + retry teilen sich das). */
   const requestAnswer = async (history: ChatMessage[]) => {
     if (!id) return;
-    setPending(true);
     setError(null);
-    streamRef.current = '';
+    beginRun(runKey, chat?.title ?? 'Chat');
     try {
       const appContext = assistantContextEnabled
         ? buildAppContext({
@@ -516,14 +520,16 @@ export default function ChatScreen() {
         combined,
         memory,
         (delta) => {
-          streamRef.current += delta;
-          setStreamText(streamRef.current);
+          deltaRun(runKey, delta);
           scrollRef.current?.scrollToEnd({ animated: false });
         },
         toolData,
       );
       const saved = await appendMessage.mutateAsync({ chatId: id, role: 'assistant', content: answer });
       clearOnMessageId.current = saved.id;
+      // Die Antwort ist gespeichert — der Lauf hat seinen Zweck erfuellt und
+      // wird abgeraeumt, damit kein Geister-Hinweis stehen bleibt.
+      clearRun(runKey);
       hapticSuccess();
 
       // Auto-Titel nach dem ERSTEN Austausch — es sei denn, der Nutzer hat schon
@@ -535,11 +541,9 @@ export default function ChatScreen() {
         });
       }
     } catch (e) {
-      streamRef.current = '';
-      setStreamText(null);
-      setError(e instanceof Error ? e.message : 'Unbekannter Fehler.');
-    } finally {
-      setPending(false);
+      const msg = e instanceof Error ? e.message : 'Unbekannter Fehler.';
+      failRun(runKey, msg);
+      setError(msg);
     }
   };
 

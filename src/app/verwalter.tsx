@@ -24,6 +24,7 @@ import { useCreateNote } from '@/data/noteQueries';
 import { useCompleteTask, useCreateList, useCreateTask, useDeleteTask, useLists, useTasks, useUpdateTask } from '@/data/queries';
 import type { ChatMessage } from '@/data/types';
 import { applyAssistantActions } from '@/lib/applyActions';
+import { RUN_VERWALTER, useAssistantRuns } from '@/lib/assistantRun';
 import {
   askAssistant,
   buildAppContext,
@@ -66,22 +67,26 @@ export default function VerwalterScreen() {
   const deleteTask = useDeleteTask();
   const createEvents = useCreateAssistantEvents();
 
-  const [pending, setPending] = useState(false);
-  const [stream, setStream] = useState('');
-  const [text, setText] = useState<string | null>(null);
-  const [actions, setActions] = useState<AssistantAction | null>(null);
+  // Der Lauf lebt im Store — der Entwurf ueberlebt es, wenn man zwischendurch
+  // woanders hingeht (siehe lib/assistantRun.ts).
+  const run = useAssistantRuns((s2) => s2.runs[RUN_VERWALTER]);
+  const beginRun = useAssistantRuns((s2) => s2.begin);
+  const deltaRun = useAssistantRuns((s2) => s2.delta);
+  const finishRun = useAssistantRuns((s2) => s2.finish);
+  const failRun = useAssistantRuns((s2) => s2.fail);
+  const clearRun = useAssistantRuns((s2) => s2.clear);
+  const pending = run?.status === 'running';
+  const stream = run?.stream ?? '';
+  const text = run?.status === 'done' ? run.clean : null;
+  const actions = run?.status === 'done' ? run.actions : null;
+  const error = run?.status === 'error' ? run.error : null;
   const [deselected, setDeselected] = useState<Set<string>>(new Set());
-  const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
 
   const ansehen = async () => {
     if (pending) return;
-    setPending(true);
-    setError(null);
-    setActions(null);
-    setText(null);
     setDone(null);
-    setStream('');
+    beginRun(RUN_VERWALTER, 'Die Woche');
     try {
       const appContext = buildAppContext({
         events: events ?? [],
@@ -109,19 +114,15 @@ export default function VerwalterScreen() {
         memory,
         (delta) => {
           acc += delta;
-          setStream(acc);
+          deltaRun(RUN_VERWALTER, delta);
         },
         toolData,
       );
       const { clean, actions: parsed } = extractActions(answer);
-      setText(clean);
-      setActions(parsed);
+      finishRun(RUN_VERWALTER, { clean, actions: parsed });
       setDeselected(new Set());
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unbekannter Fehler.');
-    } finally {
-      setPending(false);
-      setStream('');
+      failRun(RUN_VERWALTER, e instanceof Error ? e.message : 'Unbekannter Fehler.');
     }
   };
 
@@ -165,7 +166,7 @@ export default function VerwalterScreen() {
       res.termine > 0 ? `${res.termine} ${res.termine === 1 ? 'Termin' : 'Termine'}` : '',
       res.notizen > 0 ? `${res.notizen} ${res.notizen === 1 ? 'Notiz' : 'Notizen'}` : '',
     ].filter(Boolean);
-    setActions(null);
+    clearRun(RUN_VERWALTER);
     setDone(teile.length > 0 ? `${teile.join(', ')} übernommen. Die Woche steht.` : 'Nichts übernommen.');
   };
 

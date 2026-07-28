@@ -38,6 +38,7 @@ import type { Task } from '@/data/types';
 import { bucketEventsByDay } from '@/lib/calendarLogic';
 import { buildDayTimeline, nowMarkerIndex } from '@/lib/dayTimeline';
 import { addDays, formatDayHeading, toDateStr, todayStr } from '@/lib/dates';
+import { anyRunning, useAssistantRuns } from '@/lib/assistantRun';
 import { weekReviewDue } from '@/lib/verwalter';
 import { type DeviceEvent, hasCalendarPermission } from '@/lib/deviceCalendar';
 import { groupToday, groupUpcomingDays } from '@/lib/taskLogic';
@@ -82,6 +83,8 @@ export default function HeuteScreen() {
   }, []);
 
   const today = todayStr();
+  // Laeuft irgendwo eine Assistenten-Anfrage? (lib/assistantRun.ts)
+  const laeuft = useAssistantRuns((s2) => anyRunning(s2.runs));
   // Ausrichtung des Tages (der Bogen) — ein Satz, im Settings-Store je Datum.
   const intention = useSettings((st) => st.dayIntentions[today]);
   const setDayIntention = useSettings((st) => st.setDayIntention);
@@ -467,11 +470,19 @@ export default function HeuteScreen() {
               </PressableScale>
             )}
             <PressableScale
-              accessibilityLabel="Assistent öffnen"
+              accessibilityLabel={laeuft ? 'Assistent öffnen — es läuft noch etwas' : 'Assistent öffnen'}
               onPress={() => router.push('/chats')}
               style={{ padding: Spacing.sm }}
             >
-              <Sparkles size={20} color={colors.text3} strokeWidth={2} />
+              <Sparkles size={20} color={laeuft ? colors.teal : colors.text3} strokeWidth={2} />
+              {/* Laeuft im Hintergrund noch eine Anfrage, sagt ein ruhiger Punkt
+                  Bescheid — sonst weiss man nicht, dass es sich lohnt
+                  zurueckzukommen. Kein Zaehler, kein Text. */}
+              {laeuft && (
+                <View style={{ position: 'absolute', top: 6, right: 6 }}>
+                  <PulseDot color={colors.teal} size={6} />
+                </View>
+              )}
             </PressableScale>
             <PressableScale
               accessibilityLabel="Neue Aufgabe"
