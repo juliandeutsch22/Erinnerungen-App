@@ -17,8 +17,8 @@
 //
 // Seit v1.53.0 (Stufe 2) kann man in die Zeile auch SPRECHEN (das Diktat füllt
 // das Feld, man sieht das Gesagte vor dem Abschicken), Vorschläge einzeln
-// abwählen und zurechtrücken — und die Weiche ÜBERSTIMMEN: langer Druck auf
-// den Knopf schickt die Eingabe den jeweils anderen Weg.
+// abwählen und zurechtrücken — und die Weiche ÜBERSTIMMEN: über den sichtbaren
+// Weg-Chip oder, als Abkürzung, mit einem langen Druck auf den Knopf.
 import { CalendarDays, Check, Clock, Plus, Repeat, Sparkles, X } from 'lucide-react-native';
 import React, { useMemo, useRef, useState } from 'react';
 import { TextInput, View } from 'react-native';
@@ -429,6 +429,18 @@ export function QuickAdd({
                   // Plus = wird angelegt, Funke = der Assistent sieht es an.
                   accessibilityLabel={zeigtLokal ? 'Aufgabe anlegen' : 'An den Assistenten geben'}
                   onPress={() => submit(ueberstimmt)}
+                  // Abkürzung für alle, die sie kennen — dieselbe Wirkung wie
+                  // der Weg-Chip daneben. Sie kostet keine Fläche und ist NICHT
+                  // der einzige Weg; als einziger wäre sie unauffindbar
+                  // (v1.53.0/1) und damit falsch.
+                  onLongPress={
+                    zeigtWegChip
+                      ? () => {
+                          hapticSelect();
+                          setUeberstimmt((v) => !v);
+                        }
+                      : undefined
+                  }
                   style={{
                     width: 30,
                     height: 30,

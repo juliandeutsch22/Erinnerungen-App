@@ -784,11 +784,18 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
       Tastendruck wieder gelöst; **bewusst kein dauerhafter Schalter**, das
       wäre ein versteckter Modus, und Modi loszuwerden war der ganze Punkt.
       Ohne Schlüssel erscheint er nicht (es gäbe kein Ziel).
-      ⚠️ Der erste Anlauf (v1.53.0) war ein LANGER DRUCK auf den Knopf. Das war
-      falsch und wurde in v1.53.1 ersatzlos entfernt: eine versteckte Geste, die
-      die Bedeutung des Hauptknopfes umdreht, widerspricht der Prämisse „nichts
-      zu lernen" — wer sie vergisst, für den existiert die Funktion nicht mehr.
-      **Keine unsichtbaren Gesten in dieser App.**
+      Der lange Druck auf den Knopf tut dasselbe — als ABKÜRZUNG neben dem
+      Chip, nicht als einziger Weg.
+      ⚠️ Historie, damit sie niemand falsch liest: In v1.53.0 war der Langdruck
+      die EINZIGE Möglichkeit. Das war falsch (unauffindbar), und in v1.53.1
+      wurde er ersatzlos entfernt — was **zu streng** war und vom Nutzer sofort
+      bemerkt wurde. Seit v1.53.2 gibt es beides. Die Regel lautet also nicht
+      „keine Gesten", sondern: **eine Geste darf nie der einzige Weg zu einer
+      Funktion sein.** Sichtbar ist Pflicht, die Abkürzung ist Kür — sie kostet
+      keine Fläche und ist genau das, was iOS überall so macht.
+      (Nicht zu verwechseln mit dem Fall „Werktags-Knopf" aus v1.50.0: dort
+      wurden zwei gleich SICHTBARE Bedienelemente für dieselbe Sache zu einem
+      zusammengefasst — das bleibt richtig.)
 
 43. **UX-Nachprüfung der Zeile** (v1.53.1) — auf die Frage „macht das
     bedienungstechnisch überhaupt Sinn?" hin gefunden, alles vom selben Muster:
