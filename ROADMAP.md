@@ -159,8 +159,33 @@ Reanimated-Worklet hat die App am Gerät hart abstürzen lassen, während alle
 Web-Tests grün waren (v1.24.0–v1.27.1). Deshalb: **einzeln bauen, einzeln
 ausliefern, einzeln am Gerät bestätigen** — nie gebündelt.
 
+### Wartet auf den Apple-Developer-Account (bewusst NICHT vorher gepfuscht)
+
+Stand v1.50.0 — alles Folgende ist an ein Entitlement oder an einen echten
+Provisioning-Profile gebunden. Es gäbe für zwei davon halbe Notbehelfe (siehe
+unten); die wurden **abgelehnt**, weil man sie danach doppelt bauen müsste.
+
+- **CloudKit-Sync** `[ACCOUNT]` — **die wichtigste Lücke überhaupt.** Es gibt
+  nur ein Gerät und keine lebende Kopie: geht das iPhone verloren, ist der
+  Stand des letzten Auto-Backups da, schlimmstenfalls sechs Tage alt. CloudKit
+  ist dabei KEIN „weg von lokal": die Daten liegen in der iCloud des Nutzers,
+  unter seinem Apple-Konto — es gibt weiterhin kein Stoa-Konto und keinen
+  Stoa-Server, die Zusage auf der Willkommens-Karte bleibt wahr. Öffnet
+  zugleich die macOS-Fassung.
+  · *Verworfener Notbehelf:* ein „Backup teilen"-Knopf (Share-Sheet → iCloud
+    Drive von Hand). Halbe Lösung, die man später wieder ausbaut.
+- **Backup in iCloud Drive** `[ACCOUNT]` — braucht das iCloud-Entitlement.
+  Heute liegt das Wochen-Backup unter `Paths.document`: sichtbar in der
+  Dateien-App und im iCloud-GERÄTE-Backup, aber keine lebende Kopie.
+- **Hintergrund-URLSession** `[ACCOUNT]` — die Assistenten-Anfrage läuft
+  weiter, wenn die App geschlossen wird; iOS weckt sie mit der Antwort. Braucht
+  KEINEN Server. Passt zu v1.46.0: die Erfassen-Wege sind im JSON-Modus, dort
+  gibt es ohnehin nichts zu streamen (Background-URLSession kann kein SSE).
+  Andockstelle ist `lib/assistantRun.ts`.
 - **Home-Screen-Widget** — heutige Aufgaben + nächster Termin. Größter
-  Alltagsgewinn der nativen Gruppe.
+  Alltagsgewinn der nativen Gruppe. Die eigentliche Schwäche gegenüber Todoist
+  ist nicht die App, sondern die ENTFERNUNG zu ihr: dort ist ein Gedanke in
+  zwei Sekunden erfasst, hier in acht. Genau dort gehen Gedanken verloren.
 - **Orts-Erinnerungen** — „wenn ich beim Baumarkt bin". Über
   `expo-location`-Geofencing, bleibt vollständig lokal und kostenlos. Die
   einzige Art von Erinnerung, die wir gar nicht abbilden — und eine ruhigere als

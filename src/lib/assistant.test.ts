@@ -706,3 +706,15 @@ describe('Wochentags-Wiederholungen im Aktions-Block', () => {
     expect(systemPrompt('erfassen')).toContain('wd:1,4');
   });
 });
+
+describe('actionDueDate mit festen Wochentagen', () => {
+  it('verankert das abgeleitete Datum, respektiert aber ein genanntes', () => {
+    // Dienstag, 28.07.2026.
+    expect(actionDueDate({ wiederholung: 'wd:1,4' }, '2026-07-28')).toBe('2026-07-30');
+    // Der Assistent hat ein Datum genannt — das ist eine Aussage, keine Ableitung.
+    expect(actionDueDate({ datum: '2026-07-28', wiederholung: 'wd:1,4' }, '2026-07-28')).toBe('2026-07-28');
+    // Ohne Wiederholung bleibt es wie bisher.
+    expect(actionDueDate({}, '2026-07-28')).toBeNull();
+    expect(actionDueDate({ wiederholung: 'weekly' }, '2026-07-28')).toBe('2026-07-28');
+  });
+});

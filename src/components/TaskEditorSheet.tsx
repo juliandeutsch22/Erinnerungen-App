@@ -25,7 +25,7 @@ import { Type } from '@/components/Type';
 import { useCreateTask, useDeleteTask, useLists, useTasks, useUpdateTask } from '@/data/queries';
 import type { Rrule, RruleUnit, Subtask, Task } from '@/data/types';
 import { newId, normalizeTag } from '@/data/types';
-import { addMonths, buildRrule, buildWeekdayRrule, formatDueDate, isWeekdayRule, rruleLabel, rruleParts, todayStr, weekdaysOf, WEEKDAY_ORDER, WEEKDAY_SHORT } from '@/lib/dates';
+import { addMonths, anchorWeekdayRrule, buildRrule, buildWeekdayRrule, formatDueDate, isWeekdayRule, rruleLabel, rruleParts, todayStr, weekdaysOf, WEEKDAY_ORDER, WEEKDAY_SHORT } from '@/lib/dates';
 import { tagCounts } from '@/lib/taskFilters';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { webNoOutline } from '@/theme/layout';
@@ -156,8 +156,10 @@ export function TaskEditorSheet({
     if (!canSave) return;
     // Nur gültige Uhrzeiten übernehmen — halbe Eingaben („9:3", Text) verfallen.
     const validTime = dueTime && /^\d{2}:\d{2}$/.test(dueTime) ? dueTime : null;
-    // Uhrzeit ohne Datum → heute; Wiederholung braucht ein Datum.
-    const finalDate = dueDate ?? (validTime || rrule ? today : null);
+    // Uhrzeit ohne Datum → heute; Wiederholung braucht ein Datum. Bei festen
+    // Wochentagen rückt das ABGELEITETE Datum auf den nächsten gewählten Tag —
+    // ein selbst ausgesuchtes Datum bleibt unangetastet.
+    const finalDate = dueDate ?? (validTime || rrule ? anchorWeekdayRrule(today, rrule) : null);
     // Offener Entwurf im Eingabefeld nicht verschlucken.
     const finalTags = tagDraft.trim() ? [...tags, normalizeTag(tagDraft)].filter((v, i, a) => v && a.indexOf(v) === i) : tags;
     const finalSubs = subDraft.trim() ? [...subtasks, { id: newId(), title: subDraft.trim(), done: false }] : subtasks;

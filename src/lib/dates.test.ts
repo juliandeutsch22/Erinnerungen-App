@@ -1,5 +1,5 @@
 // dates.test.ts — Wiederholungs-Berechnung + lokale Kalenderdaten (Fahrplan M1).
-import { addDays, addMonths, buildRrule, daysBetween, deadlineLabel, formatDueDate, isRrule, nextOccurrence, nextOccurrenceAfter, parseDateStr, parseRrule, rruleLabel, rruleParts, toDateStr, parseWeekdays, buildWeekdayRrule, isWeekdayRule, weekdaysOf} from './dates';
+import { anchorWeekdayRrule, addDays, addMonths, buildRrule, daysBetween, deadlineLabel, formatDueDate, isRrule, nextOccurrence, nextOccurrenceAfter, parseDateStr, parseRrule, rruleLabel, rruleParts, toDateStr, parseWeekdays, buildWeekdayRrule, isWeekdayRule, weekdaysOf} from './dates';
 
 describe('toDateStr/parseDateStr', () => {
   it('läuft lokal rund (kein UTC-Versatz)', () => {
@@ -223,5 +223,24 @@ describe('Wochentags-Wiederholungen', () => {
     expect(isRrule('wd:1,4')).toBe(true);
     expect(isRrule('wd:9')).toBe(false);
     expect(rruleParts('wd:1,4')).toBeNull();
+  });
+});
+
+describe('Verankerung fester Wochentage', () => {
+  // 2026-07-28 ist ein Dienstag.
+  it('rückt ein abgeleitetes Datum auf den nächsten gewählten Tag', () => {
+    expect(anchorWeekdayRrule('2026-07-28', 'wd:1,4')).toBe('2026-07-30'); // Do
+    expect(anchorWeekdayRrule('2026-07-28', 'wd:2')).toBe('2026-07-28');   // Di selbst
+  });
+
+  it('gilt auch für das ältere „Werktags"', () => {
+    // Samstag angelegt → der erste Termin ist der Montag, nicht das Wochenende.
+    expect(anchorWeekdayRrule('2026-08-01', 'weekdays')).toBe('2026-08-03');
+  });
+
+  it('lässt alles andere unangetastet', () => {
+    expect(anchorWeekdayRrule('2026-07-28', 'weekly')).toBe('2026-07-28');
+    expect(anchorWeekdayRrule('2026-07-28', 'every:2w')).toBe('2026-07-28');
+    expect(anchorWeekdayRrule('2026-07-28', null)).toBe('2026-07-28');
   });
 });

@@ -3,7 +3,7 @@
 // laufenden Kosten, kein Mittelsmann. Reine Logik testbar (Prompt-Bau,
 // Antwort-Extraktion); der fetch selbst wird im Test nicht ausgeführt.
 import { type ChatMessage, type List, type Note, newId, normalizeTag, type Rrule, type Subtask, type Task } from '@/data/types';
-import { isRrule, rruleLabel } from '@/lib/dates';
+import { anchorWeekdayRrule, isRrule, rruleLabel } from '@/lib/dates';
 import { noteTitle } from '@/lib/noteLogic';
 import type { DeviceEvent } from '@/lib/deviceCalendar';
 
@@ -299,7 +299,10 @@ export function resolveListId(
  * zurück.
  */
 export function actionDueDate(a: { datum?: string; wiederholung?: Rrule }, today: string): string | null {
-  return a.datum ?? (a.wiederholung ? today : null);
+  // Ein genanntes Datum gilt; nur das ABGELEITETE „heute" wird bei festen
+  // Wochentagen auf den nächsten passenden Tag gesetzt (anchorWeekdayRrule).
+  if (a.datum) return a.datum;
+  return a.wiederholung ? anchorWeekdayRrule(today, a.wiederholung) : null;
 }
 
 /**

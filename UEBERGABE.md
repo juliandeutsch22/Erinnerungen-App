@@ -674,6 +674,14 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
       wirft Unsinn weg wie bisher.
     · Erinnerungen brauchten keine Änderung: geplant wird immer nur die
       AKTUELLE Fälligkeit, die nächste entsteht beim Abhaken.
+    · **`anchorWeekdayRrule`** (v1.50.1, direkt nachgereicht): Eine
+      Wiederholung ohne Datum wird auf „heute" verankert, sonst liefe sie nie
+      an — bei festen Wochentagen ist „heute" aber oft ein Tag, den man gerade
+      NICHT gewählt hat („jeden Mo und Do", am Dienstag angelegt, wäre sofort
+      heute fällig). Betraf auch das ältere `'weekdays'` (samstags angelegt).
+      Verankert wird NUR ein abgeleitetes Datum; ein selbst ausgesuchtes ist
+      eine Entscheidung und wird nicht stillschweigend verschoben. Gilt im
+      Editor UND im Aktions-Block (`actionDueDate`).
 
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 

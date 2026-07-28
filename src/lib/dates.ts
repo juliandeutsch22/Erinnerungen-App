@@ -133,6 +133,27 @@ export function weekdaysOf(rrule: Rrule | null): number[] {
   return parseWeekdays(rrule ?? '') ?? [];
 }
 
+/**
+ * Ein ABGELEITETES Startdatum auf die Regel setzen. Eine Wiederholung ohne
+ * Datum wird auf „heute" verankert (sonst liefe sie nie an) — bei festen
+ * Wochentagen ist „heute" aber oft ein Tag, den der Nutzer gerade NICHT gewählt
+ * hat: „jeden Mo und Do", am Dienstag angelegt, wäre sofort heute fällig.
+ *
+ * Bewusst NUR für abgeleitete Daten. Hat der Nutzer ein Datum ausgesucht, ist
+ * das eine Entscheidung — die wird nicht stillschweigend verschoben.
+ */
+export function anchorWeekdayRrule(date: string, rrule: Rrule | null): string {
+  const tage = weekdaysOf(rrule);
+  if (tage.length === 0) return date;
+  const d = parseDateStr(date);
+  if (tage.includes(d.getDay())) return date;
+  for (let i = 0; i < 7; i += 1) {
+    d.setDate(d.getDate() + 1);
+    if (tage.includes(d.getDay())) return toDateStr(d);
+  }
+  return date;
+}
+
 const UNIT_WORDS: Record<RruleUnit, [string, string]> = {
   d: ['Tag', 'Tage'],
   w: ['Woche', 'Wochen'],
