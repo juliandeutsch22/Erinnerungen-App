@@ -386,7 +386,6 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
         // nicht, während man spricht.
         mode: 'erfassen',
         json: true,
-        preferLite: true,
         onDelta: (delta) => deltaRun(RUN_QUICKVOICE, delta),
       });
       let parsed = extractActions(answer).actions;

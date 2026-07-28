@@ -142,7 +142,6 @@ export default function BraindumpScreen() {
         // Sortieren selbst ist keine Denkaufgabe: kleines Modell zuerst.
         mode: 'erfassen',
         json: true,
-        preferLite: true,
         images,
         onDelta: (delta) => deltaRun(RUN_BRAINDUMP, delta),
       });

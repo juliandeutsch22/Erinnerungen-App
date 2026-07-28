@@ -12,8 +12,9 @@ import type { DeviceEvent } from '@/lib/deviceCalendar';
 // auf das aktuelle Modell, die versionierten IDs sind das Netz darunter. Greift
 // keine, fragt discoverModels() beim Dienst nach, was der Schlüssel wirklich kann.
 export const MODEL_CHAIN = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash'];
-/** Kleinere Lite-Kette: zuerst bei preferLite (Sortieren), sonst wenn das
- *  Tageskontingent des Hauptmodells erschöpft ist (429). */
+/** Kleinere Lite-Kette — AUSSCHLIESSLICH als Rückfall, wenn das Tageskontingent
+ *  des Hauptmodells erschöpft ist (429) oder alles überlastet ist (5xx). Sie
+ *  wird bewusst NIE vorgezogen; siehe UEBERGABE §8.31. */
 export const LITE_CHAIN = ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-flash-lite-latest', 'gemini-2.5-flash-lite', 'gemini-2.0-flash-lite'];
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 // Streaming läuft über denselben Dienst, nur als Server-Sent-Events —
@@ -1239,20 +1240,7 @@ const RETRY_DELAY_MS = 1500;
 /** EINE Anfrage samt aller Ausweichwege: Kandidaten-Kette, Modell-Discovery bei
  *  404, Lite-Kette bei 429/5xx und ein später Wiederholungsversuch bei Überlast.
  *  Herausgelöst, damit die Werkzeug-Schleife jede Runde dieselben Netze bekommt. */
-async function requestWithFallbacks(apiKey: string, body: unknown, stream: boolean, preferLite = false): Promise<Response> {
-  // Sortier-Aufgaben brauchen kein Denken: das kleine Modell ist schneller und
-  // hat ein eigenes Kontingent. Klappt es nicht, geht es normal weiter.
-  if (preferLite) {
-    try {
-      const lite = await callChain(LITE_CHAIN, workingLite, apiKey, body, stream);
-      if (lite.res.ok) {
-        setWorkingLite(lite.model);
-        return lite.res;
-      }
-    } catch {
-      /* egal — die Hauptkette ist ohnehin der nächste Schritt */
-    }
-  }
+async function requestWithFallbacks(apiKey: string, body: unknown, stream: boolean): Promise<Response> {
   let { res, model } = await callChain(MODEL_CHAIN, workingModel, apiKey, body, stream);
 
   // 400 heißt „so nicht" — meist der Schlüssel, es kann aber auch unsere
@@ -1325,9 +1313,6 @@ export type AskOptions = {
   mode?: PromptMode;
   /** Antwort als reines JSON erzwingen — nur wo eine Vorschlagskarte folgt. */
   json?: boolean;
-  /** Kleines Modell ZUERST versuchen. Für Sortier-Aufgaben, die kein Denken
-   *  brauchen: spürbar schneller und mit eigenem Kontingent. */
-  preferLite?: boolean;
 };
 
 export async function askAssistant(
@@ -1339,7 +1324,7 @@ export async function askAssistant(
   memory: string | null,
   opts: AskOptions = {},
 ): Promise<string> {
-  const { onDelta, toolData, images, mode = 'voll', json = false, preferLite = false } = opts;
+  const { onDelta, toolData, images, mode = 'voll', json = false } = opts;
   const stream = onDelta !== undefined;
   const base = buildRequestBody(messages, context, new Date(), memory, !!toolData, images ?? [], mode, json) as Record<
     string,
@@ -1351,7 +1336,7 @@ export async function askAssistant(
 
   for (let round = 0; ; round += 1) {
     const body = { ...base, contents: [...baseContents, ...extra] };
-    const res = await requestWithFallbacks(apiKey, body, stream, preferLite);
+    const res = await requestWithFallbacks(apiKey, body, stream);
     if (!res.ok) throw new Error(describeError(res.status));
 
     const calls: ToolCall[] = [];

@@ -522,8 +522,20 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
       fast immer, und es entstehen weniger Ausgabe-Token. Preis: keine Prosa,
       also kein anzeigbarer Streaming-Text. **Nur dort einschalten, wo niemand
       auf Sätze wartet** — im Chat wäre es falsch.
-    · **Kleines Modell zuerst** (`preferLite`): Sortieren ist keine Denkaufgabe.
-      Klappt die Lite-Kette nicht, geht es normal weiter.
+    · ~~**Kleines Modell zuerst** (`preferLite`)~~ — **in v1.51.1 wieder
+      ENTFERNT, samt Verkabelung.** Die Begründung („Sortieren ist keine
+      Denkaufgabe") war falsch: Das Bündeln („Milch, Brot, Butter" → EINE
+      Aufgabe mit Schritten), deutsche Relativdaten („Donnerstag in zwei
+      Wochen") und vor allem das LESEN VON FOTOS sind genau die Stellen, an
+      denen die kleine Klasse abrutscht — und der Fotokanal liegt im Braindump.
+      Entscheidend ist die Ungleichheit der Fehler: Lite scheitert **still und
+      dauerhaft** (die Karte sieht richtig aus, der Termin steht falsch im
+      Kalender, man merkt es Wochen später), Flash scheitert **sichtbar und
+      selbstheilend** (etwas langsamer; bei erschöpftem Kontingent fällt
+      `requestWithFallbacks` bei 429 ohnehin automatisch auf die Lite-Kette
+      zurück). Die Lite-Kette bleibt also — aber NUR als Rückfall, nie
+      vorgezogen. Wer sie je wieder vorziehen will, braucht dafür ein Argument,
+      das diese Ungleichheit aushebelt.
     · **Gemerktes Modell** (`assistantModel`/`assistantLiteModel` im Settings-
       Store, `primeWorkingModel`/`setModelPersister` in `_layout.tsx`): ohne das
       klappert die erste Anfrage nach JEDEM Kaltstart die Kandidatenkette ab,
