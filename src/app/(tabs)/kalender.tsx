@@ -17,6 +17,7 @@ import { GlassPanel } from '@/components/GlassPanel';
 import { PressableScale } from '@/components/PressableScale';
 import { RescheduleSheet } from '@/components/RescheduleSheet';
 import { Reveal } from '@/components/Reveal';
+import { QuickAdd } from '@/components/QuickAdd';
 import { Screen } from '@/components/Screen';
 import { Seam } from '@/components/Seam';
 import { EmptyState, LoadingState } from '@/components/StateView';
@@ -36,6 +37,7 @@ import { deadlineLabel, formatDayHeading, parseDateStr, todayStr } from '@/lib/d
 import { deviceCalendarAvailable, type DeviceEvent, ensureCalendarPermission } from '@/lib/deviceCalendar';
 import { hapticSelect } from '@/lib/haptics';
 import { byTimeThenCreation, isOpen } from '@/lib/taskLogic';
+import { QUICK_ADD_CLEARANCE, TAB_BAR_SAFE_BOTTOM } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
 import { Spacing } from '@/theme/theme.tokens';
 
@@ -162,7 +164,8 @@ export default function KalenderScreen() {
   const dayCount = dayEvents.length + dayTasks.length + dayDeadlines.length;
 
   return (
-    <Screen>
+    <View style={{ flex: 1 }}>
+    <Screen contentContainerStyle={{ paddingBottom: TAB_BAR_SAFE_BOTTOM + QUICK_ADD_CLEARANCE }}>
       <Reveal>
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
           <View style={{ gap: Spacing.xs, flex: 1 }}>
@@ -364,5 +367,9 @@ export default function KalenderScreen() {
       {rescheduleTask && <RescheduleSheet task={rescheduleTask} onClose={() => setRescheduleTask(null)} />}
       {quickTask && <TaskQuickSheet task={quickTask} onClose={() => setQuickTask(null)} />}
     </Screen>
+    {/* Der ausgewaehlte Tag ist der Kontext: was hier ohne eigenes
+        Datum getippt wird, landet auf ihm. Der Chip zeigt es an. */}
+    <QuickAdd basisDatum={selected} />
+    </View>
   );
 }

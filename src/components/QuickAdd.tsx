@@ -20,7 +20,7 @@
 // abwählen und zurechtrücken — und die Weiche ÜBERSTIMMEN: über den sichtbaren
 // Weg-Chip oder, als Abkürzung, mit einem langen Druck auf den Knopf.
 import { Camera, CalendarDays, Check, Clock, Image as ImageIcon, Paperclip, Plus, Repeat, Sparkles, X } from 'lucide-react-native';
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Image, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -32,17 +32,19 @@ import { PopIn } from '@/components/PopIn';
 import { PressableScale } from '@/components/PressableScale';
 import { Type } from '@/components/Type';
 import { LIST_COLORS } from '@/components/listMeta';
-import { useCreateAssistantEvents } from '@/data/calendarQueries';
+import { useCreateAssistantEvents, useDeviceEvents } from '@/data/calendarQueries';
 import { useCreateNote, useNotes } from '@/data/noteQueries';
 import { useCompleteTask, useCreateList, useCreateTask, useDeleteTask, useLists, useTasks, useUpdateTask } from '@/data/queries';
 import { DEFAULT_LIST_ID } from '@/data/ListRepository';
 import type { ChatMessage } from '@/data/types';
-import type { DeviceEvent } from '@/lib/deviceCalendar';
+import { hasCalendarPermission } from '@/lib/deviceCalendar';
 import { applyAssistantActions } from '@/lib/applyActions';
 import { type AssistantAction, type AssistantImage, askAssistant, buildAppContext, extractActions, IMAGE_LIMIT, type ToolData } from '@/lib/assistant';
 import { assistantCameraAvailable, assistantImagesAvailable, captureAssistantImage, pickAssistantImages } from '@/lib/assistantImage';
 import { RUN_ZEILE, useAssistantRuns } from '@/lib/assistantRun';
-import { formatDueDate, todayStr } from '@/lib/dates';
+import { addDays, formatDueDate, todayStr } from '@/lib/dates';
+import { useSheetOffen } from '@/lib/sheetPresence';
+import { NOTHING_REMOVED, type Removed, useZeileDraft } from '@/lib/zeileDraft';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { routeInput, type AssistentGrund } from '@/lib/inputRoute';
 import { parseQuickAdd } from '@/lib/quickAddParser';
@@ -60,8 +62,6 @@ const RRULE_LABEL: Record<string, string> = {
   yearly: 'Jährlich',
 };
 
-type Removed = { date: boolean; time: boolean; rrule: boolean };
-const NOTHING_REMOVED: Removed = { date: false, time: false, rrule: false };
 
 // Die Zeile liegt HÖHER als alles andere — sie ist die Tür, nicht eine Karte
 // unter vielen. Shadow.lg (9 %, Radius 12) verschwand auf dem cremefarbenen
@@ -78,14 +78,14 @@ const SCHATTEN_ZEILE = {
 
 export function QuickAdd({
   listId = DEFAULT_LIST_ID,
-  /** Termine des Geräts für den App-Überblick — „Heute" hat sie ohnehin
-   *  geladen, deshalb werden sie hereingereicht statt hier neu geholt. */
-  events = [],
-  calendarDenied = false,
+  /** Der Tag, den der Bildschirm gerade zeigt (Kalender). Findet der Parser
+   *  KEIN Datum, landet die Aufgabe dort — wer am 5. August steht und
+   *  „Zahnarzt 10 Uhr" tippt, meint den 5. August. Der Chip zeigt es an und
+   *  lässt sich abnehmen, es passiert also nichts hinter dem Rücken. */
+  basisDatum,
 }: {
   listId?: string;
-  events?: DeviceEvent[];
-  calendarDenied?: boolean;
+  basisDatum?: string;
 }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -114,21 +114,27 @@ export function QuickAdd({
   const clearRun = useAssistantRuns((s) => s.clear);
   const [grund, setGrund] = useState<AssistentGrund>('auftrag');
 
-  const [text, setText] = useState('');
-  const [removed, setRemoved] = useState<Removed>(NOTHING_REMOVED);
+  // Text, Chips und Bilder liegen im Store, nicht im Bildschirm — sonst haette
+  // jeder Tab seinen eigenen Entwurf und „eine Zeile" waeren vier (zeileDraft.ts).
+  const text = useZeileDraft((s) => s.text);
+  const setText = useZeileDraft((s) => s.setText);
+  const removed = useZeileDraft((s) => s.removed);
+  const setRemoved = useZeileDraft((s) => s.setRemoved);
   /** Abgewählte Vorschläge und der gerade offene Schnell-Editor. */
   const [deselected, setDeselected] = useState<Set<string>>(new Set());
   const [edit, setEdit] = useState<EditTarget | null>(null);
   /** Weiche überstimmt? Gilt für genau diese Eingabe und wird beim Tippen
    *  wieder gelöst — eine dauerhafte Umschaltung wäre ein versteckter Modus,
    *  und Modi loszuwerden war der ganze Punkt. */
-  const [ueberstimmt, setUeberstimmt] = useState(false);
+  const ueberstimmt = useZeileDraft((s) => s.ueberstimmt);
+  const setUeberstimmt = useZeileDraft((s) => s.setUeberstimmt);
   const [diktiert, setDiktiert] = useState(false);
   const diktatBasis = useRef('');
   /** Angehängte Bilder. Sie leben NUR bis zum Abschicken — kein Dateisystem,
    *  kein Backup, keine Notiz (siehe `assistantImage.ts`). Ein abfotografierter
    *  Zettel soll keine Spur hinterlassen, die man später aufräumen muss. */
-  const [bilder, setBilder] = useState<AssistantImage[]>([]);
+  const bilder = useZeileDraft((s) => s.bilder);
+  const setBilder = useZeileDraft((s) => s.setBilder);
   /** Ist die Auswahl „Abfotografieren / Mediathek" aufgeklappt? */
   const [anhangOffen, setAnhangOffen] = useState(false);
   /** Kurze Quittung an der Stelle, wo eben noch die Karte stand — sonst
@@ -142,8 +148,24 @@ export function QuickAdd({
   };
 
   const today = todayStr();
+
+  // Die Termine holt die Zeile SELBST — früher reichte „Heute" sie herein, und
+  // §8.42 mahnte schon an, dass jeder weitere Bildschirm das nachziehen müsse.
+  // Genau so vergisst man es. Der Query-Schlüssel ist derselbe wie auf „Heute",
+  // die Antwort kommt also aus dem Cache: keine zweite Abfrage, aber überall
+  // dieselbe Auskunft auf „Was steht morgen an?".
+  const [calGranted, setCalGranted] = useState(false);
+  useEffect(() => {
+    void hasCalendarPermission().then(setCalGranted);
+  }, []);
+  const { data: events } = useDeviceEvents(today, addDays(today, 6), calGranted);
+
   const parsed = useMemo(() => parseQuickAdd(text, today), [text, today]);
-  const dueDate = removed.date ? null : parsed.dueDate;
+  // Das Basisdatum greift NUR, wenn der Parser nichts gefunden hat und wirklich
+  // etwas im Feld steht — sonst stünde auf dem Kalender dauerhaft ein
+  // Datums-Chip an einer leeren Zeile.
+  const basis = basisDatum && text.trim().length > 0 ? basisDatum : null;
+  const dueDate = removed.date ? null : (parsed.dueDate ?? basis);
   const dueTime = removed.date || removed.time ? null : parsed.dueTime;
   const rrule = removed.date || removed.rrule ? null : parsed.rrule;
 
@@ -154,7 +176,7 @@ export function QuickAdd({
     beginRun(RUN_ZEILE, 'Zeile', eingabe);
     try {
       const kontext = contextEnabled
-        ? buildAppContext({ events, tasks: tasks ?? [], lists: lists ?? [], notes: notes ?? [], today, calendarDenied })
+        ? buildAppContext({ events: events ?? [], tasks: tasks ?? [], lists: lists ?? [], notes: notes ?? [], today, calendarDenied: !calGranted })
         : null;
       // Werkzeuge am SELBEN Schalter wie der Überblick — wer ihn ausschaltet,
       // will nicht, dass stattdessen nachgeschlagen wird.
@@ -325,6 +347,27 @@ export function QuickAdd({
   // Pill sitzt direkt darüber; zu → über der schwebenden Tab-Bar.
   const keyboard = useKeyboardHeight();
   const restingBottom = Math.max(insets.bottom, Spacing.md) + TAB_BAR_HEIGHT + Spacing.sm;
+
+  // Liegt ein Sheet über dem Bildschirm, tritt die Zeile zurück. Sheets sind
+  // RN-Modals in einer eigenen View-Hierarchie: die Zeile läge dahinter und
+  // würde bei offener Tastatur daneben hervorschauen. Der Lauf lebt im Store,
+  // eine offene Antwort ist danach also wieder da.
+  const sheetOffen = useSheetOffen();
+
+  // Der eigene Schnell-Editor wird IMMER gerendert, auch wenn die Zeile
+  // zurücktritt — er ist selbst ein Sheet und würde sich sonst beim Öffnen
+  // sofort wieder abbauen.
+  const schnellEditor = edit && run?.status === 'done' && run.actions && (
+    <ActionEditSheet
+      target={edit}
+      actions={run.actions}
+      lists={lists ?? []}
+      onClose={() => setEdit(null)}
+      onSave={(next) => finishRun(RUN_ZEILE, { clean: run.clean, actions: next })}
+    />
+  );
+
+  if (sheetOffen) return <>{schnellEditor}</>;
 
   return (
     <View pointerEvents="box-none" style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }}>
@@ -626,15 +669,7 @@ export function QuickAdd({
       </View>
       {/* Einen Vorschlag zurechtrücken, ohne ihn abzuwählen und neu zu tippen.
           Derselbe Editor wie im Braindump. */}
-      {edit && run?.status === 'done' && run.actions && (
-        <ActionEditSheet
-          target={edit}
-          actions={run.actions}
-          lists={lists ?? []}
-          onClose={() => setEdit(null)}
-          onSave={(next) => finishRun(RUN_ZEILE, { clean: run.clean, actions: next })}
-        />
-      )}
+      {schnellEditor}
     </View>
   );
 }

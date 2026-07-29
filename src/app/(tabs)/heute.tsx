@@ -44,7 +44,7 @@ import { type DeviceEvent, hasCalendarPermission } from '@/lib/deviceCalendar';
 import { groupToday, groupUpcomingDays } from '@/lib/taskLogic';
 import { dictationAvailable } from '@/lib/dictation';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
-import { TAB_BAR_SAFE_BOTTOM, webNoOutline } from '@/theme/layout';
+import { QUICK_ADD_CLEARANCE, TAB_BAR_SAFE_BOTTOM, webNoOutline } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
 import { useSettings } from '@/theme/settings.store';
 import { R, Spacing, T } from '@/theme/theme.tokens';
@@ -406,7 +406,7 @@ export default function HeuteScreen() {
   return (
     <View style={{ flex: 1 }}>
     <Screen
-      contentContainerStyle={{ paddingBottom: TAB_BAR_SAFE_BOTTOM + 84 }}
+      contentContainerStyle={{ paddingBottom: TAB_BAR_SAFE_BOTTOM + QUICK_ADD_CLEARANCE }}
       automaticallyAdjustKeyboardInsets
       scrollHandle={scrollHandle}
     >
@@ -638,7 +638,7 @@ export default function HeuteScreen() {
     {/* Quick-Add klebt über der Tab-Bar — Gedanke rein, Kopf frei (§1). */}
     {/* Die Zeile bekommt die Termine, die dieser Bildschirm ohnehin geladen
         hat — so kann sie Fragen beantworten, ohne sie erneut zu holen. */}
-    <QuickAdd events={events ?? []} calendarDenied={!calGranted} />
+    <QuickAdd />
     <QuickVoiceSheet visible={voiceOpen} onClose={() => setVoiceOpen(false)} apiKey={apiKey} />
     <BottomSheet
       visible={intentionSheet}

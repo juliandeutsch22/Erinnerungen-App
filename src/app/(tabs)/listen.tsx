@@ -15,6 +15,7 @@ import { listIcon } from '@/components/listMeta';
 import { PressableScale } from '@/components/PressableScale';
 import { ProgressLine } from '@/components/ProgressLine';
 import { Reveal } from '@/components/Reveal';
+import { QuickAdd } from '@/components/QuickAdd';
 import { Screen } from '@/components/Screen';
 import { Seam } from '@/components/Seam';
 import { SwipeActionSlide } from '@/components/SwipeActionSlide';
@@ -35,6 +36,7 @@ import { addDays, deadlineLabel, formatDueDate, toDateStr, todayStr } from '@/li
 import { isCurrent, isOpen, listProgress, projectDeadlineLabel, projectState } from '@/lib/taskLogic';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { useSettings } from '@/theme/settings.store';
+import { QUICK_ADD_CLEARANCE, TAB_BAR_SAFE_BOTTOM } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
 import { R, Shadow, Spacing, T } from '@/theme/theme.tokens';
 
@@ -72,7 +74,8 @@ export default function ListenScreen() {
   const openPlanned = useMemo(() => (tasks ?? []).filter((t) => isOpen(t) && isCurrent(t, today) && t.dueDate !== null).length, [tasks, today]);
 
   return (
-    <Screen>
+    <View style={{ flex: 1 }}>
+    <Screen contentContainerStyle={{ paddingBottom: TAB_BAR_SAFE_BOTTOM + QUICK_ADD_CLEARANCE }}>
       <Reveal>
         <View style={{ gap: Spacing.xs }}>
           <Type variant="title">Listen</Type>
@@ -225,6 +228,8 @@ export default function ListenScreen() {
 
       {editorList !== undefined && <ListEditorSheet list={editorList} onClose={() => setEditorList(undefined)} />}
     </Screen>
+    <QuickAdd />
+    </View>
   );
 }
 

@@ -16,6 +16,7 @@ import { Type } from '@/components/Type';
 import { useReorderTasks } from '@/data/queries';
 import type { Task } from '@/data/types';
 import { hapticSelect } from '@/lib/haptics';
+import { useSheetRegistration } from '@/lib/sheetPresence';
 import { useColors } from '@/theme/ThemeProvider';
 import { MAX_CONTENT_WIDTH } from '@/theme/layout';
 import { R, Shadow, Spacing } from '@/theme/theme.tokens';
@@ -23,6 +24,8 @@ import { R, Shadow, Spacing } from '@/theme/theme.tokens';
 export function ReorderSheet({ tasks, onClose }: { tasks: Task[]; onClose: () => void }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  // Wird nur gerendert, wenn es offen ist — deshalb fest `true`.
+  useSheetRegistration(true);
   const reorder = useReorderTasks();
   const [data, setData] = useState<Task[]>(tasks);
 

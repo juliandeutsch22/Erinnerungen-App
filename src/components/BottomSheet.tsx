@@ -29,6 +29,7 @@ import { Glass } from '@/components/Glass';
 import { PressableScale } from '@/components/PressableScale';
 import { Type } from '@/components/Type';
 import { hapticSelect } from '@/lib/haptics';
+import { useSheetRegistration } from '@/lib/sheetPresence';
 import { useKeyboardHeight } from '@/lib/useKeyboardHeight';
 import { MAX_CONTENT_WIDTH } from '@/theme/layout';
 import { springConfig } from '@/theme/motion.tokens';
@@ -60,6 +61,10 @@ export function BottomSheet({
   const insets = useSafeAreaInsets();
   const keyboard = useKeyboardHeight();
   const { height: windowHeight } = useWindowDimensions();
+  // Solange dieses Sheet steht, zieht sich die EINE Zeile zurück — sie sitzt
+  // unten und läge sonst hinter dem Sheet, bei offener Tastatur sogar sichtbar
+  // daneben. Zentral gemeldet, damit kein Bildschirm es einzeln buchführen muss.
+  useSheetRegistration(visible);
 
   // Sichtbarer Raum über der Tastatur; der Inhalt scrollt innerhalb davon.
   const footerAllowance = footer ? 84 : 0;

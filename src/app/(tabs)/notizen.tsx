@@ -15,6 +15,7 @@ import { DisclosureChevron } from '@/components/DisclosureChevron';
 import { GlassPanel } from '@/components/GlassPanel';
 import { PressableScale } from '@/components/PressableScale';
 import { Reveal } from '@/components/Reveal';
+import { QuickAdd } from '@/components/QuickAdd';
 import { Screen } from '@/components/Screen';
 import { Seam } from '@/components/Seam';
 import { EmptyState, LoadingState } from '@/components/StateView';
@@ -25,7 +26,7 @@ import type { Note } from '@/data/types';
 import { formatDueDate, toDateStr, todayStr } from '@/lib/dates';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { activeNotes, checklistProgress, expiredTrash, groupNotes, notePreview, noteTitle, trashedNotes } from '@/lib/noteLogic';
-import { TAB_BAR_SAFE_BOTTOM } from '@/theme/layout';
+import { QUICK_ADD_CLEARANCE, TAB_BAR_SAFE_BOTTOM } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
 import { Spacing, T } from '@/theme/theme.tokens';
 
@@ -62,7 +63,8 @@ export default function NotizenScreen() {
   };
 
   return (
-    <Screen contentContainerStyle={{ paddingBottom: TAB_BAR_SAFE_BOTTOM }}>
+    <View style={{ flex: 1 }}>
+    <Screen contentContainerStyle={{ paddingBottom: TAB_BAR_SAFE_BOTTOM + QUICK_ADD_CLEARANCE }}>
       <Reveal>
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
           <View style={{ gap: Spacing.xs, flex: 1 }}>
@@ -140,6 +142,8 @@ export default function NotizenScreen() {
         </GlassPanel>
       </Reveal>
     </Screen>
+    <QuickAdd />
+    </View>
   );
 }
 

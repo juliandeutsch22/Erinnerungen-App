@@ -904,6 +904,52 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
       Text abschickbar, `inlineData` geht wirklich raus, `BILDER:` steht im
       Prompt, Vorschlag landet in der Ablage — und ohne Schlüssel KEINE Klammer.
 
+47. **Stufe 3: die Zeile auf allen Tabs** (`lib/sheetPresence.ts` +
+    `lib/zeileDraft.ts` + `theme/layout.ts`, v1.55.0). Bedingung des Nutzers:
+    harmonisch und natürlich, nicht in Overlays, nichts Wichtiges verdecken.
+    · **Wo sie steht:** Heute, Kalender, Notizen, Listen. **NICHT auf Suche** —
+      dieser Bildschirm IST bereits ein Textfeld, ein zweites am unteren Rand
+      wären zwei Eingaben mit verschiedenen Bedeutungen auf einem Bild. Auch
+      nicht in geschobenen Routen (Aufgabe, Notiz, Chat, Einstellungen …): das
+      sind Arbeitsplätze, keine Ablageorte.
+    · **Ihre BEDEUTUNG bleibt überall dieselbe** — anlegen oder fragen. Auf
+      „Notizen" eine Notiz statt einer Aufgabe anzulegen wäre bequem und falsch:
+      ein Modus, der sich am Bildschirm versteckt. Wer auf „Notizen" fragt
+      („Wo war der Beleg vom Baumarkt?"), bekommt dieselbe Antwort wie überall.
+    · **`sheetPresence.ts` — ein ZÄHLER, kein Boolean.** Sheets sind RN-Modals
+      in einer eigenen View-Hierarchie; die Zeile läge dahinter und würde bei
+      offener Tastatur daneben hervorschauen. `BottomSheet`, `PhotoViewer` und
+      `ReorderSheet` melden sich zentral an, `QuickAdd` tritt zurück. Ein
+      Boolean wäre falsch, weil Sheets sich überlagern können — beim Schließen
+      des oberen meldete es „alles zu", obwohl das untere noch steht. Zentral
+      statt Prop je Bildschirm, weil man es beim dreizehnten Sheet vergisst.
+      ⚠️ `QuickAdd` rendert seinen EIGENEN `ActionEditSheet` weiter, auch wenn
+      es zurücktritt — sonst baut der sich beim Öffnen sofort wieder ab.
+    · **`zeileDraft.ts`:** Text, Chips und Bilder liegen im Store. Mit lokalem
+      State hätte jeder Tab seinen eigenen Entwurf — vier Zeilen, die gleich
+      aussehen, also das Gegenteil der Idee. Nicht persistiert: ein halber Satz
+      von vorgestern beim App-Start wäre Müll, kein Entwurf.
+    · **`QUICK_ADD_CLEARANCE = 84`** in `layout.ts`: jeder Bildschirm mit Zeile
+      addiert ihn zu `TAB_BAR_SAFE_BOTTOM`. Vorher stand die 84 als nackte Zahl
+      in `heute.tsx` — beim zweiten Bildschirm wäre sie geraten worden.
+    · **Die Zeile holt die Termine SELBST.** §8.42 mahnte an, jeder weitere
+      Bildschirm müsse sie hereinreichen — genau so vergisst man es. Gleicher
+      Query-Schlüssel wie „Heute", also aus dem Cache: keine zweite Abfrage,
+      aber überall dieselbe Auskunft auf „Was steht morgen an?".
+    · **Der gewählte Kalendertag ist der Kontext** (`basisDatum`): findet der
+      Parser kein Datum, landet die Aufgabe auf dem angesehenen Tag. Der Chip
+      zeigt es und lässt sich abnehmen — nichts passiert hinter dem Rücken.
+      Greift nur bei Text im Feld, sonst stünde an der leeren Zeile dauerhaft
+      ein Datums-Chip.
+    ⚠️ **Fallstrick für jede künftige Prüfung — teuer gelernt:** expo-router
+    hält ALLE Tabs montiert, es liegen also VIER Zeilen im DOM. Inaktive Tabs
+    sind dabei nicht `display:none`, sondern nur verdeckt: `offsetParent`,
+    Größe und sogar die Lage im Fenster stimmen weiter. Weder
+    `locator.count()` noch Playwrights `:visible` noch Geometrie taugen
+    deshalb — es braucht den Treffertest (`document.elementFromPoint`). Drei
+    meiner Prüfungen meldeten nacheinander Fehlalarm, bevor das klar war;
+    `scratchpad/stufe3.mjs` macht es jetzt richtig, auch für die Chips.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

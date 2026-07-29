@@ -11,6 +11,7 @@ import { PressableScale } from '@/components/PressableScale';
 import { Type } from '@/components/Type';
 import type { EventPhoto } from '@/data/PhotoRepository';
 import { hapticSelect } from '@/lib/haptics';
+import { useSheetRegistration } from '@/lib/sheetPresence';
 import { Spacing } from '@/theme/theme.tokens';
 
 export function PhotoViewer({
@@ -26,6 +27,8 @@ export function PhotoViewer({
 }) {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
+  // Der Viewer wird nur gerendert, wenn er offen ist — deshalb fest `true`.
+  useSheetRegistration(true);
   const [current, setCurrent] = useState(index);
   const [confirm, setConfirm] = useState(false);
 
