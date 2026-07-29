@@ -29,6 +29,15 @@ export type ApplyDeps = {
   colorAt: (index: number) => string;
   /** Verknüpfung für neu angelegte Aufgaben (Chat an einem Termin). */
   taskEventId?: string | null;
+  /**
+   * Wohin Aufgaben gehen, für die das Modell KEINE Liste genannt hat.
+   *
+   * Der Bildschirm ist der Kontext: wer in einer Liste steht und dort etwas
+   * eingibt, meint diese Liste — auch dann, wenn der Assistent die Eingabe
+   * übernimmt. Ohne das sagte der Chip „→ Umzug", und die Aufgabe landete im
+   * Eingang. Standard bleibt der Eingang.
+   */
+  defaultListId?: string;
 };
 
 /**
@@ -53,8 +62,15 @@ export type ApplyUndo = {
   aenderungen: { id: string; vorher: Partial<Omit<Task, 'id'>> }[];
   /** In den Papierkorb gelegte Aufgaben → wiederherstellen. */
   entsorgt: string[];
-  /** Abgehakte Aufgaben → wieder öffnen. */
-  abgehakt: string[];
+  /**
+   * Abgehakte Aufgaben mit ihrem Stand VORHER.
+   *
+   * ⚠️ Nicht bloß die id: Abhaken ist bei einer Wiederholung ein DATUMS-SPRUNG
+   * (`resolveCompletion`), nicht ein `completedAt`. Ein Zurücknehmen, das nur
+   * `completedAt` zurücksetzt, ließe die Aufgabe eine Woche in der Zukunft
+   * stehen — genau davor warnt schon der Kommentar in `useCompleteTask`.
+   */
+  abgehakt: { id: string; completedAt: string | null; dueDate: string | null }[];
 };
 
 export type ApplyResult = {
@@ -69,7 +85,6 @@ export type ApplyResult = {
 export type UndoDeps = {
   trashTask: (id: string) => Promise<unknown>;
   restoreTask: (id: string) => Promise<unknown>;
-  reopenTask: (id: string) => Promise<unknown>;
   updateTask: (id: string, patch: Partial<Omit<Task, 'id'>>) => Promise<unknown>;
   trashNote: (id: string) => Promise<unknown>;
   trashList: (id: string) => Promise<unknown>;
@@ -87,7 +102,8 @@ export type UndoDeps = {
 export async function undoAppliedActions(u: ApplyUndo, deps: UndoDeps): Promise<void> {
   for (const id of u.aufgaben) await deps.trashTask(id);
   for (const id of u.notizen) await deps.trashNote(id);
-  for (const id of u.abgehakt) await deps.reopenTask(id);
+  // Beide Felder zurück, nicht nur `completedAt` — siehe `ApplyUndo.abgehakt`.
+  for (const a of u.abgehakt) await deps.updateTask(a.id, { completedAt: a.completedAt, dueDate: a.dueDate });
   for (const id of u.entsorgt) await deps.restoreTask(id);
   for (const { id, vorher } of u.aenderungen) await deps.updateTask(id, vorher);
   for (const id of u.listen) await deps.trashList(id);
@@ -163,8 +179,11 @@ export async function applyAssistantActions(a: AssistantAction, deps: ApplyDeps)
     // Abhaken zuletzt: bei einer Wiederholung wandert dabei das Datum — das
     // soll auf dem bereits geänderten Stand geschehen.
     if (c.erledigt) {
-      await deps.completeTask({ ...t, ...patch });
-      rueckgaengig.abgehakt.push(t.id);
+      // Der Stand VOR dem Abhaken — und zwar nach dem Patch, denn genau der
+      // wird abgehakt (`{ ...t, ...patch }`).
+      const vorherStand = { ...t, ...patch };
+      await deps.completeTask(vorherStand);
+      rueckgaengig.abgehakt.push({ id: t.id, completedAt: vorherStand.completedAt, dueDate: vorherStand.dueDate });
     }
     aenderungen += 1;
   }
@@ -174,7 +193,7 @@ export async function applyAssistantActions(a: AssistantAction, deps: ApplyDeps)
   for (const t of a.aufgaben) {
     const subtasks: Subtask[] = subtasksFromSchritte(t.schritte);
     const neu = await deps.createTask({
-      listId: resolveListId(t.liste, alleListen),
+      listId: resolveListId(t.liste, alleListen, deps.defaultListId ?? 'default'),
       title: t.titel,
       note: t.notiz ?? null,
       dueDate: actionDueDate(t, deps.today),

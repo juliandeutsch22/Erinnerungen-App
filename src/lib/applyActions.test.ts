@@ -192,15 +192,74 @@ describe('Rückgängig für „Übernehmen"', () => {
     const rueck: UndoDeps = {
       trashTask: async (id) => void log.push(`aufgabe-weg:${id}`),
       restoreTask: async (id) => void log.push(`zurück:${id}`),
-      reopenTask: async (id) => void log.push(`geöffnet:${id}`),
-      updateTask: async (id) => void log.push(`update:${id}`),
+      updateTask: async (id, patch) => void log.push(`update:${id}:${JSON.stringify(patch)}`),
       trashNote: async (id) => void log.push(`notiz-weg:${id}`),
       trashList: async (id) => void log.push(`liste-weg:${id}`),
     };
     await undoAppliedActions(
-      { aufgaben: ['t1'], notizen: ['n1'], listen: ['l1'], aenderungen: [{ id: 'a1', vorher: {} }], entsorgt: ['e1'], abgehakt: ['h1'] },
+      {
+        aufgaben: ['t1'],
+        notizen: ['n1'],
+        listen: ['l1'],
+        aenderungen: [{ id: 'a1', vorher: {} }],
+        entsorgt: ['e1'],
+        abgehakt: [{ id: 'h1', completedAt: null, dueDate: '2026-07-27' }],
+      },
       rueck,
     );
-    expect(log).toEqual(['aufgabe-weg:t1', 'notiz-weg:n1', 'geöffnet:h1', 'zurück:e1', 'update:a1', 'liste-weg:l1']);
+    expect(log).toEqual([
+      'aufgabe-weg:t1',
+      'notiz-weg:n1',
+      // Beide Felder zurueck — nicht nur completedAt.
+      'update:h1:{"completedAt":null,"dueDate":"2026-07-27"}',
+      'zurück:e1',
+      'update:a1:{}',
+      'liste-weg:l1',
+    ]);
+  });
+});
+
+describe('Rückgängig eines Abhakens bei WIEDERHOLUNG', () => {
+  // Abhaken ist bei einer Wiederholung ein Datums-Sprung, kein `completedAt`.
+  // Wer nur `completedAt` zuruecksetzt, laesst die Aufgabe eine Woche in der
+  // Zukunft stehen — und genau das tat die erste Fassung (`reopenTask`).
+  const woechentlich: Task = {
+    id: 'w1', listId: 'default', title: 'Müll rausbringen', note: null,
+    dueDate: '2026-07-27', dueTime: null, rrule: 'weekly', startDate: null, expiresOn: null,
+    evening: false, flagged: false, eventId: null, completedAt: null, notificationId: null,
+    tags: [], subtasks: [], createdAt: '', sort: 0,
+  };
+
+  it('merkt sich Datum UND completedAt, nicht nur die id', async () => {
+    const d = deps({ tasks: [woechentlich] });
+    const res = await applyAssistantActions({ ...leer, aenderungen: [{ handle: 'w1', erledigt: true }] }, d.deps);
+    expect(res.rueckgaengig.abgehakt).toEqual([{ id: 'w1', completedAt: null, dueDate: '2026-07-27' }]);
+  });
+
+  it('nimmt beim Zurücknehmen BEIDE Felder zurück', async () => {
+    const gesetzt: { id: string; patch: Partial<Omit<Task, 'id'>> }[] = [];
+    await undoAppliedActions(
+      { aufgaben: [], notizen: [], listen: [], aenderungen: [], entsorgt: [], abgehakt: [{ id: 'w1', completedAt: null, dueDate: '2026-07-27' }] },
+      {
+        trashTask: async () => {},
+        restoreTask: async () => {},
+        updateTask: async (id, patch) => void gesetzt.push({ id, patch }),
+        trashNote: async () => {},
+        trashList: async () => {},
+      },
+    );
+    expect(gesetzt).toEqual([{ id: 'w1', patch: { completedAt: null, dueDate: '2026-07-27' } }]);
+  });
+
+  it('bei einer Änderung MIT Abhaken zählt der Stand nach dem Patch', async () => {
+    const d = deps({ tasks: [woechentlich] });
+    const res = await applyAssistantActions(
+      { ...leer, aenderungen: [{ handle: 'w1', datum: '2026-08-03', erledigt: true }] },
+      d.deps,
+    );
+    // Abgehakt wird `{ ...t, ...patch }` — also mit dem NEUEN Datum.
+    expect(res.rueckgaengig.abgehakt).toEqual([{ id: 'w1', completedAt: null, dueDate: '2026-08-03' }]);
+    // Und die Änderung selbst kennt weiterhin das alte Datum.
+    expect(res.rueckgaengig.aenderungen).toEqual([{ id: 'w1', vorher: { dueDate: '2026-07-27' } }]);
   });
 });

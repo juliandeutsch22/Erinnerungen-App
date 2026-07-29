@@ -1063,6 +1063,55 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
     Gemessen: Auftritt bei 0.94, Standzeit 4665 ms, 21 Zwischenbilder beim
     Ausblenden; mit Reduced-Motion sofort da und sofort weg.
 
+51. **Fehlersuche v1.58.0 — was v1.49–v1.57 still hinterlassen haben.** Sieben
+    Funde, alle in Code aus dieser Strecke. Auffällig: **drei davon sind
+    Wiederholungstäter** — dieselbe Regel ein zweites Mal aufgeschrieben.
+    · **Ein Abhaken war nicht zurückzunehmen** (`ApplyUndo.abgehakt`). Ich hatte
+      nur die id gemerkt und mit `reopenTask` (`completedAt: null`)
+      zurückgenommen. Bei einer WIEDERHOLUNG ist Abhaken aber ein
+      Datums-Sprung, kein `completedAt` — die Aufgabe wäre eine Woche in der
+      Zukunft stehen geblieben. Ausgerechnet `useCompleteTask` warnt genau davor
+      im eigenen Kommentar. Jetzt werden `completedAt` UND `dueDate` gemerkt und
+      per `updateTask` zurückgeschrieben; `reopenTask` fliegt aus `UndoDeps`.
+    · **`zeileVorschlaege` hatte „überfällig" neu erfunden** (`dueDate < today`)
+      statt `isOverdue` zu benutzen. Damit hätte der Chip eine VERFALLENE oder
+      noch SCHLAFENDE Aufgabe mitgezählt — dieselbe Doppelung, die in §8.36
+      schon einmal dafür sorgte, dass „Heute" etwas als überfällig zeigte, was
+      nirgends sonst so galt. Jetzt aus `taskLogic`, mit Tests für beide Fälle.
+    · **Der „→ Liste"-Chip log.** Auf einem Listen-Detail zeigte er „→ Umzug",
+      aber eine vom ASSISTENTEN angelegte Aufgabe landete im Eingang:
+      `applyAssistantActions` fiel auf `'default'` zurück. Neu:
+      `ApplyDeps.defaultListId`, von der Zeile mit ihrer `listId` gefüttert.
+    · **Zu wenig Fußraum auf dem Listen-Detail.** `Screen` mischt ein
+      übergebenes `contentContainerStyle` NACH seinem eigenen — ein
+      `paddingBottom` ERSETZT also `bottomPad` samt Safe-Area. Bei
+      `withTabBar={false}` fiel damit `insets.bottom` weg, und auf einem Gerät
+      mit Home-Anzeige rutschte die letzte Aufgabe unter die Zeile. Im Web
+      unsichtbar, weil `insets.bottom` dort 0 ist.
+    · **Die Abwahl hing am Bildschirm.** Der Lauf ist global, die Karte steht
+      also auf jedem Tab — die Abwahl lag aber im Bildschirm. Dieselbe Karte
+      zeigte auf „Heute" zwei Häkchen weniger als auf „Kalender". Jetzt in
+      `zeileDraft`, wie der Text seit §8.47.
+    · **Doppeltipp auf „Rückgängig".** Während des 160-ms-Abgangs war der Knopf
+      noch anklickbar und nahm den Durchgang ein zweites Mal zurück (folgenlos,
+      aber falsch). Jetzt während des Abgangs tot.
+    · **Timer liefen nach dem Abbau weiter** (`quittungTimer`, `blurTimer`).
+      Auf den Tabs egal — die bleiben montiert —, auf dem Listen-Detail nicht.
+    **Ohne Befund geprüft:** `sheetPresence` (Zähler balanciert auch bei
+    gestapelten Sheets und StrictMode), `useDeleteList` gegen das Rückgängig
+    (bereits entsorgte Aufgaben werden nicht neu gestempelt), `groupJournal`,
+    die Hook-Reihenfolge vor `if (sheetOffen) return`, und die
+    Mehrfach-Montage der Zeile (fünf Instanzen, ein Store).
+    **Bekannt und NICHT angefasst:** `npx expo lint` meldet 49 Fehler in der
+    ganzen App (Refs im Render, `setState` im Effekt, unescapte Anführungs-
+    zeichen). Drei liegen in Dateien dieser Strecke, sind dort aber Altbestand.
+    Das ist eine eigene Aufräumrunde, keine Fehlersuche.
+    ⚠️ **Zwei Fallen für Touren**, beide hier wieder aufgelaufen: `routeInput`
+    schickt „Leg …" NICHT an den Assistenten (kein Befehlswort) — für
+    Assistenten-Wege „Plane …" nehmen. Und der Suchbildschirm zeigt die letzten
+    SUCHBEGRIFFE als Chips: ein `innerText`-Treffer beweist dort nichts, es
+    braucht die Zeile der Aufgabe (`aria-label="<Titel> — erledigen"`).
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

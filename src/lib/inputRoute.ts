@@ -14,7 +14,9 @@
 // Die Reihenfolge ist nicht verhandelbar: **lokal zuerst.** Der Parser
 // antwortet in Mikrosekunden, ohne Netz und ohne Schlüssel. Ohne Assistenten
 // bleibt die Zeile deshalb genau so nutzbar wie vorher.
+import type { Task } from '@/data/types';
 import { parseQuickAdd, type QuickAddResult } from '@/lib/quickAddParser';
+import { isDueToday, isOverdue } from '@/lib/taskLogic';
 
 export type InputRoute =
   /** Der lokale Parser hat eine saubere Aufgabe erkannt — sofort anlegen. */
@@ -77,13 +79,14 @@ export function routeInput(input: string, today: string, assistentVerfuegbar: bo
  * nur da, wenn wirklich etwas überfällig ist. Ein Vorschlag, der ins Leere
  * führt, wäre schlimmer als keiner — er kostet Wartezeit für ein „nichts".
  */
-export function zeileVorschlaege(
-  offeneAufgaben: { dueDate: string | null; completedAt: string | null }[],
-  today: string,
-): string[] {
-  const offen = offeneAufgaben.filter((t) => t.completedAt === null);
-  const ueberfaellig = offen.filter((t) => t.dueDate !== null && t.dueDate < today).length;
-  const heute = offen.filter((t) => t.dueDate === today).length;
+export function zeileVorschlaege(aufgaben: Task[], today: string): string[] {
+  // ⚠️ „Überfällig" und „heute" kommen aus `taskLogic`, NICHT aus einem eigenen
+  // `dueDate < today`. Die App zählt eine verfallene oder noch schlafende
+  // Aufgabe bewusst nicht mit (Lebensspanne, `isCurrent`) — eine zweite,
+  // schlichtere Fassung dieser Regel hat schon einmal dazu geführt, dass
+  // „Heute" etwas als überfällig zeigte, was nirgends sonst so galt.
+  const ueberfaellig = aufgaben.filter((t) => isOverdue(t, today)).length;
+  const heute = aufgaben.filter((t) => isDueToday(t, today)).length;
 
   const alle: string[] = [];
   if (ueberfaellig > 0) alle.push('Was ist überfällig?');

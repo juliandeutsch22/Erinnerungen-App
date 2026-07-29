@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowUpDown, CalendarClock, CheckCheck, ChevronLeft, Pencil, Plus, RotateCcw, Share2 } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GlassButton } from '@/components/GlassButton';
 import { DisclosureChevron } from '@/components/DisclosureChevron';
@@ -39,6 +40,9 @@ export default function ListeDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colors = useColors();
   const router = useRouter();
+  // Der Fußraum muss die Home-Anzeige MITrechnen: die Zeile sitzt hier ohne
+  // Tab-Bar direkt über dem unteren Rand.
+  const insets = useSafeAreaInsets();
   const { data: tasks } = useTasks();
   const { data: lists } = useLists();
   const complete = useCompleteTask();
@@ -118,7 +122,7 @@ export default function ListeDetailScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-    <Screen withTabBar={false} contentContainerStyle={{ paddingBottom: QUICK_ADD_CLEARANCE }}>
+    <Screen withTabBar={false} contentContainerStyle={{ paddingBottom: insets.bottom + QUICK_ADD_CLEARANCE }}>
       <Reveal>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <PressableScale accessibilityLabel="Zurück" onPress={() => router.back()} style={{ padding: Spacing.sm, marginLeft: -Spacing.sm }}>

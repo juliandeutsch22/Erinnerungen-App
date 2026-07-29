@@ -23,11 +23,22 @@ type ZeileDraft = {
   text: string;
   removed: Removed;
   bilder: AssistantImage[];
+  /**
+   * Abgewählte Vorschläge der Antwortkarte (Schlüssel aus `omniZeilen`).
+   *
+   * Gehört aus demselben Grund hierher wie der Text: der LAUF liegt global
+   * (`RUN_ZEILE`), die Karte steht also auf jedem Tab. Lag die Abwahl im
+   * Bildschirm, sah man auf „Heute" zwei Häkchen weniger und auf „Kalender"
+   * wieder alle — dieselbe Karte, zwei Wahrheiten.
+   */
+  deselected: Set<string>;
   /** Gilt für genau diese Eingabe, wird beim Tippen wieder gelöst. */
   ueberstimmt: boolean;
   setText: (t: string) => void;
   setRemoved: (r: Removed | ((prev: Removed) => Removed)) => void;
   setBilder: (b: AssistantImage[] | ((prev: AssistantImage[]) => AssistantImage[])) => void;
+  toggleDeselected: (key: string) => void;
+  clearDeselected: () => void;
   setUeberstimmt: (v: boolean | ((prev: boolean) => boolean)) => void;
   /** Nach dem Abschicken: alles zurück auf Anfang. */
   leeren: () => void;
@@ -37,10 +48,19 @@ export const useZeileDraft = create<ZeileDraft>((set) => ({
   text: '',
   removed: NOTHING_REMOVED,
   bilder: [],
+  deselected: new Set<string>(),
   ueberstimmt: false,
   setText: (t) => set({ text: t }),
   setRemoved: (r) => set((s) => ({ removed: typeof r === 'function' ? r(s.removed) : r })),
   setBilder: (b) => set((s) => ({ bilder: typeof b === 'function' ? b(s.bilder) : b })),
+  toggleDeselected: (key) =>
+    set((s) => {
+      const next = new Set(s.deselected);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return { deselected: next };
+    }),
+  clearDeselected: () => set({ deselected: new Set<string>() }),
   setUeberstimmt: (v) => set((s) => ({ ueberstimmt: typeof v === 'function' ? v(s.ueberstimmt) : v })),
   leeren: () => set({ text: '', removed: NOTHING_REMOVED, bilder: [], ueberstimmt: false }),
 }));

@@ -34,7 +34,7 @@ import { Type } from '@/components/Type';
 import { LIST_COLORS } from '@/components/listMeta';
 import { useCreateAssistantEvents, useDeviceEvents } from '@/data/calendarQueries';
 import { useCreateNote, useDeleteNote, useNotes } from '@/data/noteQueries';
-import { useCompleteTask, useCreateList, useCreateTask, useDeleteList, useDeleteTask, useLists, useReopenTask, useRestoreTask, useTasks, useUpdateTask } from '@/data/queries';
+import { useCompleteTask, useCreateList, useCreateTask, useDeleteList, useDeleteTask, useLists, useRestoreTask, useTasks, useUpdateTask } from '@/data/queries';
 import { DEFAULT_LIST_ID } from '@/data/ListRepository';
 import type { ChatMessage } from '@/data/types';
 import { hasCalendarPermission } from '@/lib/deviceCalendar';
@@ -116,7 +116,6 @@ export function QuickAdd({
   const createEvents = useCreateAssistantEvents();
   // Nur fuer das Ruecknehmen eines uebernommenen Vorschlags.
   const restoreTask = useRestoreTask();
-  const reopenTask = useReopenTask();
   const deleteNote = useDeleteNote();
   const deleteList = useDeleteList();
   const { data: tasks } = useTasks();
@@ -141,8 +140,11 @@ export function QuickAdd({
   const setText = useZeileDraft((s) => s.setText);
   const removed = useZeileDraft((s) => s.removed);
   const setRemoved = useZeileDraft((s) => s.setRemoved);
-  /** Abgewählte Vorschläge und der gerade offene Schnell-Editor. */
-  const [deselected, setDeselected] = useState<Set<string>>(new Set());
+  /** Abgewählte Vorschläge liegen im Store — die Karte steht auf jedem Tab,
+   *  also darf die Abwahl nicht am Bildschirm hängen (zeileDraft.ts). */
+  const deselected = useZeileDraft((s) => s.deselected);
+  const toggleDeselected = useZeileDraft((s) => s.toggleDeselected);
+  const clearDeselected = useZeileDraft((s) => s.clearDeselected);
   const [edit, setEdit] = useState<EditTarget | null>(null);
   /** Weiche überstimmt? Gilt für genau diese Eingabe und wird beim Tippen
    *  wieder gelöst — eine dauerhafte Umschaltung wäre ein versteckter Modus,
@@ -225,7 +227,7 @@ export function QuickAdd({
         onDelta: (d) => deltaRun(RUN_ZEILE, d),
       });
       const { clean, actions } = extractActions(antwort);
-      setDeselected(new Set());
+      clearDeselected();
       finishRun(RUN_ZEILE, { clean, actions });
     } catch (e) {
       failRun(RUN_ZEILE, e instanceof Error ? e.message : 'Unbekannter Fehler.');
@@ -300,12 +302,7 @@ export function QuickAdd({
 
   const toggleZeile = (key: string) => {
     hapticSelect();
-    setDeselected((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+    toggleDeselected(key);
   };
 
   /** Schlüssel („a0") → Ziel des Schnell-Editors. */
@@ -343,13 +340,15 @@ export function QuickAdd({
         trashTask: (id) => deleteTask.mutateAsync(id),
         createEvents: (termine) => createEvents(termine),
         colorAt: (i) => LIST_COLORS[i % LIST_COLORS.length],
+        // Der Bildschirm ist der Kontext — sonst luege der „→ Liste"-Chip.
+        defaultListId: listId,
       });
     } catch (e) {
       failRun(RUN_ZEILE, `Konnte es nicht anlegen: ${e instanceof Error ? e.message : 'Unbekannter Fehler.'}`);
       return;
     }
     clearRun(RUN_ZEILE);
-    setDeselected(new Set());
+    clearDeselected();
 
     // Ein Tipp schreibt hier bis zu einem Dutzend Einträge in Listen, Notizen
     // und Kalender. Die Karte verhindert das VERSEHENTLICHE Übernehmen — gegen
@@ -369,7 +368,6 @@ export function QuickAdd({
           await undoAppliedActions(u, {
             trashTask: (id) => deleteTask.mutateAsync(id),
             restoreTask: (id) => restoreTask.mutateAsync(id),
-            reopenTask: (id) => reopenTask.mutateAsync(id),
             updateTask: (id, patch) => updateTask.mutateAsync({ id, patch }),
             trashNote: (id) => deleteNote.mutateAsync(id),
             trashList: (id) => deleteList.mutateAsync(id),
@@ -440,6 +438,16 @@ export function QuickAdd({
   // Tastatur: gemessene Höhe statt KeyboardAvoidingView (bei position:absolute
   // unzuverlässig — die Pill wanderte an unlogische Stellen). Tastatur offen →
   // Pill sitzt direkt darüber; zu → über der schwebenden Tab-Bar.
+  // Beim Abbau (Listen-Detail wird verlassen) laufende Timer abraeumen —
+  // sonst feuert ein `setState` in eine Komponente, die es nicht mehr gibt.
+  useEffect(
+    () => () => {
+      if (quittungTimer.current) clearTimeout(quittungTimer.current);
+      if (blurTimer.current) clearTimeout(blurTimer.current);
+    },
+    [],
+  );
+
   const keyboard = useKeyboardHeight();
   const restingBottom = Math.max(insets.bottom, Spacing.md) + (ueberTabBar ? TAB_BAR_HEIGHT + Spacing.sm : 0);
 
@@ -502,7 +510,9 @@ export function QuickAdd({
                 {quittung.zurueck && (
                   <PressableScale
                     accessibilityLabel="Übernommenes zurücknehmen"
-                    onPress={() => {
+                    // Waehrend des Abgangs ist der Knopf noch da, aber tot —
+                    // ein zweiter Tipp wuerde den Durchgang doppelt zuruecknehmen.
+                    onPress={quittungGeht ? undefined : () => {
                       if (quittungTimer.current) clearTimeout(quittungTimer.current);
                       // Die alte Quittung geht, die neue („Zurückgenommen.")
                       // kommt — sonst tauschte der Text unter der Hand.
@@ -531,7 +541,7 @@ export function QuickAdd({
                 onApply={() => void uebernehmen()}
                 onDismiss={() => {
                   clearRun(RUN_ZEILE);
-                  setDeselected(new Set());
+                  clearDeselected();
                 }}
               />
             </PopIn>
