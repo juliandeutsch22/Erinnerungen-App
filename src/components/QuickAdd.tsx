@@ -27,7 +27,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ActionEditSheet, type EditTarget } from '@/components/ActionEditSheet';
 import { Glass } from '@/components/Glass';
 import { MicButton } from '@/components/MicButton';
-import { OmniResult } from '@/components/OmniResult';
+import { OmniResult, omniZeilen } from '@/components/OmniResult';
 import { PopIn } from '@/components/PopIn';
 import { PressableScale } from '@/components/PressableScale';
 import { Type } from '@/components/Type';
@@ -45,6 +45,7 @@ import { RUN_ZEILE, useAssistantRuns } from '@/lib/assistantRun';
 import { addDays, formatDueDate, todayStr } from '@/lib/dates';
 import { useSheetOffen } from '@/lib/sheetPresence';
 import { NOTHING_REMOVED, type Removed, useZeileDraft } from '@/lib/zeileDraft';
+import { verlaufAntwort, verlaufErweitern, verlaufNachrichten, type Wechsel } from '@/lib/zeileVerlauf';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { useUndo } from '@/lib/undo';
 import { routeInput, zeileVorschlaege, type AssistentGrund } from '@/lib/inputRoute';
@@ -133,6 +134,11 @@ export function QuickAdd({
   const failRun = useAssistantRuns((s) => s.fail);
   const clearRun = useAssistantRuns((s) => s.clear);
   const [grund, setGrund] = useState<AssistentGrund>('auftrag');
+  // Steht eine FERTIGE Antwort auf dem Schirm? Dann ist die nächste Eingabe
+  // eine Rückfrage und keine neue Anfrage (siehe `submit`). Nur mit Schlüssel —
+  // ohne gäbe es niemanden zum Nachfragen. Steht hier oben, weil unten drei
+  // Stellen davon abhängen: die Weiche, der Weg-Chip und der Platzhalter.
+  const rueckfrageOffen = run?.status === 'done' && apiKey.length > 0;
 
   // Text, Chips und Bilder liegen im Store, nicht im Bildschirm — sonst haette
   // jeder Tab seinen eigenen Entwurf und „eine Zeile" waeren vier (zeileDraft.ts).
@@ -204,11 +210,28 @@ export function QuickAdd({
   const dueTime = removed.date || removed.time ? null : parsed.dueTime;
   const rrule = removed.date || removed.rrule ? null : parsed.rrule;
 
+  /**
+   * Der Verlauf, den die NÄCHSTE Anfrage mitnimmt.
+   *
+   * Steht eine fertige Antwort auf dem Schirm, gehört sie dazu — sonst wäre
+   * jede Nachfrage wieder ein Einzelschuss. Ein FEHLGESCHLAGENER Lauf steuert
+   * nichts bei (es gibt keine Antwort), behält aber die Runden davor: ein
+   * zweiter Versuch soll nicht bei null anfangen.
+   */
+  const verlaufFuerNaechste = (): Wechsel[] => {
+    if (!run) return [];
+    if (run.status !== 'done') return run.verlauf;
+    const zeilen = run.actions ? omniZeilen(run.actions, tasks ?? [], today) : [];
+    return verlaufErweitern(run.verlauf, run.input, verlaufAntwort(run.clean, zeilen));
+  };
+
   /** Der Weg an den Assistenten. Der Lauf lebt im Store, überlebt also das
    *  Wegtippen und einen Bildschirmwechsel. */
   const frage = async (eingabe: string, warum: AssistentGrund, mitBildern: AssistantImage[] = []) => {
+    // VOR `beginRun` einsammeln — das überschreibt den alten Lauf.
+    const verlauf = verlaufFuerNaechste();
     setGrund(warum);
-    beginRun(RUN_ZEILE, 'Zeile', eingabe);
+    beginRun(RUN_ZEILE, 'Zeile', eingabe, verlauf);
     try {
       const kontext = contextEnabled
         ? buildAppContext({ events: events ?? [], tasks: tasks ?? [], lists: lists ?? [], notes: notes ?? [], today, calendarDenied: !calGranted })
@@ -218,10 +241,10 @@ export function QuickAdd({
       const toolData: ToolData | null = contextEnabled
         ? { tasks: tasks ?? [], lists: lists ?? [], notes: notes ?? [], today }
         : null;
-      const msg: ChatMessage = {
-        id: 'zeile', chatId: 'zeile', role: 'user', content: eingabe, createdAt: new Date().toISOString(),
-      };
-      const antwort = await askAssistant(apiKey, [msg], kontext, memory, {
+      // Die letzten Runden gehen mit, damit „welchen?" beantwortbar wird.
+      // Bilder NICHT — sie gelten für genau die Anfrage, an der sie hängen.
+      const nachrichten = verlaufNachrichten(verlauf, eingabe);
+      const antwort = await askAssistant(apiKey, nachrichten, kontext, memory, {
         toolData,
         images: mitBildern,
         onDelta: (d) => deltaRun(RUN_ZEILE, d),
@@ -259,6 +282,39 @@ export function QuickAdd({
     const eingabe = text.trim();
     // Ein Foto allein genügt — der Zettel IST die Eingabe.
     if (eingabe.length === 0 && bilder.length === 0) return;
+
+    // ——— Rückfrage: die Weiche kehrt sich um, solange eine Antwort dasteht ———
+    //
+    // Sonst überall gilt „lokal zuerst". Hier NICHT, und der Grund ist der
+    // Fall, für den es die Rückfrage überhaupt gibt: Antworten auf eine
+    // Rückfrage sehen wie Bruchstücke aus. „lieber Freitag" hat kein
+    // Fragezeichen, kein Befehlswort und ist kurz — der Parser hielte es für
+    // eine Aufgabe und legte „lieber" für Freitag an. Genau das passierte bis
+    // v1.58.2 wirklich.
+    //
+    // Die Umkehrung ist eng begrenzt: nur bei einer FERTIGEN Antwort, nur mit
+    // Schlüssel, und der Weg-Chip sagt „Rückfrage" und schaltet mit einem Tipp
+    // auf „wird angelegt" um. Ein Tipp auf das X beendet die Runde sofort.
+    if (rueckfrageOffen && bilder.length === 0) {
+      const nachAssistent = !umkehren;
+      if (nachAssistent) {
+        const r = routeInput(eingabe, today, true);
+        setText('');
+        setRemoved(NOTHING_REMOVED);
+        setUeberstimmt(false);
+        void frage(eingabe, r.ziel === 'assistent' ? r.grund : 'auftrag');
+        return;
+      }
+      // Überstimmt: doch eine Aufgabe. Die Runde bleibt stehen — man wollte
+      // etwas nebenbei notieren, nicht das Gespräch abbrechen.
+      createTask.mutate({ listId, title: parsed.title || eingabe, dueDate, dueTime, rrule, tags: parsed.tags });
+      hapticSuccess();
+      setText('');
+      setRemoved(NOTHING_REMOVED);
+      setUeberstimmt(false);
+      inputRef.current?.focus();
+      return;
+    }
 
     // Ein Bild hebt die Weiche AUF, es gibt keine zweite Meinung: der lokale
     // Parser kann kein Foto lesen. Deshalb ist das Überstimmen hier gesperrt
@@ -400,7 +456,8 @@ export function QuickAdd({
   );
   // Was der Knopf ZEIGT — inklusive eines etwaigen Überstimmens. Mit Bild ist
   // die Sache entschieden: es geht an den Assistenten, sonst nirgendwohin.
-  const gehtLokal = weicheJetzt.ziel === 'lokal';
+  // Und bei offener Runde ist der Standard die Rückfrage, nicht der Parser.
+  const gehtLokal = rueckfrageOffen ? false : weicheJetzt.ziel === 'lokal';
   const zeigtLokal = bilder.length > 0 ? false : ueberstimmt ? !gehtLokal : gehtLokal;
   // Der Chip erscheint nur, wenn es überhaupt eine Wahl gibt: mit Text im Feld
   // und mit Schlüssel. Ohne Schlüssel führt nur ein Weg irgendwohin — und mit
@@ -430,10 +487,17 @@ export function QuickAdd({
   // — auf „Heute" wäre „→ Erinnerungen" bloß Rauschen.
   const zielListe = listId === DEFAULT_LIST_ID ? null : (lists ?? []).find((l) => l.id === listId) ?? null;
 
+  // Die Parser-Chips beschreiben, was ANGELEGT wird — sie stehen deshalb nur
+  // da, wenn das auch passiert. Bei einer Rückfrage oder einem Auftrag an den
+  // Assistenten sagten sie bisher „Do 30.7." zu einer Eingabe, aus der gar
+  // keine Aufgabe entsteht. Tippt man den Weg-Chip auf „wird angelegt", sind
+  // sie sofort wieder da.
   const chips: { key: keyof Removed; icon: typeof Clock; label: string }[] = [];
-  if (dueDate) chips.push({ key: 'date', icon: CalendarDays, label: formatDueDate(dueDate, today) });
-  if (dueTime) chips.push({ key: 'time', icon: Clock, label: dueTime });
-  if (rrule) chips.push({ key: 'rrule', icon: Repeat, label: RRULE_LABEL[rrule] ?? 'Wiederholung' });
+  if (zeigtLokal) {
+    if (dueDate) chips.push({ key: 'date', icon: CalendarDays, label: formatDueDate(dueDate, today) });
+    if (dueTime) chips.push({ key: 'time', icon: Clock, label: dueTime });
+    if (rrule) chips.push({ key: 'rrule', icon: Repeat, label: RRULE_LABEL[rrule] ?? 'Wiederholung' });
+  }
 
   // Tastatur: gemessene Höhe statt KeyboardAvoidingView (bei position:absolute
   // unzuverlässig — die Pill wanderte an unlogische Stellen). Tastatur offen →
@@ -680,7 +744,11 @@ export function QuickAdd({
                         <Sparkles size={12} color={colors.teal} strokeWidth={2.2} />
                       )}
                       <Type variant="caption" tone={zeigtLokal ? 'text3' : 'teal'}>
-                        {zeigtLokal ? 'wird angelegt' : 'geht an den Assistenten'}
+                        {zeigtLokal
+                          ? 'wird angelegt'
+                          : rueckfrageOffen
+                            ? 'Rückfrage'
+                            : 'geht an den Assistenten'}
                       </Type>
                     </Glass>
                   </PressableScale>
@@ -780,7 +848,10 @@ export function QuickAdd({
                     // sucht man nach dem Satz, den man noch schreiben „muss".
                     bilder.length > 0
                     ? 'Noch etwas dazu? (nicht nötig)'
-                    : apiKey.length > 0
+                    : // Die Runde laeuft — hier fragt man nach, statt neu zu beginnen.
+                      rueckfrageOffen
+                      ? 'Nachfragen …'
+                      : apiKey.length > 0
                       ? 'Was liegt an? Oder frag mich.'
                       : 'Was liegt an?'
               }
@@ -823,7 +894,9 @@ export function QuickAdd({
                 <PressableScale
                   // Das Symbol verrät VOR dem Tippen, was passieren wird:
                   // Plus = wird angelegt, Funke = der Assistent sieht es an.
-                  accessibilityLabel={zeigtLokal ? 'Aufgabe anlegen' : 'An den Assistenten geben'}
+                  accessibilityLabel={
+                    zeigtLokal ? 'Aufgabe anlegen' : rueckfrageOffen ? 'Nachfragen' : 'An den Assistenten geben'
+                  }
                   onPress={() => submit(ueberstimmt)}
                   // Abkürzung für alle, die sie kennen — dieselbe Wirkung wie
                   // der Weg-Chip daneben. Sie kostet keine Fläche und ist NICHT

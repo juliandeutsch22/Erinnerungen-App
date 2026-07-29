@@ -19,6 +19,7 @@
 import { create } from 'zustand';
 
 import type { AssistantAction } from '@/lib/assistant';
+import type { Wechsel } from '@/lib/zeileVerlauf';
 
 export type RunStatus = 'running' | 'done' | 'error';
 
@@ -38,6 +39,14 @@ export type AssistantRun = {
   actions: AssistantAction | null;
   error: string | null;
   startedAt: number;
+  /**
+   * Abgeschlossene Runden VOR dieser Anfrage (nur die EINE Zeile benutzt das).
+   *
+   * Er hängt am Lauf und nicht am Bildschirm, damit er dasselbe Schicksal
+   * teilt: `clear()` — also Karte schließen oder „Übernehmen" — räumt ihn mit
+   * weg. Genau das macht es zu einer RUNDE und nicht zu einem Chat.
+   */
+  verlauf: Wechsel[];
 };
 
 /** Feste Schlüssel für die Bildschirme mit genau einem Lauf. */
@@ -51,7 +60,7 @@ export const runKeyForChat = (chatId: string) => `chat:${chatId}`;
 
 type RunStore = {
   runs: Record<string, AssistantRun>;
-  begin: (key: string, label: string, input?: string) => void;
+  begin: (key: string, label: string, input?: string, verlauf?: Wechsel[]) => void;
   delta: (key: string, text: string) => void;
   finish: (key: string, result: { clean: string; actions: AssistantAction | null }) => void;
   fail: (key: string, message: string) => void;
@@ -60,11 +69,11 @@ type RunStore = {
 
 export const useAssistantRuns = create<RunStore>((set) => ({
   runs: {},
-  begin: (key, label, input = '') =>
+  begin: (key, label, input = '', verlauf = []) =>
     set((s) => ({
       runs: {
         ...s.runs,
-        [key]: { label, input, status: 'running', stream: '', clean: '', actions: null, error: null, startedAt: Date.now() },
+        [key]: { label, input, status: 'running', stream: '', clean: '', actions: null, error: null, startedAt: Date.now(), verlauf },
       },
     })),
   delta: (key, text) =>

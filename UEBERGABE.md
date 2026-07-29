@@ -1168,6 +1168,43 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
     statt Modal gegen Modal. Das ist alt und war nie gemeldet, gehört aber auf
     dieselbe Liste, falls Abstürze bleiben.
 
+55. **Die Rückfrage-Runde** (`lib/zeileVerlauf.ts`, v1.59.0) — der letzte offene
+    Punkt von „Eine Zeile für alles". Bis hierher war jede Anfrage ein
+    Einzelschuss: „Verschieb den Zahnarzt" → „welchen, du hast zwei?" konnte
+    der Assistent gar nicht fragen, weil die Antwort darauf ihn ohne
+    Zusammenhang erreicht hätte.
+    · **Es ist bewusst KEIN Chat.** Eine RUNDE: nachfragen, Antwort, und wenn
+      die Karte zugeht, ist sie vorbei. Der Verlauf hängt deshalb am LAUF
+      (`AssistantRun.verlauf`) — `clearRun` räumt ihn mit weg, also sowohl
+      beim Schließen als auch nach „Übernehmen". Gedeckelt auf `VERLAUF_MAX`
+      (3) Runden; was älter ist, fällt hinten raus.
+    · **Zurück geht Prosa, nie der Aktions-Block.** `verlaufAntwort` baut aus
+      `clean` plus einer Zeile „Vorgeschlagen: Aufgabe „…" (Morgen); Notiz …"
+      — in der Sprache der App, inklusive der Änderungen, die der Nutzer an den
+      Vorschlägen vorgenommen hat. Das rohe JSON zurückzuschicken hieße, das
+      Modell einzuladen, es wortgleich zu wiederholen.
+    · **Bilder gehen NIE in den Verlauf.** Sie gelten für die eine Anfrage, an
+      der sie hängen; der Text-Verlauf bleibt davon unberührt. Eine Tour prüft
+      genau das (`inlineData` taucht in der Folgerunde nicht mehr auf).
+    ⚠️ **Die Weiche kehrt sich um, und das ist die eine Ausnahme von
+    „lokal zuerst".** Solange eine FERTIGE Antwort dasteht (und ein Schlüssel
+    da ist), geht die nächste Eingabe an den Assistenten — auch ohne
+    Fragezeichen und ohne Befehlswort. Grund: Antworten auf eine Rückfrage
+    sehen wie Bruchstücke aus. „lieber Freitag" hat keins von beidem und ist
+    kurz — der Parser hielt es für eine Aufgabe und legte bis v1.58.2
+    tatsächlich „lieber" für Freitag an. Die Umkehrung ist eng begrenzt (nur
+    `status === 'done'`, nur mit Schlüssel, nie mit angehängtem Bild) und
+    sichtbar: Platzhalter „Nachfragen …", Weg-Chip „Rückfrage", Knopf
+    „Nachfragen". Ein Tipp auf den Chip legt doch eine Aufgabe an — und lässt
+    die Runde dabei stehen, denn man wollte etwas nebenbei notieren, nicht das
+    Gespräch abbrechen.
+    · Nebenbei begradigt: die **Parser-Chips erscheinen nur noch, wenn wirklich
+      etwas angelegt wird** (`zeigtLokal`). Vorher stand bei „Was steht morgen
+      an?" ein „Morgen"-Chip an einer Eingabe, aus der nie eine Aufgabe wurde.
+    · Abgesichert durch `zeileVerlauf.test.ts` (10 Fälle) und
+      `scratchpad/rueckfrage.mjs` (27 Prüfungen, u. a. was WIRKLICH im Request
+      landet, der Deckel, das Notieren nebenbei und das Ende der Runde).
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

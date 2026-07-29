@@ -58,9 +58,10 @@ Seit v1.57.0 zusätzlich: Rückgängig für „Übernehmen", drei lokale Vorschl
 an der leeren Zeile, und die Zeile auf dem Listen-Detail (dort landet die
 Aufgabe in DIESER Liste) — siehe UEBERGABE §8.49.
 
-Offen bleibt: **eine Rückfrage-Runde** (jede Anfrage ist ein Einzelschuss ohne
-Gedächtnis — „Verschieb den Zahnarzt" → „welchen, du hast zwei?" geht nicht).
-Kleiner, aber lohnend: **Rückgängig auch im Braindump, Chat und Sprach-Sheet**
+**Die Rückfrage-Runde ist seit v1.59.0 gebaut** (UEBERGABE §8.55) — damit ist
+Stufe 3 vollständig und „Eine Zeile für alles" abgeschlossen.
+
+Offen, kleiner, aber lohnend: **Rückgängig auch im Braindump, Chat und Sprach-Sheet**
 — `undoAppliedActions` liegt bereit, es fehlt nur die Verdrahtung.
 Der **Rückbau** (Sprach-Schnellzugriff und Braindump können beide nichts mehr,
 was die Zeile nicht auch kann) bleibt auf Wunsch vorerst liegen.
