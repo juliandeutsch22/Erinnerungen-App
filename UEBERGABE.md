@@ -950,6 +950,38 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
     meiner Prüfungen meldeten nacheinander Fehlalarm, bevor das klar war;
     `scratchpad/stufe3.mjs` macht es jetzt richtig, auch für die Chips.
 
+48. **Abendbetrachtung: einklappbar und gegliedert** (v1.56.0). Zwei
+    Rückmeldungen, beide berechtigt — die Karte wirkte „roh".
+    · **Einklappbar auf „Heute"** (`journalCardOpen` im Settings-Store). Das
+      Geschriebene ist der persönlichste Inhalt der App und stand offen auf dem
+      Startbildschirm — jedem sichtbar, der einem über die Schulter sieht. Die
+      Kopfzeile klappt jetzt auf und zu, die Wahl wird gemerkt. Zugeklappt wird
+      der Text **nicht gerendert** (nicht nur ausgeblendet), er steht also auch
+      in keinem Vorlesemodus. Ein leises „geschrieben" bleibt als Lebenszeichen
+      — sonst wüsste man nicht, ob der Abend schon geschrieben ist, und es
+      verrät nichts.
+      ⚠️ `partialize` in `settings.store.ts` MIT ändern — genau davor warnt der
+      Kommentar dort, und genau das habe ich zuerst vergessen; die Playwright-
+      Tour hat es gefunden („nach Neustart immer noch zu: false").
+    · **Verlauf als Jahre → Monate** (`groupJournal` in `journalLogic.ts`).
+      **Warum Monate und nicht Wochen** (danach war gefragt): ein Tagebuch hat
+      höchstens einen Eintrag pro Tag; Wochen ergäben Grüppchen von vier bis
+      fünf Zeilen und mehr Überschriften als Inhalt — die Gliederung würde
+      lauter als das Geschriebene. Der Monat ist die Einheit, in der man sich
+      erinnert („im Juli war das"), das Jahr die Einheit darüber.
+    · Beim Aufschlagen steht genau EINES offen: der neueste Monat. Die
+      Jahreszeile erscheint nur, wenn es mehr als ein Jahr gibt — im ersten
+      Jahr wäre sie eine Überschrift ohne Gegenstück.
+    ⚠️ **Fallstricke für Tests der Abendbetrachtung** (`scratchpad/abend2.mjs`):
+    Der Web-Bestand ist In-Memory — über `localStorage` lässt sich NICHTS
+    seeden, und ein Reload leert ihn (Reload-Prüfungen also VOR dem Aufbau des
+    Bestands). Und `heute.tsx` berechnet `todayStr()` beim Rendern, während ein
+    Tab-Wechsel einen bereits montierten Bildschirm nicht neu rendert: ein
+    Uhr-Sprung kommt erst eine Runde später an, Einträge landen um einen Abend
+    versetzt. Deshalb prüft die Tour die STRUKTUR (Jahre, Monate, Zähler, was
+    auf- und zuklappt); dass der richtige Text am richtigen Datum hängt, deckt
+    `journalLogic.test.ts` ab.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

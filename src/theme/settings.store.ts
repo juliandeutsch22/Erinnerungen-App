@@ -38,6 +38,10 @@ type SettingsState = {
   /** Tägliche Erinnerung an die Abendbetrachtung (Uhrzeit: journalReminderTime). */
   journalReminderEnabled: boolean;
   journalReminderTime: string;
+  /** Steht die Abendkarte auf „Heute" offen? Das Geschriebene ist der
+   *  persönlichste Inhalt der App und lag bisher offen auf dem Startbildschirm
+   *  — wer die Karte zuklappt, will sie zugeklappt behalten. */
+  journalCardOpen: boolean;
   /** Assistent bekommt bei jedem Senden den App-Überblick mit
    *  (Termine/Aufgaben/Listen/Notiz-Titel — nie das Journal). */
   assistantContextEnabled: boolean;
@@ -73,6 +77,7 @@ type SettingsState = {
   setLastAutoBackupAt: (at: string) => void;
   setJournalReminderEnabled: (v: boolean) => void;
   setJournalReminderTime: (t: string) => void;
+  setJournalCardOpen: (open: boolean) => void;
   setAssistantContextEnabled: (v: boolean) => void;
   setHasHydrated: (v: boolean) => void;
   /** Der Satz des Tages („Ausrichtung"), je Datum. Bewusst hier statt in einem
@@ -102,6 +107,7 @@ export const useSettings = create<SettingsState>()(
       lastAutoBackupAt: '',
       journalReminderEnabled: false,
       journalReminderTime: '21:00',
+      journalCardOpen: true,
       assistantContextEnabled: true,
       dayIntentions: {},
       assistantMemory: '',
@@ -133,6 +139,7 @@ export const useSettings = create<SettingsState>()(
       setLastAutoBackupAt: (lastAutoBackupAt) => set({ lastAutoBackupAt }),
       setJournalReminderEnabled: (journalReminderEnabled) => set({ journalReminderEnabled }),
       setJournalReminderTime: (journalReminderTime) => set({ journalReminderTime }),
+      setJournalCardOpen: (journalCardOpen) => set({ journalCardOpen }),
       setAssistantContextEnabled: (assistantContextEnabled) => set({ assistantContextEnabled }),
       setHasHydrated: (_hasHydrated) => set({ _hasHydrated }),
       setDayIntention: (date, text) =>
@@ -173,6 +180,7 @@ export const useSettings = create<SettingsState>()(
         lastAutoBackupAt: s.lastAutoBackupAt,
         journalReminderEnabled: s.journalReminderEnabled,
         journalReminderTime: s.journalReminderTime,
+        journalCardOpen: s.journalCardOpen,
         assistantContextEnabled: s.assistantContextEnabled,
         dayIntentions: s.dayIntentions,
         assistantMemory: s.assistantMemory,

@@ -6,6 +6,7 @@ import { ChevronRight, MoonStar } from 'lucide-react-native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { TextInput, View } from 'react-native';
 
+import { DisclosureChevron } from '@/components/DisclosureChevron';
 import { GlassPanel } from '@/components/GlassPanel';
 import { InsetField } from '@/components/InsetField';
 import { KeyboardDoneBar, keyboardDoneProps } from '@/components/KeyboardDone';
@@ -68,17 +69,46 @@ export function JournalCard({ today, onFocusInput }: { today: string; onFocusInp
   const streak = useMemo(() => journalStreak(entries ?? [], today), [entries, today]);
   const hasHistory = (entries ?? []).some((e) => e.text.trim().length > 0);
 
+  const offen = useSettings((st) => st.journalCardOpen);
+  const setOffen = useSettings((st) => st.setJournalCardOpen);
+
   return (
     <GlassPanel>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+      {/* Die Kopfzeile klappt die Karte auf und zu. Das Geschriebene ist der
+          persönlichste Inhalt der App und stand bisher offen auf dem
+          Startbildschirm — jedem sichtbar, der einem über die Schulter sieht.
+          Zugeklappt wird der Text NICHT gerendert (nicht nur ausgeblendet), er
+          steht also auch in keinem Vorlesemodus. Die Wahl merkt sich die App. */}
+      <PressableScale
+        accessibilityLabel={offen ? 'Abendbetrachtung zuklappen' : 'Abendbetrachtung aufklappen'}
+        accessibilityState={{ expanded: offen }}
+        onPress={() => {
+          hapticSelect();
+          setOffen(!offen);
+        }}
+        pressedScale={0.995}
+        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 2 }}
+      >
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
           <MoonStar size={14} color={colors.indigo} strokeWidth={2} />
           <Type variant="eyebrow" tone="text3">Abendbetrachtung</Type>
         </View>
-        {streak >= 2 && (
-          <Type variant="caption" tone="teal" tabular>{streak} Abende in Folge</Type>
-        )}
-      </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+          {streak >= 2 && (
+            <Type variant="caption" tone="teal" tabular>{streak} Abende in Folge</Type>
+          )}
+          {/* Zugeklappt braucht es ein Lebenszeichen — sonst weiß man nicht,
+              ob der Abend schon geschrieben ist. „Geschrieben" verrät nichts. */}
+          {!offen && (text ?? '').trim().length > 0 && (
+            <Type variant="caption" tone="text3">geschrieben</Type>
+          )}
+          <DisclosureChevron open={offen} color={colors.text3} size={14} />
+        </View>
+      </PressableScale>
+
+      {offen && (
+      <>
+
       {/* Der Bogen — Abendseite: die EINE Zeile, die den Morgen erinnert.
           Tippen quittiert sie still („— erledigt."); wir behaupten das nie von
           selbst, weil ein freier Satz sich nicht automatisch prüfen lässt. */}
@@ -151,6 +181,8 @@ export function JournalCard({ today, onFocusInput }: { today: string; onFocusInp
           <Type variant="caption" tone="text3">Alle Betrachtungen</Type>
           <ChevronRight size={14} color={colors.text3} strokeWidth={2} />
         </PressableScale>
+      )}
+      </>
       )}
     </GlassPanel>
   );
