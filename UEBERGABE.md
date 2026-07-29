@@ -1152,6 +1152,22 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
     ganzes Sheet mit sieben Aktionen nie von einer Tour berührt wurde
     (`scratchpad/sheets.mjs` schließt das).
 
+54. **Modal-über-Modal: die Übergabe braucht eine Pause** (v1.58.2). Die
+    „Neu planen"-Zeile aus §8.53 schloss ihr Sheet und öffnete das nächste im
+    SELBEN React-Commit. RN-Modals sind auf iOS echte View-Controller — wer
+    einen präsentiert, während der vorherige noch entlassen wird, bekommt im
+    besten Fall ein hängendes Sheet, im schlechteren einen Absturz beim
+    Aufziehen. Jetzt geht der zweite erst nach `MODAL_UEBERGABE_MS` (340 ms)
+    auf, also nach der Schließ-Animation.
+    ⚠️ **Am Web-Harnisch NICHT sichtbar** — dort sind Modals gewöhnliche
+    Overlays ohne View-Controller-Lebenszyklus. Die Tour lief die ganze Zeit
+    grün. Wer künftig ein Sheet aus einem Sheet öffnet, muss dieselbe Pause
+    einlegen; ein Test dafür kann es hier nicht geben.
+    **Noch offen, gleiche Familie:** `PhotoStrip` rendert den `PhotoViewer`
+    (Modal) INNERHALB von `EventEditorSheet` (Modal) — also Modal auf Modal
+    statt Modal gegen Modal. Das ist alt und war nie gemeldet, gehört aber auf
+    dieselbe Liste, falls Abstürze bleiben.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**
