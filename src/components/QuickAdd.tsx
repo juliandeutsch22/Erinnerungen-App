@@ -46,7 +46,7 @@ import { addDays, formatDueDate, todayStr } from '@/lib/dates';
 import { useSheetOffen } from '@/lib/sheetPresence';
 import { NOTHING_REMOVED, type Removed, useZeileDraft } from '@/lib/zeileDraft';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
-import { UNDO_MS, useUndo } from '@/lib/undo';
+import { useUndo } from '@/lib/undo';
 import { routeInput, zeileVorschlaege, type AssistentGrund } from '@/lib/inputRoute';
 import { parseQuickAdd } from '@/lib/quickAddParser';
 import { useKeyboardHeight } from '@/lib/useKeyboardHeight';
@@ -63,6 +63,17 @@ const RRULE_LABEL: Record<string, string> = {
   yearly: 'Jährlich',
 };
 
+
+// Wie lange die Quittung steht.
+//
+// Sie sitzt IM Fluss über der Eingabezeile, nicht als schwebende Leiste am
+// Bildschirmrand — jede Sekunde kostet hier mehr als bei der globalen
+// Undo-Leiste (die deshalb bei UNDO_MS bleibt). Bemessen am Lesen und
+// Entscheiden: „1 Projekt, 2 Aufgaben, 1 Notiz übernommen." liest man in gut
+// zwei Sekunden, entschieden ist man nach weiteren zwei. Danach steht sie nur
+// noch herum — und ausgerechnet über dem Feld, in das man als Nächstes tippt.
+const QUITTUNG_MS = 2400;
+const QUITTUNG_UNDO_MS = 4500;
 
 // Die Zeile liegt HÖHER als alles andere — sie ist die Tür, nicht eine Karte
 // unter vielen. Shadow.lg (9 %, Radius 12) verschwand auf dem cremefarbenen
@@ -150,14 +161,23 @@ export function QuickAdd({
   /** Kurze Quittung an der Stelle, wo eben noch die Karte stand — sonst
    *  verschwindet sie einfach und man muss blind vertrauen. */
   const [quittung, setQuittung] = useState<{ text: string; zurueck?: () => Promise<void> } | null>(null);
+  /** Läuft der Abgang gerade? Abgebaut wird erst, wenn er durch ist. */
+  const [quittungGeht, setQuittungGeht] = useState(false);
+  // Derselbe Zustand als Ref: `onWeg` läuft aus einem Animations-Callback und
+  // darf keine INZWISCHEN neu gezeigte Quittung abräumen („Zurückgenommen."
+  // erscheint, während die alte noch ausblendet).
+  const gehtRef = useRef(false);
   const quittungTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Trägt die Quittung ein Rückgängig, bleibt sie so lange stehen wie die
-  // Undo-Leiste sonst auch (UNDO_MS) — drei Sekunden reichen zum Lesen, aber
-  // nicht zum Entscheiden.
+  const beendeQuittung = () => {
+    gehtRef.current = true;
+    setQuittungGeht(true);
+  };
   const zeigeQuittung = (text: string, zurueck?: () => Promise<void>) => {
     if (quittungTimer.current) clearTimeout(quittungTimer.current);
+    gehtRef.current = false;
+    setQuittungGeht(false);
     setQuittung({ text, zurueck });
-    quittungTimer.current = setTimeout(() => setQuittung(null), zurueck ? UNDO_MS : 3000);
+    quittungTimer.current = setTimeout(beendeQuittung, zurueck ? QUITTUNG_UNDO_MS : QUITTUNG_MS);
   };
 
   const today = todayStr();
@@ -456,7 +476,21 @@ export function QuickAdd({
       >
         <View style={{ width: '100%', maxWidth: MAX_CONTENT_WIDTH, gap: Spacing.xs }}>
           {!run && quittung && (
-            <PopIn>
+            // Eine Meldung ERSCHEINT, sie tritt nicht auf: 0.94 statt 0.6 und
+            // die weiche Feder. Und sie geht wieder, statt zu verschwinden —
+            // ein harter Schnitt nach einem weichen Auftritt liest sich als
+            // Fehler.
+            <PopIn
+              von={0.94}
+              feder="gentle"
+              sichtbar={!quittungGeht}
+              onWeg={() => {
+                if (!gehtRef.current) return;
+                gehtRef.current = false;
+                setQuittung(null);
+                setQuittungGeht(false);
+              }}
+            >
               <Glass
                 variant="pill"
                 intensity={85}
@@ -470,6 +504,9 @@ export function QuickAdd({
                     accessibilityLabel="Übernommenes zurücknehmen"
                     onPress={() => {
                       if (quittungTimer.current) clearTimeout(quittungTimer.current);
+                      // Die alte Quittung geht, die neue („Zurückgenommen.")
+                      // kommt — sonst tauschte der Text unter der Hand.
+                      beendeQuittung();
                       void quittung.zurueck?.();
                     }}
                     style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingLeft: Spacing.xs }}

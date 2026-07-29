@@ -1028,6 +1028,41 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
     unsichtbare Kopie — `scratchpad/maechtig.mjs` klickt deshalb grundsätzlich
     über `document.elementFromPoint`.
 
+50. **Die Quittung geht jetzt auch wieder** (v1.57.1) — auf „der Rückgängig-Knopf
+    ist zu lange auf und könnte eine Animation vertragen". Beides stimmte, aber
+    der eigentliche Fehler war ein dritter: sie hatte **gar keinen Abgang**.
+    · **`PopIn` kann jetzt gehen** (`sichtbar` + `onWeg`). Vorher federte alles
+      herein und verschwand dann hart — ein harter Schnitt nach einem weichen
+      Auftritt liest sich als Fehler, nicht als Ruhe. Der Abgang läuft bewusst
+      mit `withTiming` (Ease.out, `Dur.pressOut`), NICHT mit einer Feder: eine
+      Feder schwingt am Ende nach, und etwas, das im Verschwinden noch zappelt,
+      wirkt unentschlossen.
+    · **`von` (Anfangsgröße) ist jetzt einstellbar.** 0.6 ist für einen kleinen
+      Knopf richtig, für eine MELDUNG zu viel Persönlichkeit — sie soll
+      erscheinen, nicht auftreten. Quittung: `von={0.94}`, `feder="gentle"`.
+      Der Default bleibt 0.6, alle anderen Aufrufer sind unverändert.
+    · **Standzeit 6000 → 4500 ms** (mit Rückgängig) bzw. 3000 → 2400 ms (ohne).
+      Die globale Undo-Leiste bleibt bei `UNDO_MS`: sie schwebt am Bildschirm-
+      rand, die Quittung sitzt IM Fluss über der Eingabezeile — jede Sekunde
+      kostet dort mehr, und zwar ausgerechnet über dem Feld, in das man als
+      Nächstes tippt.
+    · **Verworfen: ein ablaufender Fortschrittsstrich** als „Zeit läuft"-Anzeige.
+      Er wäre informativ, aber er ist ein Countdown — fünf Sekunden Dauerbewegung
+      und ein Druckmittel. Beides widerspricht §1.
+    ⚠️ **Zwei Fallen, beide beim Messen aufgeflogen:**
+    **(a)** `onWeg` läuft aus einem Animations-Callback und hätte eine INZWISCHEN
+    neu gezeigte Quittung abgeräumt („Zurückgenommen." erscheint, während die
+    alte noch ausblendet). Deshalb der `gehtRef`-Wächter.
+    **(b)** Die erste Messung stieg beim ersten Element mit `transform != none`
+    aus und maß damit den KNOPF statt des animierten Wrappers — `PressableScale`
+    trägt selbst ein `scale(1)`, also immer 1/1. Ergebnis: grüne Haken ohne
+    Aussage. `scratchpad/quittung.mjs` multipliziert jetzt Deckkraft und
+    Skalierung über ALLE Vorfahren und zeichnet pro Bild auf (`requestAnimation
+    Frame`) statt über CDP zu pollen — bei 160 ms Abgang ergäbe Pollen sonst
+    zwei, drei Stichproben und damit Zufall.
+    Gemessen: Auftritt bei 0.94, Standzeit 4665 ms, 21 Zwischenbilder beim
+    Ausblenden; mit Reduced-Motion sofort da und sofort weg.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**
