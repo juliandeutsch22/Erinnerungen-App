@@ -2,7 +2,7 @@
 // Marken-Palette. Genutzt von der DB-Migration (db.ts) und vom Backup-Import.
 // Die Einträge laufen als KETTE in Reihenfolge: v1.0 (Teal/Indigo) →
 // v1.2 (Erdtöne) → v1.3 (Ägäis) — ein Durchlauf migriert jeden Stand.
-export const COLOR_REBRAND: ReadonlyArray<readonly [string, string]> = [
+export const COLOR_REBRAND: readonly (readonly [string, string])[] = [
   // Stufe 1: Teal/Indigo (v1.0) → Erdtöne (v1.2)
   ['#1FB6A6', '#C96A47'],
   ['#149286', '#A9532F'],

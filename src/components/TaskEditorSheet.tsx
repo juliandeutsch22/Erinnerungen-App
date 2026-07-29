@@ -5,7 +5,7 @@
 // Primär-Button sitzt fest im Sheet-Footer. Löschen zweistufig.
 import { CalendarDays, CalendarX2, Clock, Flag, ListChecks, type LucideIcon, Minus, Plus, Repeat, Tag as TagIcon, Trash2, X, Hourglass, Moon } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { TextInput, View } from 'react-native';
 
 import { BottomSheet } from '@/components/BottomSheet';
 import { DisclosureChevron } from '@/components/DisclosureChevron';

@@ -21,13 +21,6 @@ import { isOverdue } from '@/lib/taskLogic';
 import { useColors } from '@/theme/ThemeProvider';
 import { R, Spacing, T } from '@/theme/theme.tokens';
 
-const RRULE_SHORT: Record<string, string> = {
-  daily: 'täglich',
-  weekdays: 'werktags',
-  weekly: 'wöchentlich',
-  monthly: 'monatlich',
-  yearly: 'jährlich',
-};
 
 export function TaskRow({
   task,

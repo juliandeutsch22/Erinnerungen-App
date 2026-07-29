@@ -3,7 +3,6 @@
 // Teal-Ring (Reduced-Motion → statisch). Reine Präsentation über useDictation.
 import { Mic } from 'lucide-react-native';
 import React, { useEffect, useRef } from 'react';
-import { View } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 
 import { PressableScale } from '@/components/PressableScale';

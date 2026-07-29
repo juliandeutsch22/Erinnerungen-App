@@ -1,6 +1,5 @@
 // taskLogic.test.ts — Überfällig-Ableitung, Abhak-Semantik, Gruppierungen.
-import type { Task } from '@/data/types';
-import type { List } from '@/data/types';
+import type { List, Task } from '@/data/types';
 import { adoptOverdueToToday, groupPlanned, listProgress, groupToday, groupUpcomingDays, isDueToday, isOverdue, recentlyCompleted, resolveCompletion, projectState, projectDeadlineLabel, projectShowsDeadline, isCurrent, isDormant, isExpired, expiredTasks, lifespanLabel } from './taskLogic';
 
 const TODAY = '2026-07-03';

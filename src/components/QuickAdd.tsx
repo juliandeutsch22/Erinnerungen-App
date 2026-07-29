@@ -27,7 +27,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ActionEditSheet, type EditTarget } from '@/components/ActionEditSheet';
 import { Glass } from '@/components/Glass';
 import { MicButton } from '@/components/MicButton';
-import { OmniResult, omniZeilen } from '@/components/OmniResult';
+import { OmniResult } from '@/components/OmniResult';
 import { PopIn } from '@/components/PopIn';
 import { PressableScale } from '@/components/PressableScale';
 import { Type } from '@/components/Type';

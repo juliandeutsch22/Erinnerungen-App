@@ -629,7 +629,13 @@ export default function HeuteScreen() {
         <TaskEditorSheet task={editorTask} defaultDueDate={today} onClose={() => setEditorTask(undefined)} />
       )}
       {rescheduleTask && <RescheduleSheet task={rescheduleTask} onClose={() => setRescheduleTask(null)} />}
-      {quickTask && <TaskQuickSheet task={quickTask} onClose={() => setQuickTask(null)} />}
+      {quickTask && (
+        <TaskQuickSheet
+          task={quickTask}
+          onClose={() => setQuickTask(null)}
+          onReschedule={() => setRescheduleTask(quickTask)}
+        />
+      )}
       {editorEvent && (
         <EventEditorSheet event={editorEvent} defaultDate={today} calendars={calendars ?? []} onClose={() => setEditorEvent(null)} />
       )}

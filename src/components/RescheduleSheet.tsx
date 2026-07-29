@@ -27,6 +27,39 @@ import { findFreeSlots } from '@/lib/timeboxing';
 import { useColors } from '@/theme/ThemeProvider';
 import { R, Spacing } from '@/theme/theme.tokens';
 
+// Eine Zeile des Bogens. Liegt bewusst AUSSERHALB der Komponente: innen waere
+// sie bei jedem Rendern ein neuer Komponententyp — React baut sie dann jedes
+// Mal neu auf, statt sie zu aktualisieren. `colors` kommt als Eigenschaft rein.
+function Row({
+  icon: Icon,
+  label,
+  onPress,
+  tone = 'teal',
+  expanded,
+  colors,
+}: {
+  icon: LucideIcon;
+  label: string;
+  onPress: () => void;
+  tone?: 'teal' | 'text3';
+  expanded?: boolean;
+  colors: ReturnType<typeof useColors>;
+}) {
+  return (
+    <PressableScale
+      accessibilityLabel={label}
+      accessibilityState={expanded !== undefined ? { expanded } : undefined}
+      onPress={onPress}
+      pressedScale={0.99}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.md, paddingHorizontal: Spacing.md }}
+    >
+      <Icon size={18} color={tone === 'text3' ? colors.text3 : colors.teal} strokeWidth={2} />
+      <Type variant="body" style={{ flex: 1 }}>{label}</Type>
+      {expanded !== undefined && <DisclosureChevron open={expanded} color={colors.text3} />}
+    </PressableScale>
+  );
+}
+
 export function RescheduleSheet({ task, onClose }: { task: Task; onClose: () => void }) {
   const colors = useColors();
   const updateTask = useUpdateTask();
@@ -59,33 +92,6 @@ export function RescheduleSheet({ task, onClose }: { task: Task; onClose: () => 
     onClose();
   };
 
-  const Row = ({
-    icon: Icon,
-    label,
-    onPress,
-    tone = 'teal',
-    expanded,
-  }: {
-    icon: LucideIcon;
-    label: string;
-    onPress: () => void;
-    tone?: 'teal' | 'text3';
-    expanded?: boolean;
-  }) => (
-    <PressableScale
-      accessibilityLabel={label}
-      accessibilityState={expanded !== undefined ? { expanded } : undefined}
-      onPress={onPress}
-      pressedScale={0.99}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.md, paddingHorizontal: Spacing.md }}
-    >
-      <Icon size={18} color={tone === 'text3' ? colors.text3 : colors.teal} strokeWidth={2} />
-      <Type variant="body" style={{ flex: 1 }}>{label}</Type>
-      {expanded !== undefined &&
-        <DisclosureChevron open={expanded} color={colors.text3} />}
-    </PressableScale>
-  );
-
   return (
     <BottomSheet visible title="Neu planen" onClose={onClose}>
       <Type variant="caption" tone="text3" style={{ marginBottom: Spacing.md }} numberOfLines={1}>
@@ -93,14 +99,15 @@ export function RescheduleSheet({ task, onClose }: { task: Task; onClose: () => 
       </Type>
 
       <Group>
-        <Row icon={Moon} label="Heute Abend" onPress={() => apply({ dueDate: today, dueTime: '18:00' })} />
+        <Row colors={colors} icon={Moon} label="Heute Abend" onPress={() => apply({ dueDate: today, dueTime: '18:00' })} />
         <RowDivider />
-        <Row icon={Sun} label="Morgen" onPress={() => apply({ dueDate: tomorrow })} />
+        <Row colors={colors} icon={Sun} label="Morgen" onPress={() => apply({ dueDate: tomorrow })} />
         <RowDivider />
-        <Row icon={CalendarDays} label="Wochenende" onPress={() => apply({ dueDate: nextWeekend(today) })} />
+        <Row colors={colors} icon={CalendarDays} label="Wochenende" onPress={() => apply({ dueDate: nextWeekend(today) })} />
         <RowDivider />
 
         <Row
+          colors={colors}
           icon={Clock}
           label="In freie Zeit einplanen…"
           expanded={showSlots}
@@ -143,6 +150,7 @@ export function RescheduleSheet({ task, onClose }: { task: Task; onClose: () => 
         <RowDivider />
 
         <Row
+          colors={colors}
           icon={CalendarClock}
           label="Datum wählen…"
           expanded={showCalendar}
@@ -160,7 +168,7 @@ export function RescheduleSheet({ task, onClose }: { task: Task; onClose: () => 
         )}
         <RowDivider />
 
-        <Row icon={CalendarX2} label="Kein Datum" tone="text3" onPress={() => apply({ dueDate: null, dueTime: null })} />
+        <Row colors={colors} icon={CalendarX2} label="Kein Datum" tone="text3" onPress={() => apply({ dueDate: null, dueTime: null })} />
       </Group>
     </BottomSheet>
   );

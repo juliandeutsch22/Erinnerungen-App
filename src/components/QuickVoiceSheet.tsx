@@ -39,7 +39,7 @@ import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { useColors, useReducedMotion } from '@/theme/ThemeProvider';
 import { useSettings } from '@/theme/settings.store';
 import { LIST_COLORS } from '@/components/listMeta';
-import { R, Spacing } from '@/theme/theme.tokens';
+import { Spacing } from '@/theme/theme.tokens';
 
 export type QuickVoicePhase = 'listening' | 'thinking' | 'result' | 'error' | 'done';
 

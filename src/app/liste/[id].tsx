@@ -27,7 +27,7 @@ import { TaskRow } from '@/components/TaskRow';
 import { Type } from '@/components/Type';
 import { useCompleteList, useCompleteTask, useLists, useReopenList, useReopenTask, useTasks } from '@/data/queries';
 import type { Task } from '@/data/types';
-import { deadlineLabel, todayStr } from '@/lib/dates';
+import { todayStr } from '@/lib/dates';
 import { byTimeThenCreation, expiredTasks, groupPlanned, isCurrent, isDormant, isOpen, listProgress, projectDeadlineLabel, projectState, recentlyCompleted } from '@/lib/taskLogic';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { shareText } from '@/lib/share';
@@ -35,6 +35,18 @@ import { listToShareText } from '@/lib/shareText';
 import { QUICK_ADD_CLEARANCE } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
 import { Spacing } from '@/theme/theme.tokens';
+
+// Das Listen-Symbol als eigene, MODULWEITE Komponente. Vorher stand
+// `const ListIcon = listIcon(list.icon)` im Rendern — ein Komponententyp, der
+// mit jedem Rendern neu bestimmt wird; React baut ihn dann jedes Mal neu auf
+// statt ihn zu aktualisieren.
+function ListenIcon({ icon, color }: { icon: string; color: string }) {
+  // `createElement` statt `<Icon …>`: `listIcon` ist ein NACHSCHLAGEN in einer
+  // festen Tabelle, kein Erzeugen — die Identität ist je Namen stabil. In
+  // JSX-Schreibweise liest der Linter es trotzdem als „Komponente im Rendern
+  // gebaut", weil er der Tabelle nicht folgen kann.
+  return React.createElement(listIcon(icon), { size: 26, color, strokeWidth: 2.2 });
+}
 
 export default function ListeDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -100,7 +112,6 @@ export default function ListeDetailScreen() {
   const plannedGroups = useMemo(() => (id === 'geplant' ? groupPlanned(scoped, today) : []), [id, scoped, today]);
 
   const title = id === 'geplant' ? 'Geplant' : id === 'alle' ? 'Alle' : (list?.name ?? 'Liste');
-  const ListIcon = list ? listIcon(list.icon) : null;
 
   const toggle = (task: Task) => (next: boolean) => {
     if (next) complete.mutate(task);
@@ -156,7 +167,7 @@ export default function ListeDetailScreen() {
           </View>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.xs }}>
-          {ListIcon && list && <ListIcon size={26} color={list.color} strokeWidth={2.2} />}
+          {list && <ListenIcon icon={list.icon} color={list.color} />}
           <Type variant="title">{title}</Type>
         </View>
         <Type variant="caption" tone="text3" style={{ marginTop: 2 }} tabular>
@@ -300,7 +311,13 @@ export default function ListeDetailScreen() {
         />
       )}
       {rescheduleTask && <RescheduleSheet task={rescheduleTask} onClose={() => setRescheduleTask(null)} />}
-      {quickTask && <TaskQuickSheet task={quickTask} onClose={() => setQuickTask(null)} />}
+      {quickTask && (
+        <TaskQuickSheet
+          task={quickTask}
+          onClose={() => setQuickTask(null)}
+          onReschedule={() => setRescheduleTask(quickTask)}
+        />
+      )}
       {editList && list && <ListEditorSheet list={list} onClose={() => setEditList(false)} />}
       {reordering && <ReorderSheet tasks={open} onClose={() => setReordering(false)} />}
     </Screen>

@@ -1112,6 +1112,46 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
     SUCHBEGRIFFE als Chips: ein `innerText`-Treffer beweist dort nichts, es
     braucht die Zeile der Aufgabe (`aria-label="<Titel> — erledigen"`).
 
+52. **Lint-Runde** (v1.58.1) — von **110 Problemen / 49 Fehlern auf 25 / NULL**.
+    Nicht durch Wegdrücken: die Regeln sind einzeln geprüft und die
+    Abschaltungen in `eslint.config.js` ausführlich begründet.
+    · **`react/no-unescaped-entities` AUS** — sie verlangt in React Native
+      FALSCHES. Aus `<Type>&quot;</Type>` wird auf dem Gerät sichtbar der Text
+      `&quot;`; die App ist voller deutscher Anführungszeichen. Die Regel hätte
+      dazu verleitet, sie reihenweise kaputtzumachen (13 Fälle).
+    · **`react-hooks/immutability` AUS** — der React-Compiler hält
+      `SharedValue.value` für unveränderlich und meldet jedes
+      `scale.value = withTiming(…)`, auch im `onPressIn`. „Reparieren" hieße,
+      die Animationen abzuschalten.
+    · **`@typescript-eslint/no-require-imports` AUS** — `require()` ist hier
+      die ABSICHT: native Module werden träge geladen, sonst zöge ein
+      statischer Import sie in den Web-Build. 28 Warnungen, die alles übertönt
+      haben, was wirklich einen Blick verdient.
+    · **Vier Compiler-Regeln auf WARNUNG statt aus** (`refs`, `purity`,
+      `set-state-in-effect`, `preserve-manual-memoization`): sie treffen
+      Stellen, an denen asynchron eintreffende Daten gespiegelt werden. Sauber
+      aufzulösen ist Arbeit am Datenfluss, kein Aufräumen — sichtbar bleiben
+      sie, damit NEUE Fälle auffallen.
+    · **Echt repariert:** zehn Komponenten, die IM Rendern entstanden
+      (`TaskQuickSheet.Row`, `RescheduleSheet.Row`, das Listen-Symbol) — sie
+      wurden bei jedem Rendern neu aufgebaut statt aktualisiert. Dazu eine
+      fehlende Abhängigkeit in `listen.tsx` (`openByList` hing an `today`,
+      listete es aber nicht: über Mitternacht wären die Zahlen stehen
+      geblieben) und ein instabiles `criteria`-Objekt in `filter.tsx`. Plus
+      rund 20 tote Importe.
+
+53. **„Neu planen" war nur eine Geste** (v1.58.1) — beim Testen der beiden
+    umgebauten Sheets aufgefallen: `RescheduleSheet` war AUSSCHLIESSLICH über
+    den Wisch nach links erreichbar. Das verstößt gegen die eigene Leitplanke
+    aus §8.42 („eine Geste darf nie der einzige Weg zu einer Funktion sein") —
+    und ausgerechnet beim häufigsten Handgriff überhaupt. Der Long-Press-Bogen
+    hatte Flagge, Erledigt und Papierkorb, aber nicht das Umplanen.
+    Jetzt steht „Neu planen" dort an erster Stelle; der Wisch bleibt als
+    Abkürzung. Nebenwirkung: der Weg ist damit überhaupt erst PRÜFBAR — die
+    Wisch-Geste ist im Web-Harnisch nicht zuverlässig auszulösen, weshalb ein
+    ganzes Sheet mit sieben Aktionen nie von einer Tour berührt wurde
+    (`scratchpad/sheets.mjs` schließt das).
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

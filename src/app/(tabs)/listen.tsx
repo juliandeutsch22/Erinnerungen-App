@@ -17,7 +17,6 @@ import { ProgressLine } from '@/components/ProgressLine';
 import { Reveal } from '@/components/Reveal';
 import { QuickAdd } from '@/components/QuickAdd';
 import { Screen } from '@/components/Screen';
-import { Seam } from '@/components/Seam';
 import { SwipeActionSlide } from '@/components/SwipeActionSlide';
 import { Type } from '@/components/Type';
 import {
@@ -32,7 +31,7 @@ import {
 } from '@/data/queries';
 import type { List, Task } from '@/data/types';
 import { applyFilter } from '@/lib/taskFilters';
-import { addDays, deadlineLabel, formatDueDate, toDateStr, todayStr } from '@/lib/dates';
+import { addDays, formatDueDate, toDateStr, todayStr } from '@/lib/dates';
 import { isCurrent, isOpen, listProgress, projectDeadlineLabel, projectState } from '@/lib/taskLogic';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { useSettings } from '@/theme/settings.store';
@@ -58,7 +57,9 @@ export default function ListenScreen() {
       if (isOpen(t) && isCurrent(t, today)) map.set(t.listId, (map.get(t.listId) ?? 0) + 1);
     }
     return map;
-  }, [tasks]);
+    // `today` MUSS mit hinein: die Zaehlung haengt an der Lebensspanne. Ohne
+    // das blieben die Zahlen stehen, wenn die App ueber Mitternacht offen ist.
+  }, [tasks, today]);
   const progressByList = useMemo(() => {
     const byList = new Map<string, Task[]>();
     for (const t of tasks ?? []) {

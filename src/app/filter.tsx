@@ -24,11 +24,11 @@ import type { Task } from '@/data/types';
 import { newId } from '@/data/types';
 import { todayStr } from '@/lib/dates';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
-import { applyFilter, emptyFilter, type FilterRange, tagCounts } from '@/lib/taskFilters';
+import { applyFilter, type FilterRange, tagCounts } from '@/lib/taskFilters';
 import { webNoOutline } from '@/theme/layout';
 import { useSettings } from '@/theme/settings.store';
 import { useColors } from '@/theme/ThemeProvider';
-import { R, Spacing, T } from '@/theme/theme.tokens';
+import { Spacing, T } from '@/theme/theme.tokens';
 
 const RANGES: { value: FilterRange; label: string }[] = [
   { value: 'all', label: 'Alle' },
@@ -66,8 +66,10 @@ export default function FilterScreen() {
   const [rescheduleTask, setRescheduleTask] = useState<Task | null>(null);
   const [quickTask, setQuickTask] = useState<Task | null>(null);
 
-  const criteria = { tags, flagged, range, includeCompleted };
-  const results = useMemo(() => applyFilter(tasks ?? [], criteria, today), [tasks, tags, flagged, range, includeCompleted, today]);
+  // Gemerkt, damit die Kennung stabil bleibt — sonst waere `criteria` bei
+  // jedem Rendern ein neues Objekt und die Abhaengigkeit unten wertlos.
+  const criteria = useMemo(() => ({ tags, flagged, range, includeCompleted }), [tags, flagged, range, includeCompleted]);
+  const results = useMemo(() => applyFilter(tasks ?? [], criteria, today), [tasks, criteria, today]);
   const allTags = useMemo(() => tagCounts(tasks ?? []), [tasks]);
   const listById = useMemo(() => new Map((lists ?? []).map((l) => [l.id, l])), [lists]);
 
@@ -222,7 +224,13 @@ export default function FilterScreen() {
 
       {editorTask && <TaskEditorSheet task={editorTask} onClose={() => setEditorTask(null)} />}
       {rescheduleTask && <RescheduleSheet task={rescheduleTask} onClose={() => setRescheduleTask(null)} />}
-      {quickTask && <TaskQuickSheet task={quickTask} onClose={() => setQuickTask(null)} />}
+      {quickTask && (
+        <TaskQuickSheet
+          task={quickTask}
+          onClose={() => setQuickTask(null)}
+          onReschedule={() => setRescheduleTask(quickTask)}
+        />
+      )}
     </Screen>
   );
 }

@@ -19,7 +19,7 @@ import { PressableScale } from '@/components/PressableScale';
 import { Type } from '@/components/Type';
 import { useDeviceEvents } from '@/data/calendarQueries';
 import { useCreateChat } from '@/data/chatQueries';
-import { useDeleteNote, useNotes, useUpdateNote } from '@/data/noteQueries';
+import { useNotes, useUpdateNote } from '@/data/noteQueries';
 import { useSettings } from '@/theme/settings.store';
 import { useCreateTask, useTasks } from '@/data/queries';
 import { addDays, todayStr } from '@/lib/dates';
@@ -69,7 +69,6 @@ export default function NotizScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: notes } = useNotes();
   const updateNote = useUpdateNote();
-  const deleteNote = useDeleteNote();
 
   const note = (notes ?? []).find((n) => n.id === id);
 

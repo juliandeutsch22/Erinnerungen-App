@@ -28,15 +28,13 @@ import { Type } from '@/components/Type';
 import { usePhotoCounts } from '@/data/photoQueries';
 import { useDeviceCalendars, useDeviceEvents } from '@/data/calendarQueries';
 import { useCompleteTask, useLists, useReopenTask, useTasks } from '@/data/queries';
-import type { Task } from '@/data/types';
-import type { List } from '@/data/types';
+import type { Task , List } from '@/data/types';
 import { bucketEventsByDay, deadlinesByDay } from '@/lib/calendarLogic';
-import { listProgress, projectShowsDeadline } from '@/lib/taskLogic';
+import { listProgress, projectShowsDeadline , byTimeThenCreation, isOpen } from '@/lib/taskLogic';
 import { buildDayTimeline } from '@/lib/dayTimeline';
 import { deadlineLabel, formatDayHeading, parseDateStr, todayStr } from '@/lib/dates';
 import { deviceCalendarAvailable, type DeviceEvent, ensureCalendarPermission } from '@/lib/deviceCalendar';
 import { hapticSelect } from '@/lib/haptics';
-import { byTimeThenCreation, isOpen } from '@/lib/taskLogic';
 import { QUICK_ADD_CLEARANCE, TAB_BAR_SAFE_BOTTOM } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
 import { Spacing } from '@/theme/theme.tokens';
@@ -365,7 +363,13 @@ export default function KalenderScreen() {
       )}
       {editorTask && <TaskEditorSheet task={editorTask} onClose={() => setEditorTask(null)} />}
       {rescheduleTask && <RescheduleSheet task={rescheduleTask} onClose={() => setRescheduleTask(null)} />}
-      {quickTask && <TaskQuickSheet task={quickTask} onClose={() => setQuickTask(null)} />}
+      {quickTask && (
+        <TaskQuickSheet
+          task={quickTask}
+          onClose={() => setQuickTask(null)}
+          onReschedule={() => setRescheduleTask(quickTask)}
+        />
+      )}
     </Screen>
     {/* Der ausgewaehlte Tag ist der Kontext: was hier ohne eigenes
         Datum getippt wird, landet auf ihm. Der Chip zeigt es an. */}

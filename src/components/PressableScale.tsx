@@ -5,8 +5,7 @@ import React from 'react';
 import { Pressable, PressableProps, StyleProp, ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 
-import { Dur } from '@/theme/motion.tokens';
-import { springConfig } from '@/theme/motion.tokens';
+import { Dur , springConfig } from '@/theme/motion.tokens';
 import { useReducedMotion } from '@/theme/ThemeProvider';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);

@@ -420,7 +420,13 @@ export default function SucheScreen() {
 
       {editorTask && <TaskEditorSheet task={editorTask} onClose={() => setEditorTask(null)} />}
       {rescheduleTask && <RescheduleSheet task={rescheduleTask} onClose={() => setRescheduleTask(null)} />}
-      {quickTask && <TaskQuickSheet task={quickTask} onClose={() => setQuickTask(null)} />}
+      {quickTask && (
+        <TaskQuickSheet
+          task={quickTask}
+          onClose={() => setQuickTask(null)}
+          onReschedule={() => setRescheduleTask(quickTask)}
+        />
+      )}
     </Screen>
   );
 }

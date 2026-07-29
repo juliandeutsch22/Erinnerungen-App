@@ -23,7 +23,7 @@ import { useCreateAssistantEvents } from '@/data/calendarQueries';
 import { useCreateNote } from '@/data/noteQueries';
 import { useCompleteTask, useCreateList, useCreateTask, useDeleteTask, useLists, useUpdateTask } from '@/data/queries';
 import type { ChatMessage } from '@/data/types';
-import { askAssistant, type AssistantImage, buildBraindumpContext, IMAGE_LIMIT, actionDueDate, describeExtras, describeSchritte, extractActions, hasCapturableActions, resolveListId, subtasksFromSchritte, type AssistantAction } from '@/lib/assistant';
+import { askAssistant, type AssistantImage, buildBraindumpContext, IMAGE_LIMIT, describeExtras, describeSchritte, extractActions, hasCapturableActions, type AssistantAction } from '@/lib/assistant';
 import { ActionEditSheet, type EditTarget } from '@/components/ActionEditSheet';
 import { applyAssistantActions } from '@/lib/applyActions';
 import { RUN_BRAINDUMP, useAssistantRuns } from '@/lib/assistantRun';

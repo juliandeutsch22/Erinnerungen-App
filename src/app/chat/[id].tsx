@@ -395,7 +395,6 @@ export default function ChatScreen() {
   const run = useAssistantRuns((st) => st.runs[runKey]);
   const beginRun = useAssistantRuns((st) => st.begin);
   const deltaRun = useAssistantRuns((st) => st.delta);
-  const finishRun = useAssistantRuns((st) => st.finish);
   const failRun = useAssistantRuns((st) => st.fail);
   const clearRun = useAssistantRuns((st) => st.clear);
   const pending = run?.status === 'running';

@@ -18,7 +18,7 @@ import { getChatRepository, getDocumentRepository, getJournalRepository, getList
 import type { JournalEntry } from './JournalRepository';
 import { DEFAULT_LIST_ID } from './ListRepository';
 import type { EventPhoto } from './PhotoRepository';
-import type { Chat, ChatMessage, List, Note, Rrule, Task } from './types';
+import type { Chat, ChatMessage, List, Note, Task } from './types';
 import { newId } from './types';
 
 /** Ein Foto im Backup: Verknüpfung + eingebettete Bilddaten (Base64). */

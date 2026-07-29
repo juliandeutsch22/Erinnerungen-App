@@ -8,7 +8,7 @@ import {
   __setNoteRepositoryForTests,
   __setPhotoRepositoryForTests,
   __setTaskRepositoryForTests,
-} from './index';
+ getChatRepository, getDocumentRepository, getJournalRepository, getListRepository, getNoteRepository, getPhotoRepository, getTaskRepository } from './index';
 import { InMemoryChatRepository } from './ChatRepository';
 import { InMemoryDocumentRepository } from './DocumentRepository';
 import { InMemoryJournalRepository } from './JournalRepository';
@@ -16,7 +16,6 @@ import { InMemoryListRepository } from './ListRepository';
 import { InMemoryNoteRepository } from './NoteRepository';
 import { InMemoryPhotoRepository } from './PhotoRepository';
 import { InMemoryTaskRepository } from './TaskRepository';
-import { getChatRepository, getDocumentRepository, getJournalRepository, getListRepository, getNoteRepository, getPhotoRepository, getTaskRepository } from './index';
 import type { SavedFilter } from '@/lib/taskFilters';
 import type { Task } from './types';
 
