@@ -62,6 +62,19 @@ const RRULE_LABEL: Record<string, string> = {
 type Removed = { date: boolean; time: boolean; rrule: boolean };
 const NOTHING_REMOVED: Removed = { date: false, time: false, rrule: false };
 
+// Die Zeile liegt HÖHER als alles andere — sie ist die Tür, nicht eine Karte
+// unter vielen. Shadow.lg (9 %, Radius 12) verschwand auf dem cremefarbenen
+// Grund; das hier ist derselbe weiche, flache Charakter, nur weit genug
+// getrieben, dass die Kante trägt. Bewusst KEIN Token: sonst wandert der Wert
+// über die App und alles fängt an zu schweben.
+const SCHATTEN_ZEILE = {
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 6 },
+  shadowOpacity: 0.16,
+  shadowRadius: 18,
+  elevation: 6,
+} as const;
+
 export function QuickAdd({
   listId = DEFAULT_LIST_ID,
   /** Termine des Geräts für den App-Überblick — „Heute" hat sie ohnehin
@@ -381,16 +394,19 @@ export function QuickAdd({
           <Glass
             variant="pill"
             intensity={85}
-            style={Shadow.md}
+            style={SCHATTEN_ZEILE}
             contentStyle={{
               flexDirection: 'row',
               alignItems: 'center',
               gap: Spacing.sm,
-              paddingVertical: Spacing.sm + 2,
+              paddingVertical: Spacing.sm + 5,
               paddingHorizontal: Spacing.md,
             }}
           >
-            <Plus size={18} color={colors.text3} strokeWidth={2.2} />
+            {/* Der eine Akzent-Tupfer der Zeile. text3 ist der Ton für
+                Nebeninformation — er ließ die wichtigste Fläche des Bildschirms
+                wie ein abgeschaltetes Suchfeld aussehen. */}
+            <Plus size={18} color={colors.teal} strokeWidth={2.2} />
             <TextInput
               ref={inputRef}
               value={text}
@@ -402,7 +418,8 @@ export function QuickAdd({
               placeholder={
                 diktiert ? 'Ich höre zu …' : apiKey.length > 0 ? 'Was liegt an? Oder frag mich.' : 'Was liegt an?'
               }
-              placeholderTextColor={colors.text3}
+              // Eine Einladung, keine Randnotiz — deshalb text2, nicht text3.
+              placeholderTextColor={colors.text2}
               returnKeyType="done"
               submitBehavior="submit"
               onSubmitEditing={() => submit()}

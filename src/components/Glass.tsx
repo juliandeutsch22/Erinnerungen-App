@@ -53,6 +53,10 @@ export function Glass({ variant = 'card', radius, tint, style, contentStyle, chi
   const borderRadius = radius ?? DEFAULT_RADIUS[variant];
   const backgroundColor = tint ?? colors.bg2;
   const showTexture = !tint;
+  // Pills bleiben bewusst OHNE Relief: der 3-px-Schattengrat braucht eine hohe
+  // Platte, um als Dicke gelesen zu werden. Auf einer 52 px hohen Pille sitzt
+  // er direkt unter der Grundlinie der Schrift und liest sich als Unterstrich.
+  // (Für die EINE Zeile ausprobiert und wieder verworfen — siehe UEBERGABE.)
   const showChisel = !tint && variant !== 'pill';
   const inset = Math.min(borderRadius * 0.7, 16);
 

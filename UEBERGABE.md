@@ -843,6 +843,30 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
       Antworten") und `scratchpad/abschnitt.mjs` (Rohtext-Fall, langer
       Prosa-Fall mit Rad-Geste, zwölf Vorschläge mit festem Kopf und Knopf).
 
+45. **Die Zeile bekommt Gewicht** (v1.53.4) — auf die Rückmeldung „sie liegt
+    einfach flach über dem Bildschirm". Sie hatte recht, und die Ursache war
+    nicht die Form, sondern der TON: die wichtigste Fläche der App trug
+    durchgehend die Töne für Nebeninformation.
+    · Führendes `+` in `colors.teal` statt `text3`, Platzhalter in `text2` statt
+      `text3`. `text3` ist der Ton für Randnotizen — die Zeile sah damit aus
+      wie ein abgeschaltetes Suchfeld. Das ist der größte Teil der Wirkung und
+      kostet keine einzige neue Farbe.
+    · Etwas höher (`paddingVertical` +3) und ein eigener, tieferer Schatten
+      (`SCHATTEN_ZEILE`, lokal in `QuickAdd.tsx`). `Shadow.lg` (9 %, Radius 12)
+      verschwindet auf dem cremefarbenen Grund. Bewusst KEIN neues Token: sonst
+      wandert der Wert durch die App und alles fängt an zu schweben.
+    **Zwei Versuche, die wieder rausgeflogen sind — nicht erneut probieren:**
+    · *Sockel (Farbverlauf unter der Zeile).* Sollte ein Stylobat sein. In Dunkel
+      unauffällig, in Hell aber legt er einen Nebel über den Tempel-Backdrop,
+      weil `colors.bg` heller ist als die beschattete Backdrop-Fläche. Der
+      Backdrop bleibt unangetastet — auch durch einen Verlauf.
+    · *Meißel auf der Pille.* Klang richtig (die Zeile ist die einzige große
+      Fläche ohne Relief) und ist es nicht: der 3-px-Schattengrat braucht eine
+      hohe Platte, um als Dicke gelesen zu werden. Auf 58 px sitzt er direkt
+      unter der Grundlinie und liest sich als Unterstrich. Die Leitplanke
+      schließt Pills zu Recht aus; der Grund steht jetzt als Kommentar in
+      `Glass.tsx`.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**
