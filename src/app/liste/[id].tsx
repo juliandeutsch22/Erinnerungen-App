@@ -16,6 +16,7 @@ import { ProgressLine } from '@/components/ProgressLine';
 import { ReorderSheet } from '@/components/ReorderSheet';
 import { RescheduleSheet } from '@/components/RescheduleSheet';
 import { Reveal } from '@/components/Reveal';
+import { QuickAdd } from '@/components/QuickAdd';
 import { Screen } from '@/components/Screen';
 import { Seam } from '@/components/Seam';
 import { EmptyState } from '@/components/StateView';
@@ -30,6 +31,7 @@ import { byTimeThenCreation, expiredTasks, groupPlanned, isCurrent, isDormant, i
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { shareText } from '@/lib/share';
 import { listToShareText } from '@/lib/shareText';
+import { QUICK_ADD_CLEARANCE } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
 import { Spacing } from '@/theme/theme.tokens';
 
@@ -115,7 +117,8 @@ export default function ListeDetailScreen() {
   );
 
   return (
-    <Screen withTabBar={false}>
+    <View style={{ flex: 1 }}>
+    <Screen withTabBar={false} contentContainerStyle={{ paddingBottom: QUICK_ADD_CLEARANCE }}>
       <Reveal>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <PressableScale accessibilityLabel="Zurück" onPress={() => router.back()} style={{ padding: Spacing.sm, marginLeft: -Spacing.sm }}>
@@ -297,5 +300,10 @@ export default function ListeDetailScreen() {
       {editList && list && <ListEditorSheet list={list} onClose={() => setEditList(false)} />}
       {reordering && <ReorderSheet tasks={open} onClose={() => setReordering(false)} />}
     </Screen>
+    {/* Nur in ECHTEN Listen. Die Smart-Views („Geplant", „Alle", Filter) teilen
+        sich diesen Bildschirm, haben aber keine Liste, in die etwas gehörte —
+        eine Aufgabe landete dort in einer id, die es nicht gibt. */}
+    {list && <QuickAdd listId={list.id} ueberTabBar={false} />}
+    </View>
   );
 }

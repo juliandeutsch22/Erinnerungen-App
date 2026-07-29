@@ -10,9 +10,13 @@
 // Herumprobieren ein, und genau das soll diese App nicht sein. Es ist ein
 // Sicherheitsnetz für den Fehlgriff, keine Zeitmaschine.
 //
-// Ebenfalls bewusst NICHT rückgängig zu machen: das Übernehmen von
-// Assistenten-Vorschlägen. Das ist kein Fehlgriff, sondern eine bestätigte
-// Handlung — sie hat ihre eigene Bremse in der Vorschlagskarte.
+// Seit v1.57.0 gilt es AUCH für das Übernehmen von Assistenten-Vorschlägen aus
+// der EINEN Zeile. Bis dahin stand hier, das sei bewusst ausgenommen, weil die
+// Vorschlagskarte ja schon eine Bremse sei — das war zu kurz gedacht: die Karte
+// verhindert das VERSEHENTLICHE Übernehmen, gegen ein bereutes half sie nie.
+// Und ein Durchgang schreibt bis zu einem Dutzend Einträge auf einmal, deren
+// Aufräumen über vier Bildschirme führt. Termine bleiben ausgenommen (Grund
+// steht in `applyActions.ts` bei `ApplyUndo`).
 import { create } from 'zustand';
 
 /** Wie lange das Angebot stehen bleibt. Lang genug zum Lesen, kurz genug,

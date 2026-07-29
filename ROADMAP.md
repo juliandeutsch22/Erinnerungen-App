@@ -54,11 +54,16 @@ bewährt hat.
 (v1.55.0) umgesetzt** — siehe UEBERGABE §8.42, §8.46 und §8.47. Die Zeile steht
 auf Heute, Kalender, Notizen und Listen; auf „Suche" bewusst nicht.
 
+Seit v1.57.0 zusätzlich: Rückgängig für „Übernehmen", drei lokale Vorschläge
+an der leeren Zeile, und die Zeile auf dem Listen-Detail (dort landet die
+Aufgabe in DIESER Liste) — siehe UEBERGABE §8.49.
+
 Offen bleibt: **eine Rückfrage-Runde** (jede Anfrage ist ein Einzelschuss ohne
-Gedächtnis — „Verschieb den Zahnarzt" → „welchen, du hast zwei?" geht nicht)
-— und der **Rückbau**: Sprach-Schnellzugriff und Braindump können beide nichts
-mehr, was die Zeile nicht auch kann (Text, Diktat, Bilder, Abwählen,
-Zurechtrücken). Zwei Türen weniger wären die konsequente Fortsetzung.
+Gedächtnis — „Verschieb den Zahnarzt" → „welchen, du hast zwei?" geht nicht).
+Kleiner, aber lohnend: **Rückgängig auch im Braindump, Chat und Sprach-Sheet**
+— `undoAppliedActions` liegt bereit, es fehlt nur die Verdrahtung.
+Der **Rückbau** (Sprach-Schnellzugriff und Braindump können beide nichts mehr,
+was die Zeile nicht auch kann) bleibt auf Wunsch vorerst liegen.
 
 *Das Problem:* Stoa hat VIER Türen für Text — die Eingabezeile auf „Heute"
 (lokaler Parser), den Braindump, den Chat und das Sprach-Sheet. Bevor man ein

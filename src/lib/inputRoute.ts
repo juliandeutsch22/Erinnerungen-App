@@ -64,6 +64,35 @@ export function routeInput(input: string, today: string, assistentVerfuegbar: bo
   return { ziel: 'lokal', aufgabe };
 }
 
+/**
+ * Drei Vorschläge für die leere Zeile — rein LOKAL abgeleitet, ohne Netz und
+ * ohne Kosten.
+ *
+ * Warum es sie gibt: Die Zeile kann seit v1.52.0 weit mehr, als man ihr ansieht
+ * — fragen, umbuchen, sortieren. Ein Platzhalter kann das nicht erzählen, und
+ * ein Tutorial will diese App nicht sein. Drei ruhige Chips zeigen es beim
+ * ersten Antippen und verschwinden, sobald man selbst tippt.
+ *
+ * Sie sind bewusst nur so schlau wie der Bestand: „Was ist überfällig?" steht
+ * nur da, wenn wirklich etwas überfällig ist. Ein Vorschlag, der ins Leere
+ * führt, wäre schlimmer als keiner — er kostet Wartezeit für ein „nichts".
+ */
+export function zeileVorschlaege(
+  offeneAufgaben: { dueDate: string | null; completedAt: string | null }[],
+  today: string,
+): string[] {
+  const offen = offeneAufgaben.filter((t) => t.completedAt === null);
+  const ueberfaellig = offen.filter((t) => t.dueDate !== null && t.dueDate < today).length;
+  const heute = offen.filter((t) => t.dueDate === today).length;
+
+  const alle: string[] = [];
+  if (ueberfaellig > 0) alle.push('Was ist überfällig?');
+  // Sortieren lohnt erst, wenn der Tag voll genug ist, um unübersichtlich zu sein.
+  if (heute >= 4) alle.push('Sortier meinen Tag');
+  alle.push('Was steht morgen an?');
+  return alle.slice(0, 3);
+}
+
 /** Was die Zeile während des Wartens über sich sagt. */
 export function warteText(grund: AssistentGrund): string {
   switch (grund) {

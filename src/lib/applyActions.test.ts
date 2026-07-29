@@ -1,7 +1,7 @@
 // applyActions.test.ts — die Reihenfolge und die Schutzregeln des Anwendens.
 // Diese Datei hält genau die Fehler fest, die vorher dreimal repariert werden
 // mussten, weil die Schleife dreimal kopiert war.
-import { applyAssistantActions, type ApplyDeps } from './applyActions';
+import { applyAssistantActions, type ApplyDeps, type UndoDeps, undoAppliedActions } from './applyActions';
 import type { AssistantAction } from './assistant';
 import type { List, Task } from '@/data/types';
 
@@ -34,8 +34,12 @@ function deps(over: Partial<ApplyDeps> = {}) {
     createTask: async (input) => {
       log.push(`aufgabe:${input.title}`);
       createdTasks.push(input);
+      return { id: `t-${input.title}` };
     },
-    createNote: async (body) => log.push(`notiz:${body.slice(0, 12)}`),
+    createNote: async (body) => {
+      log.push(`notiz:${body.slice(0, 12)}`);
+      return { id: `n-${body.slice(0, 6)}` };
+    },
     updateTask: async (id, patch) => {
       log.push(`update:${id}`);
       patches.push({ id, patch });
@@ -128,7 +132,7 @@ describe('applyAssistantActions', () => {
       },
       d.deps,
     );
-    expect(res).toEqual({ projekte: 1, aufgaben: 2, notizen: 1, termine: 1, aenderungen: 1 });
+    expect(res).toMatchObject({ projekte: 1, aufgaben: 2, notizen: 1, termine: 1, aenderungen: 1 });
   });
 });
 
@@ -144,5 +148,59 @@ describe('Fehler werden nicht verschluckt', () => {
     await expect(
       applyAssistantActions({ ...leer, aufgaben: [{ titel: 'Keller aufräumen' }] }, kaputt.deps),
     ).rejects.toThrow('21 values');
+  });
+});
+
+describe('Rückgängig für „Übernehmen"', () => {
+  it('merkt sich neu Angelegtes — Aufgaben, Notizen, Projekte', async () => {
+    const res = await applyAssistantActions(
+      { ...leer, listen: [{ name: 'Umzug' }], aufgaben: [{ titel: 'Kartons' }], notizen: ['Ein Gedanke'] },
+      deps().deps,
+    );
+    expect(res.rueckgaengig.aufgaben).toEqual(['t-Kartons']);
+    expect(res.rueckgaengig.notizen).toEqual(['n-Ein Ge']);
+    expect(res.rueckgaengig.listen).toEqual(['neu-Umzug']);
+  });
+
+  it('räumt eine WIEDERVERWENDETE Liste nicht weg', async () => {
+    // „Erinnerungen" gibt es schon — das Modell schlägt sie trotzdem vor.
+    const res = await applyAssistantActions({ ...leer, listen: [{ name: 'Erinnerungen' }] }, deps().deps);
+    expect(res.projekte).toBe(0);
+    expect(res.rueckgaengig.listen).toEqual([]);
+  });
+
+  it('merkt bei Änderungen NUR die angefassten Felder', async () => {
+    const t: Task = {
+      id: 'a1', listId: 'default', title: 'Zahnarzt', note: 'wichtig', dueDate: '2026-07-27', dueTime: '10:00',
+      rrule: null, startDate: null, expiresOn: null, evening: false, flagged: false, eventId: null,
+      completedAt: null, notificationId: null, tags: [], subtasks: [], createdAt: '', sort: 0,
+    };
+    const d = deps({ tasks: [t] });
+    const res = await applyAssistantActions(
+      { ...leer, aenderungen: [{ handle: 'a1', datum: '2026-08-01' }] },
+      d.deps,
+    );
+    const [erste] = res.rueckgaengig.aenderungen;
+    expect(erste.id).toBe('a1');
+    expect(erste.vorher).toEqual({ dueDate: '2026-07-27' });
+    // Die Notiz wurde nie angefasst und darf beim Zurücknehmen nicht auftauchen.
+    expect(Object.keys(erste.vorher)).not.toContain('note');
+  });
+
+  it('nimmt in umgekehrter Reihenfolge zurück: erst Inhalt, zuletzt das Projekt', async () => {
+    const log: string[] = [];
+    const rueck: UndoDeps = {
+      trashTask: async (id) => void log.push(`aufgabe-weg:${id}`),
+      restoreTask: async (id) => void log.push(`zurück:${id}`),
+      reopenTask: async (id) => void log.push(`geöffnet:${id}`),
+      updateTask: async (id) => void log.push(`update:${id}`),
+      trashNote: async (id) => void log.push(`notiz-weg:${id}`),
+      trashList: async (id) => void log.push(`liste-weg:${id}`),
+    };
+    await undoAppliedActions(
+      { aufgaben: ['t1'], notizen: ['n1'], listen: ['l1'], aenderungen: [{ id: 'a1', vorher: {} }], entsorgt: ['e1'], abgehakt: ['h1'] },
+      rueck,
+    );
+    expect(log).toEqual(['aufgabe-weg:t1', 'notiz-weg:n1', 'geöffnet:h1', 'zurück:e1', 'update:a1', 'liste-weg:l1']);
   });
 });

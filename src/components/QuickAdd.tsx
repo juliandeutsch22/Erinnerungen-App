@@ -19,7 +19,7 @@
 // das Feld, man sieht das Gesagte vor dem Abschicken), Vorschläge einzeln
 // abwählen und zurechtrücken — und die Weiche ÜBERSTIMMEN: über den sichtbaren
 // Weg-Chip oder, als Abkürzung, mit einem langen Druck auf den Knopf.
-import { Camera, CalendarDays, Check, Clock, Image as ImageIcon, Paperclip, Plus, Repeat, Sparkles, X } from 'lucide-react-native';
+import { Camera, CalendarDays, Check, Clock, Image as ImageIcon, Paperclip, Plus, Repeat, Sparkles, Undo2, X } from 'lucide-react-native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Image, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -33,12 +33,12 @@ import { PressableScale } from '@/components/PressableScale';
 import { Type } from '@/components/Type';
 import { LIST_COLORS } from '@/components/listMeta';
 import { useCreateAssistantEvents, useDeviceEvents } from '@/data/calendarQueries';
-import { useCreateNote, useNotes } from '@/data/noteQueries';
-import { useCompleteTask, useCreateList, useCreateTask, useDeleteTask, useLists, useTasks, useUpdateTask } from '@/data/queries';
+import { useCreateNote, useDeleteNote, useNotes } from '@/data/noteQueries';
+import { useCompleteTask, useCreateList, useCreateTask, useDeleteList, useDeleteTask, useLists, useReopenTask, useRestoreTask, useTasks, useUpdateTask } from '@/data/queries';
 import { DEFAULT_LIST_ID } from '@/data/ListRepository';
 import type { ChatMessage } from '@/data/types';
 import { hasCalendarPermission } from '@/lib/deviceCalendar';
-import { applyAssistantActions } from '@/lib/applyActions';
+import { applyAssistantActions, undoAppliedActions } from '@/lib/applyActions';
 import { type AssistantAction, type AssistantImage, askAssistant, buildAppContext, extractActions, IMAGE_LIMIT, type ToolData } from '@/lib/assistant';
 import { assistantCameraAvailable, assistantImagesAvailable, captureAssistantImage, pickAssistantImages } from '@/lib/assistantImage';
 import { RUN_ZEILE, useAssistantRuns } from '@/lib/assistantRun';
@@ -46,7 +46,8 @@ import { addDays, formatDueDate, todayStr } from '@/lib/dates';
 import { useSheetOffen } from '@/lib/sheetPresence';
 import { NOTHING_REMOVED, type Removed, useZeileDraft } from '@/lib/zeileDraft';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
-import { routeInput, type AssistentGrund } from '@/lib/inputRoute';
+import { UNDO_MS, useUndo } from '@/lib/undo';
+import { routeInput, zeileVorschlaege, type AssistentGrund } from '@/lib/inputRoute';
 import { parseQuickAdd } from '@/lib/quickAddParser';
 import { useKeyboardHeight } from '@/lib/useKeyboardHeight';
 import { useSettings } from '@/theme/settings.store';
@@ -83,9 +84,13 @@ export function QuickAdd({
    *  „Zahnarzt 10 Uhr" tippt, meint den 5. August. Der Chip zeigt es an und
    *  lässt sich abnehmen, es passiert also nichts hinter dem Rücken. */
   basisDatum,
+  /** Schwebt hier eine Tab-Bar darunter? In geschobenen Routen (Listen-Detail)
+   *  nicht — dort säße die Zeile sonst 64 px über dem Nichts. */
+  ueberTabBar = true,
 }: {
   listId?: string;
   basisDatum?: string;
+  ueberTabBar?: boolean;
 }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -98,6 +103,11 @@ export function QuickAdd({
   const deleteTask = useDeleteTask();
   const createNote = useCreateNote();
   const createEvents = useCreateAssistantEvents();
+  // Nur fuer das Ruecknehmen eines uebernommenen Vorschlags.
+  const restoreTask = useRestoreTask();
+  const reopenTask = useReopenTask();
+  const deleteNote = useDeleteNote();
+  const deleteList = useDeleteList();
   const { data: tasks } = useTasks();
   const { data: lists } = useLists();
   const { data: notes } = useNotes();
@@ -139,12 +149,15 @@ export function QuickAdd({
   const [anhangOffen, setAnhangOffen] = useState(false);
   /** Kurze Quittung an der Stelle, wo eben noch die Karte stand — sonst
    *  verschwindet sie einfach und man muss blind vertrauen. */
-  const [quittung, setQuittung] = useState<string | null>(null);
+  const [quittung, setQuittung] = useState<{ text: string; zurueck?: () => Promise<void> } | null>(null);
   const quittungTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const zeigeQuittung = (text: string) => {
+  // Trägt die Quittung ein Rückgängig, bleibt sie so lange stehen wie die
+  // Undo-Leiste sonst auch (UNDO_MS) — drei Sekunden reichen zum Lesen, aber
+  // nicht zum Entscheiden.
+  const zeigeQuittung = (text: string, zurueck?: () => Promise<void>) => {
     if (quittungTimer.current) clearTimeout(quittungTimer.current);
-    setQuittung(text);
-    quittungTimer.current = setTimeout(() => setQuittung(null), 3000);
+    setQuittung({ text, zurueck });
+    quittungTimer.current = setTimeout(() => setQuittung(null), zurueck ? UNDO_MS : 3000);
   };
 
   const today = todayStr();
@@ -205,6 +218,19 @@ export function QuickAdd({
     if (got.length === 0) return;
     hapticSelect();
     setBilder((prev) => [...prev, ...got].slice(0, IMAGE_LIMIT));
+  };
+
+  /** Einen der drei Chips abschicken. Sie sind fertige Fragen, keine Vorlagen
+   *  — ein Zwischenschritt „erst ins Feld, dann tippen" wäre ein Tipp zu viel.
+   *  Der Grund kommt trotzdem aus `routeInput`, damit die Wartezeile dasselbe
+   *  sagt wie bei getippten Fragen. */
+  const vorschlagSenden = (v: string) => {
+    hapticSelect();
+    const r = routeInput(v, today, apiKey.length > 0);
+    setText('');
+    setRemoved(NOTHING_REMOVED);
+    setUeberstimmt(false);
+    void frage(v, r.ziel === 'assistent' ? r.grund : 'auftrag');
   };
 
   const submit = (umkehren = false) => {
@@ -304,6 +330,41 @@ export function QuickAdd({
     }
     clearRun(RUN_ZEILE);
     setDeselected(new Set());
+
+    // Ein Tipp schreibt hier bis zu einem Dutzend Einträge in Listen, Notizen
+    // und Kalender. Die Karte verhindert das VERSEHENTLICHE Übernehmen — gegen
+    // ein bereutes half sie nie, und das Aufräumen führte über vier
+    // Bildschirme. (Bis v1.56 stand in `undo.ts`, das sei bewusst nicht
+    // rückgängig zu machen; das war zu kurz gedacht.)
+    // Das Rückgängig sitzt IN der Quittung, nicht in der globalen Undo-Leiste:
+    // die läge an derselben Stelle, und zwei Meldungen übereinander sind
+    // schlimmer als eine. Außerdem schaut man nach dem Tippen ohnehin genau
+    // dorthin.
+    const u = res.rueckgaengig;
+    const etwasZurueck =
+      u.aufgaben.length + u.notizen.length + u.listen.length + u.aenderungen.length + u.entsorgt.length + u.abgehakt.length > 0;
+    const zurueck = etwasZurueck
+      ? async () => {
+          hapticSelect();
+          await undoAppliedActions(u, {
+            trashTask: (id) => deleteTask.mutateAsync(id),
+            restoreTask: (id) => restoreTask.mutateAsync(id),
+            reopenTask: (id) => reopenTask.mutateAsync(id),
+            updateTask: (id, patch) => updateTask.mutateAsync({ id, patch }),
+            trashNote: (id) => deleteNote.mutateAsync(id),
+            trashList: (id) => deleteList.mutateAsync(id),
+          });
+          // Das Zurücknehmen benutzt `deleteTask` & Co., und die merken sich
+          // ihrerseits ein Rückgängig (data/queries.ts). Ohne das hier stünde
+          // danach „In den Papierkorb gelegt · Rückgängig" da und böte an, EINE
+          // der gerade zurückgenommenen Aufgaben wiederzuholen — ein Rückgängig
+          // für das Rückgängig, und dazu ein irreführendes.
+          useUndo.getState().clear();
+          // Ehrlich bleiben: Termine liegen im Gerätekalender und bleiben.
+          zeigeQuittung(res.termine > 0 ? 'Zurückgenommen — Termine bleiben im Kalender.' : 'Zurückgenommen.');
+        }
+      : undefined;
+
     const teile = [
       res.projekte > 0 ? `${res.projekte} ${res.projekte === 1 ? 'Projekt' : 'Projekte'}` : '',
       res.aenderungen > 0 ? `${res.aenderungen} ${res.aenderungen === 1 ? 'Änderung' : 'Änderungen'}` : '',
@@ -311,7 +372,7 @@ export function QuickAdd({
       res.termine > 0 ? `${res.termine} ${res.termine === 1 ? 'Termin' : 'Termine'}` : '',
       res.notizen > 0 ? `${res.notizen} ${res.notizen === 1 ? 'Notiz' : 'Notizen'}` : '',
     ].filter(Boolean);
-    zeigeQuittung(teile.length > 0 ? `${teile.join(', ')} übernommen.` : 'Nichts zu übernehmen.');
+    zeigeQuittung(teile.length > 0 ? `${teile.join(', ')} übernommen.` : 'Nichts zu übernehmen.', zurueck);
   };
 
   // Einmal rechnen: der Knopf verrät damit VOR dem Tippen, was passieren wird.
@@ -337,6 +398,20 @@ export function QuickAdd({
   const kannAnhaengen = zeigtKlammer && bilder.length < IMAGE_LIMIT;
   const etwasZuSenden = text.trim().length > 0 || bilder.length > 0;
 
+  // Die drei Vorschläge für die leere, angetippte Zeile. Rein lokal (siehe
+  // `zeileVorschlaege`) — sie kosten nichts und erzählen, was die Zeile kann.
+  // Nur wenn wirklich nichts anderes im Weg ist: kein Text, kein Bild, kein
+  // Lauf, keine Quittung — sonst wäre es eine Reihe zu viel.
+  const [fokus, setFokus] = useState(false);
+  const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const zeigtVorschlaege =
+    fokus && apiKey.length > 0 && text.length === 0 && bilder.length === 0 && !run && !quittung;
+  const vorschlaege = useMemo(() => zeileVorschlaege(tasks ?? [], today), [tasks, today]);
+
+  // Auf welche Liste geht das hier? Nur ansagen, wenn es NICHT der Eingang ist
+  // — auf „Heute" wäre „→ Erinnerungen" bloß Rauschen.
+  const zielListe = listId === DEFAULT_LIST_ID ? null : (lists ?? []).find((l) => l.id === listId) ?? null;
+
   const chips: { key: keyof Removed; icon: typeof Clock; label: string }[] = [];
   if (dueDate) chips.push({ key: 'date', icon: CalendarDays, label: formatDueDate(dueDate, today) });
   if (dueTime) chips.push({ key: 'time', icon: Clock, label: dueTime });
@@ -346,7 +421,7 @@ export function QuickAdd({
   // unzuverlässig — die Pill wanderte an unlogische Stellen). Tastatur offen →
   // Pill sitzt direkt darüber; zu → über der schwebenden Tab-Bar.
   const keyboard = useKeyboardHeight();
-  const restingBottom = Math.max(insets.bottom, Spacing.md) + TAB_BAR_HEIGHT + Spacing.sm;
+  const restingBottom = Math.max(insets.bottom, Spacing.md) + (ueberTabBar ? TAB_BAR_HEIGHT + Spacing.sm : 0);
 
   // Liegt ein Sheet über dem Bildschirm, tritt die Zeile zurück. Sheets sind
   // RN-Modals in einer eigenen View-Hierarchie: die Zeile läge dahinter und
@@ -389,7 +464,20 @@ export function QuickAdd({
                 contentStyle={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: Spacing.sm + 2 }}
               >
                 <Check size={13} color={colors.teal} strokeWidth={2.6} />
-                <Type variant="caption" tone="teal">{quittung}</Type>
+                <Type variant="caption" tone="teal">{quittung.text}</Type>
+                {quittung.zurueck && (
+                  <PressableScale
+                    accessibilityLabel="Übernommenes zurücknehmen"
+                    onPress={() => {
+                      if (quittungTimer.current) clearTimeout(quittungTimer.current);
+                      void quittung.zurueck?.();
+                    }}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingLeft: Spacing.xs }}
+                  >
+                    <Undo2 size={12} color={colors.indigo} strokeWidth={2.4} />
+                    <Type variant="caption" tone="indigo">Rückgängig</Type>
+                  </PressableScale>
+                )}
               </Glass>
             </PopIn>
           )}
@@ -485,7 +573,33 @@ export function QuickAdd({
             </PopIn>
           )}
 
-          {(chips.length > 0 || zeigtWegChip) && (
+          {/* Was die Zeile kann, sieht man ihr nicht an. Drei ruhige Chips beim
+              Antippen sagen es — lokal abgeleitet, also immer wahr, und sofort
+              wieder weg, sobald man selbst tippt. Kein Tutorial, keine Kosten. */}
+          {zeigtVorschlaege && vorschlaege.length > 0 && (
+            <PopIn>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs, paddingLeft: Spacing.sm }}>
+                {vorschlaege.map((v) => (
+                  <PressableScale
+                    key={v}
+                    accessibilityLabel={`Vorschlag: ${v}`}
+                    onPress={() => vorschlagSenden(v)}
+                  >
+                    <Glass
+                      variant="pill"
+                      style={Shadow.sm}
+                      contentStyle={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, paddingVertical: 6, paddingHorizontal: Spacing.sm + 2 }}
+                    >
+                      <Sparkles size={11} color={colors.teal} strokeWidth={2.2} />
+                      <Type variant="caption" tone="teal">{v}</Type>
+                    </Glass>
+                  </PressableScale>
+                ))}
+              </View>
+            </PopIn>
+          )}
+
+          {(chips.length > 0 || zeigtWegChip || (zielListe !== null && text.trim().length > 0)) && (
             <View style={{ flexDirection: 'row', gap: Spacing.xs, justifyContent: 'flex-start', paddingLeft: Spacing.sm }}>
               {/* Der Weg-Chip sagt SICHTBAR, wohin die Eingabe geht, und ist
                   antippbar. Eine versteckte Geste (langer Druck) wäre in einer
@@ -523,6 +637,22 @@ export function QuickAdd({
                       </Type>
                     </Glass>
                   </PressableScale>
+                </PopIn>
+              )}
+              {/* Wohin es geht, wenn der Bildschirm eine Liste IST. Bewusst
+                  ohne X: das ist kein Parser-Fund, den man abwählt, sondern
+                  der Ort, an dem man steht. Sichtbar muss es trotzdem sein —
+                  eine Aufgabe, die still woanders landet, wäre Magie. */}
+              {zielListe && text.trim().length > 0 && (
+                <PopIn>
+                  <Glass
+                    variant="pill"
+                    style={Shadow.sm}
+                    contentStyle={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, paddingVertical: 6, paddingHorizontal: Spacing.sm + 2 }}
+                  >
+                    <Type variant="caption" tone="text3">→</Type>
+                    <Type variant="caption" tone="teal" numberOfLines={1}>{zielListe.name}</Type>
+                  </Glass>
                 </PopIn>
               )}
               {chips.map((c) => (
@@ -611,6 +741,19 @@ export function QuickAdd({
               placeholderTextColor={colors.text2}
               returnKeyType="done"
               submitBehavior="submit"
+              onFocus={() => {
+                // Den ausstehenden Blur abräumen: nach dem Anlegen holt sich
+                // das Feld den Fokus sofort zurück, und ohne das hier käme der
+                // ALTE Timer danach an und schlösse die Reihe wieder.
+                if (blurTimer.current) clearTimeout(blurTimer.current);
+                setFokus(true);
+              }}
+              // Verzögert: ein Tipp auf einen Vorschlag nimmt dem Feld erst den
+              // Fokus — ohne die Pause wäre die Reihe weg, bevor der Tipp ankommt.
+              onBlur={() => {
+                if (blurTimer.current) clearTimeout(blurTimer.current);
+                blurTimer.current = setTimeout(() => setFokus(false), 150);
+              }}
               onSubmitEditing={() => submit()}
               accessibilityLabel="Schnell hinzufügen"
               style={[{ flex: 1, fontSize: T.md, color: colors.text, paddingVertical: 2 }, webNoOutline]}

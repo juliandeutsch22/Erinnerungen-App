@@ -982,6 +982,52 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
     auf- und zuklappt); dass der richtige Text am richtigen Datum hängt, deckt
     `journalLogic.test.ts` ab.
 
+49. **Die Zeile wird mächtiger — drei Stücke** (v1.57.0).
+    · **Rückgängig für „Übernehmen".** Bis v1.56 stand in `undo.ts`, das sei
+      bewusst ausgenommen, weil die Vorschlagskarte ja schon eine Bremse sei.
+      Zu kurz gedacht: die Karte verhindert das VERSEHENTLICHE Übernehmen,
+      gegen ein bereutes half sie nie — und ein Durchgang schreibt bis zu einem
+      Dutzend Einträge, deren Aufräumen über vier Bildschirme führt.
+      `applyAssistantActions` liefert jetzt einen `ApplyUndo`-Block,
+      `undoAppliedActions` nimmt ihn in UMGEKEHRTER Reihenfolge zurück (zuletzt
+      die Projekte — sonst läge eine Aufgabe in einem Projekt, das es schon
+      nicht mehr gibt). Nichts wird endgültig gelöscht, alles geht in den
+      Papierkorb.
+      ⚠️ Drei Fallen, alle beim Bauen aufgelaufen und durch Tests gefunden:
+      **(a)** `frisch` enthält auch WIEDERVERWENDETE Listen — ein Rückgängig
+      darf nur die wirklich neu angelegten wegräumen (`neueListen`).
+      **(b)** Als „vorher" nur die TATSÄCHLICH angefassten Felder merken; ein
+      ganzer Task würde beim Zurücknehmen auch überschreiben, was inzwischen
+      woanders geändert wurde. **(c)** Das Zurücknehmen benutzt `deleteTask` &
+      Co., und die merken sich ihrerseits ein Rückgängig — ohne
+      `useUndo.getState().clear()` stünde danach „In den Papierkorb gelegt ·
+      Rückgängig" da: ein irreführendes Rückgängig für das Rückgängig.
+      Das Angebot sitzt IN der Quittung, nicht in der globalen Undo-Leiste —
+      die läge an derselben Stelle, und zwei Meldungen übereinander sind
+      schlimmer als eine. **Termine bleiben ausgenommen**, Grund steht bei
+      `ApplyUndo`: der Löschweg braucht das native Event-Objekt, das die
+      Web-Verifikation nie zu sehen bekommt.
+      Braindump, Chat und Sprach-Sheet übernehmen weiterhin OHNE Rückgängig —
+      `undoAppliedActions` liegt bereit, sie sind die nächsten Kandidaten.
+    · **Drei Vorschläge an der leeren Zeile** (`zeileVorschlaege`). Rein lokal
+      abgeleitet, also immer wahr: „Was ist überfällig?" steht nur da, wenn
+      etwas überfällig ist, „Sortier meinen Tag" erst ab vier Aufgaben heute.
+      Ein Vorschlag, der ins Leere führt, wäre schlimmer als keiner. Ein Tipp
+      schickt ihn DIREKT ab — es sind fertige Fragen, keine Vorlagen.
+      ⚠️ Der `onBlur`-Timer muss beim `onFocus` abgeräumt werden: nach dem
+      Anlegen holt sich das Feld den Fokus sofort zurück, und der alte Timer
+      schloss sonst die gerade wieder geöffnete Reihe.
+    · **Die Zeile auf dem Listen-Detail** (`listId` + `ueberTabBar={false}`).
+      Dort landet die Aufgabe in DIESER Liste, sichtbar über einen Chip
+      „→ Name" (bewusst ohne X: das ist kein Parser-Fund, den man abwählt,
+      sondern der Ort, an dem man steht). **Nur in echten Listen** — die
+      Smart-Views („Geplant", „Alle", Filter) teilen sich den Bildschirm, haben
+      aber keine Liste, in die etwas gehörte.
+    ⚠️ **Für jede künftige Tour:** seit dem Listen-Detail liegt fast jedes
+    Bedienelement der Zeile FÜNFMAL im DOM. `.first()` trifft regelmäßig eine
+    unsichtbare Kopie — `scratchpad/maechtig.mjs` klickt deshalb grundsätzlich
+    über `document.elementFromPoint`.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**
