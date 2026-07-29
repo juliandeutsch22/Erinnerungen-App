@@ -19,9 +19,9 @@
 // das Feld, man sieht das Gesagte vor dem Abschicken), Vorschläge einzeln
 // abwählen und zurechtrücken — und die Weiche ÜBERSTIMMEN: über den sichtbaren
 // Weg-Chip oder, als Abkürzung, mit einem langen Druck auf den Knopf.
-import { CalendarDays, Check, Clock, Plus, Repeat, Sparkles, X } from 'lucide-react-native';
+import { Camera, CalendarDays, Check, Clock, Image as ImageIcon, Paperclip, Plus, Repeat, Sparkles, X } from 'lucide-react-native';
 import React, { useMemo, useRef, useState } from 'react';
-import { TextInput, View } from 'react-native';
+import { Image, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ActionEditSheet, type EditTarget } from '@/components/ActionEditSheet';
@@ -39,7 +39,8 @@ import { DEFAULT_LIST_ID } from '@/data/ListRepository';
 import type { ChatMessage } from '@/data/types';
 import type { DeviceEvent } from '@/lib/deviceCalendar';
 import { applyAssistantActions } from '@/lib/applyActions';
-import { type AssistantAction, askAssistant, buildAppContext, extractActions, type ToolData } from '@/lib/assistant';
+import { type AssistantAction, type AssistantImage, askAssistant, buildAppContext, extractActions, IMAGE_LIMIT, type ToolData } from '@/lib/assistant';
+import { assistantCameraAvailable, assistantImagesAvailable, captureAssistantImage, pickAssistantImages } from '@/lib/assistantImage';
 import { RUN_ZEILE, useAssistantRuns } from '@/lib/assistantRun';
 import { formatDueDate, todayStr } from '@/lib/dates';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
@@ -124,6 +125,12 @@ export function QuickAdd({
   const [ueberstimmt, setUeberstimmt] = useState(false);
   const [diktiert, setDiktiert] = useState(false);
   const diktatBasis = useRef('');
+  /** Angehängte Bilder. Sie leben NUR bis zum Abschicken — kein Dateisystem,
+   *  kein Backup, keine Notiz (siehe `assistantImage.ts`). Ein abfotografierter
+   *  Zettel soll keine Spur hinterlassen, die man später aufräumen muss. */
+  const [bilder, setBilder] = useState<AssistantImage[]>([]);
+  /** Ist die Auswahl „Abfotografieren / Mediathek" aufgeklappt? */
+  const [anhangOffen, setAnhangOffen] = useState(false);
   /** Kurze Quittung an der Stelle, wo eben noch die Karte stand — sonst
    *  verschwindet sie einfach und man muss blind vertrauen. */
   const [quittung, setQuittung] = useState<string | null>(null);
@@ -142,7 +149,7 @@ export function QuickAdd({
 
   /** Der Weg an den Assistenten. Der Lauf lebt im Store, überlebt also das
    *  Wegtippen und einen Bildschirmwechsel. */
-  const frage = async (eingabe: string, warum: AssistentGrund) => {
+  const frage = async (eingabe: string, warum: AssistentGrund, mitBildern: AssistantImage[] = []) => {
     setGrund(warum);
     beginRun(RUN_ZEILE, 'Zeile', eingabe);
     try {
@@ -159,6 +166,7 @@ export function QuickAdd({
       };
       const antwort = await askAssistant(apiKey, [msg], kontext, memory, {
         toolData,
+        images: mitBildern,
         onDelta: (d) => deltaRun(RUN_ZEILE, d),
       });
       const { clean, actions } = extractActions(antwort);
@@ -169,9 +177,33 @@ export function QuickAdd({
     }
   };
 
+  const anhaengen = async (neu: Promise<AssistantImage[]>) => {
+    const got = await neu;
+    setAnhangOffen(false);
+    if (got.length === 0) return;
+    hapticSelect();
+    setBilder((prev) => [...prev, ...got].slice(0, IMAGE_LIMIT));
+  };
+
   const submit = (umkehren = false) => {
     const eingabe = text.trim();
-    if (eingabe.length === 0) return;
+    // Ein Foto allein genügt — der Zettel IST die Eingabe.
+    if (eingabe.length === 0 && bilder.length === 0) return;
+
+    // Ein Bild hebt die Weiche AUF, es gibt keine zweite Meinung: der lokale
+    // Parser kann kein Foto lesen. Deshalb ist das Überstimmen hier gesperrt
+    // (siehe `zeigtWegChip`) — sonst würde das Bild still fallengelassen.
+    if (bilder.length > 0) {
+      const mit = bilder;
+      setText('');
+      setRemoved(NOTHING_REMOVED);
+      setUeberstimmt(false);
+      setBilder([]);
+      setAnhangOffen(false);
+      void frage(eingabe || 'Lies das Bild.', 'wurf', mit);
+      return;
+    }
+
     const roh = routeInput(eingabe, today, apiKey.length > 0);
     // Überstimmen dreht die Entscheidung — aber nie ins Netz, wenn es gar
     // keinen Schlüssel gibt.
@@ -265,12 +297,23 @@ export function QuickAdd({
     () => routeInput(text.trim(), today, apiKey.length > 0),
     [text, today, apiKey],
   );
-  // Was der Knopf ZEIGT — inklusive eines etwaigen Überstimmens.
+  // Was der Knopf ZEIGT — inklusive eines etwaigen Überstimmens. Mit Bild ist
+  // die Sache entschieden: es geht an den Assistenten, sonst nirgendwohin.
   const gehtLokal = weicheJetzt.ziel === 'lokal';
-  const zeigtLokal = ueberstimmt ? !gehtLokal : gehtLokal;
+  const zeigtLokal = bilder.length > 0 ? false : ueberstimmt ? !gehtLokal : gehtLokal;
   // Der Chip erscheint nur, wenn es überhaupt eine Wahl gibt: mit Text im Feld
-  // und mit Schlüssel. Ohne Schlüssel führt nur ein Weg irgendwohin.
-  const zeigtWegChip = text.trim().length > 0 && apiKey.length > 0;
+  // und mit Schlüssel. Ohne Schlüssel führt nur ein Weg irgendwohin — und mit
+  // einem Bild ebenfalls nicht, denn der lokale Parser kann es nicht lesen.
+  // Ein Chip, der aussieht wie eine Wahl und keine ist, wäre schlimmer als
+  // keiner.
+  const zeigtWegChip = text.trim().length > 0 && apiKey.length > 0 && bilder.length === 0;
+  // Anhängen kann nur, wer den Assistenten überhaupt hat: ohne Schlüssel gäbe
+  // es niemanden, der das Bild liest — dieselbe Leitplanke wie beim Weg-Chip.
+  // Die Klammer bleibt auch beim Erreichen der Grenze stehen (sonst wäre der
+  // linke Platz plötzlich wieder ein totes Plus); nur die Wege verschwinden.
+  const zeigtKlammer = apiKey.length > 0 && assistantImagesAvailable;
+  const kannAnhaengen = zeigtKlammer && bilder.length < IMAGE_LIMIT;
+  const etwasZuSenden = text.trim().length > 0 || bilder.length > 0;
 
   const chips: { key: keyof Removed; icon: typeof Clock; label: string }[] = [];
   if (dueDate) chips.push({ key: 'date', icon: CalendarDays, label: formatDueDate(dueDate, today) });
@@ -325,6 +368,80 @@ export function QuickAdd({
               />
             </PopIn>
           )}
+          {/* Angehängte Bilder: sichtbar, einzeln abnehmbar, mit der klaren
+              Ansage, was mit ihnen passiert. Sie stehen ÜBER der Zeile, nicht
+              darin — eine Miniatur in einer 58 px hohen Pille wäre ein Fleck. */}
+          {bilder.length > 0 && (
+            <PopIn>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingLeft: Spacing.sm }}>
+                {bilder.map((img, i) => (
+                  <View key={i} style={{ width: 48, height: 48, borderRadius: R.md, overflow: 'hidden' }}>
+                    <Image
+                      source={{ uri: `data:${img.mimeType};base64,${img.data}` }}
+                      style={{ width: '100%', height: '100%' }}
+                      resizeMode="cover"
+                    />
+                    <PressableScale
+                      accessibilityLabel={`Bild ${i + 1} entfernen`}
+                      onPress={() => setBilder((prev) => prev.filter((_, k) => k !== i))}
+                      style={{ position: 'absolute', top: 2, right: 2, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 999, padding: 3 }}
+                    >
+                      <X size={11} color="#FFFFFF" strokeWidth={2.6} />
+                    </PressableScale>
+                  </View>
+                ))}
+                <Type variant="caption" tone="text3" style={{ flex: 1 }}>
+                  Geht an den Assistenten — wird gelesen, nicht gespeichert.
+                </Type>
+              </View>
+            </PopIn>
+          )}
+
+          {/* Beide Wege SICHTBAR, keiner als Geste. Auf dem Gerät steht die
+              Kamera zuerst: „der Zettel liegt vor mir" ist der häufigere Fall
+              als die Mediathek — dieselbe Reihenfolge wie im Braindump. */}
+          {anhangOffen && zeigtKlammer && (
+            <PopIn>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, paddingLeft: Spacing.sm }}>
+                {!kannAnhaengen && (
+                  <Type variant="caption" tone="text3">
+                    Mehr als {IMAGE_LIMIT} Bilder gehen nicht auf einmal.
+                  </Type>
+                )}
+                {kannAnhaengen && assistantCameraAvailable && (
+                  <PressableScale
+                    accessibilityLabel="Zettel abfotografieren"
+                    onPress={() => void anhaengen(captureAssistantImage())}
+                  >
+                    <Glass
+                      variant="pill"
+                      style={Shadow.sm}
+                      contentStyle={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, paddingVertical: 6, paddingHorizontal: Spacing.sm + 2 }}
+                    >
+                      <Camera size={12} color={colors.teal} strokeWidth={2.2} />
+                      <Type variant="caption" tone="teal">Abfotografieren</Type>
+                    </Glass>
+                  </PressableScale>
+                )}
+                {kannAnhaengen && (
+                  <PressableScale
+                    accessibilityLabel="Foto aus der Mediathek"
+                    onPress={() => void anhaengen(pickAssistantImages(IMAGE_LIMIT - bilder.length))}
+                  >
+                    <Glass
+                      variant="pill"
+                      style={Shadow.sm}
+                      contentStyle={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, paddingVertical: 6, paddingHorizontal: Spacing.sm + 2 }}
+                    >
+                      <ImageIcon size={12} color={colors.teal} strokeWidth={2.2} />
+                      <Type variant="caption" tone="teal">Aus der Mediathek</Type>
+                    </Glass>
+                  </PressableScale>
+                )}
+              </View>
+            </PopIn>
+          )}
+
           {(chips.length > 0 || zeigtWegChip) && (
             <View style={{ flexDirection: 'row', gap: Spacing.xs, justifyContent: 'flex-start', paddingLeft: Spacing.sm }}>
               {/* Der Weg-Chip sagt SICHTBAR, wohin die Eingabe geht, und ist
@@ -403,10 +520,31 @@ export function QuickAdd({
               paddingHorizontal: Spacing.md,
             }}
           >
-            {/* Der eine Akzent-Tupfer der Zeile. text3 ist der Ton für
-                Nebeninformation — er ließ die wichtigste Fläche des Bildschirms
-                wie ein abgeschaltetes Suchfeld aussehen. */}
-            <Plus size={18} color={colors.teal} strokeWidth={2.2} />
+            {/* Der linke Platz. Bis v1.53.4 stand hier ein rein dekoratives
+                Plus — und seit es den Akzent trug, sah es aus wie ein Knopf,
+                ohne einer zu sein (in iOS heißt ein farbiges + links in einer
+                Eingabezeile seit jeher „hier kommt etwas dran"). Jetzt löst es
+                das Versprechen ein: Büroklammer = Bild anhängen. Wer keinen
+                Schlüssel hat, sieht weiter das Plus — dort ist es ehrlich, denn
+                dann legt die Zeile wirklich nur an. */}
+            {zeigtKlammer ? (
+              <PressableScale
+                accessibilityLabel={anhangOffen ? 'Anhängen abbrechen' : 'Bild anhängen'}
+                accessibilityState={{ expanded: anhangOffen }}
+                onPress={() => {
+                  hapticSelect();
+                  setAnhangOffen((v) => !v);
+                }}
+                style={{ marginLeft: -2, padding: 2 }}
+              >
+                {/* Jetzt DARF es den Akzent tragen: es ist ein echter Knopf.
+                    Damit bleibt der Anker erhalten, den die Zeile in v1.53.4
+                    bekommen hat — er lügt nur nicht mehr. */}
+                <Paperclip size={18} color={colors.teal} strokeWidth={2.2} />
+              </PressableScale>
+            ) : (
+              <Plus size={18} color={colors.text3} strokeWidth={2.2} />
+            )}
             <TextInput
               ref={inputRef}
               value={text}
@@ -416,7 +554,15 @@ export function QuickAdd({
                 if (v.length === 0) setRemoved(NOTHING_REMOVED);
               }}
               placeholder={
-                diktiert ? 'Ich höre zu …' : apiKey.length > 0 ? 'Was liegt an? Oder frag mich.' : 'Was liegt an?'
+                diktiert
+                  ? 'Ich höre zu …'
+                  : // Mit Bild ist Text optional — das muss dastehen, sonst
+                    // sucht man nach dem Satz, den man noch schreiben „muss".
+                    bilder.length > 0
+                    ? 'Noch etwas dazu? (nicht nötig)'
+                    : apiKey.length > 0
+                      ? 'Was liegt an? Oder frag mich.'
+                      : 'Was liegt an?'
               }
               // Eine Einladung, keine Randnotiz — deshalb text2, nicht text3.
               placeholderTextColor={colors.text2}
@@ -439,7 +585,7 @@ export function QuickAdd({
               onText={(transkript) => setText((diktatBasis.current ? `${diktatBasis.current.trimEnd()} ` : '') + transkript)}
               onListeningChange={setDiktiert}
             />
-            {text.trim().length > 0 && (
+            {etwasZuSenden && (
               <PopIn>
                 <PressableScale
                   // Das Symbol verrät VOR dem Tippen, was passieren wird:

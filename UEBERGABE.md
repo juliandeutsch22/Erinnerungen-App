@@ -867,6 +867,43 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
       schließt Pills zu Recht aus; der Grund steht jetzt als Kommentar in
       `Glass.tsx`.
 
+46. **Die Büroklammer — Bilder an der Zeile** (v1.54.0). Auf die Frage „hat das
+    `+` in der Zeile auch einen Nutzen?" — hatte es nicht. Es war ein nacktes
+    Icon ohne `PressableScale`, reine Dekoration. In v1.53.4 hatte ich ihm den
+    Akzent gegeben, und damit stand links in der Eingabezeile ein farbiges Plus,
+    das in iOS seit Messages/WhatsApp/Slack unmissverständlich „hier kommt etwas
+    dran" heißt. Ein gemaltes Versprechen ohne Einlösung — schlimmer als das
+    graue Plus davor.
+    · Jetzt: **Büroklammer** (Akzent, weil es nun wirklich ein Knopf ist), Tipp
+      klappt zwei SICHTBARE Wege auf — „Abfotografieren" (nur nativ) und „Aus
+      der Mediathek", Kamera zuerst wie im Braindump („der Zettel liegt vor
+      mir" ist der häufigere Fall). Keine Geste, kein Modal.
+    · **Kein neuer Kanal, nur eine fehlende Leitung.** `assistantImage.ts`,
+      `IMAGE_LIMIT` und `askAssistant(..., images)` gab es seit dem Braindump;
+      `P_BILDER` steht auch im vollen Prompt. Die Zeile war die einzige Tür ohne
+      Anschluss.
+    · **Drei Leitplanken, die zusammengehören:** Ohne Schlüssel gibt es die
+      Klammer NICHT (niemand könnte das Bild lesen) — dort steht weiter das
+      Plus, wo es ehrlich ist, weil die Zeile dann wirklich nur anlegt. Mit Bild
+      verschwindet der Weg-Chip und das Überstimmen ist gesperrt: der lokale
+      Parser kann kein Foto lesen, eine Wahl gäbe es also nicht, und ein Chip,
+      der aussieht wie eine und keine ist, wäre schlimmer als keiner. Und ein
+      Foto ALLEIN genügt — ohne Text; der Platzhalter sagt das („Noch etwas
+      dazu? (nicht nötig)"), sonst sucht man nach dem Satz, den man noch
+      schreiben zu müssen glaubt.
+    · Bilder werden wie überall NICHT gespeichert: Base64 direkt aus dem Picker,
+      eine Anfrage, dann vergessen. Die Ansage steht neben der Miniatur.
+    · **Dokumente bewusst NICHT.** `documents.ts` ist Ablage (ein PDF gehört zu
+      einer Aufgabe und bleibt dort), der Bildkanal ist Eingabe (dieses Bild IST
+      der Gedanke und wird vergessen). Am selben Knopf wären das zwei
+      unverwandte Bedeutungen, unterschieden allein durch den Dateityp — ein
+      versteckter Modus, und Modi loszuwerden war der ganze Punkt der Zeile.
+      PDFs an Aufgaben gibt es weiterhin im Aufgaben-Editor, wo sie hingehören.
+    · Abgesichert durch `scratchpad/klammer.mjs`: Klammer da, Wege sichtbar,
+      Kamera im Web ausgeblendet, Miniatur abnehmbar, Weg-Chip weg, Foto ohne
+      Text abschickbar, `inlineData` geht wirklich raus, `BILDER:` steht im
+      Prompt, Vorschlag landet in der Ablage — und ohne Schlüssel KEINE Klammer.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

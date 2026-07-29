@@ -50,11 +50,13 @@ bewährt hat.
 
 ## 2b. Eine Zeile für alles `[JS · groß]`
 
-**Stufe 1 (v1.52.0) und Stufe 2 (v1.53.0) umgesetzt** — siehe UEBERGABE §8.42.
+**Stufe 1 (v1.52.0), Stufe 2 (v1.53.0) und die Bilder (v1.54.0) umgesetzt** —
+siehe UEBERGABE §8.42 und §8.46.
 Offen als **Stufe 3**: die Zeile auf ALLEN Bildschirmen (heute nur „Heute"),
-eine Rückfrage-Runde (jede Anfrage ist ein Einzelschuss ohne Gedächtnis),
-Bilder — und die Frage, ob der Sprach-Schnellzugriff als eigener Bildschirm
-jetzt zurückgebaut werden kann, weil die Zeile dasselbe kann.
+eine Rückfrage-Runde (jede Anfrage ist ein Einzelschuss ohne Gedächtnis)
+— und die Frage, ob der Sprach-Schnellzugriff als eigener Bildschirm jetzt
+zurückgebaut werden kann, weil die Zeile dasselbe kann. Seit den Bildern gilt
+dieselbe Frage für den Braindump: er kann nichts mehr, was die Zeile nicht kann.
 
 *Das Problem:* Stoa hat VIER Türen für Text — die Eingabezeile auf „Heute"
 (lokaler Parser), den Braindump, den Chat und das Sprach-Sheet. Bevor man ein
