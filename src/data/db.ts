@@ -83,6 +83,7 @@ export function getDb(): Promise<SQLiteDatabase> {
           id TEXT PRIMARY KEY NOT NULL,
           date TEXT NOT NULL UNIQUE,
           text TEXT NOT NULL,
+          deleted_at TEXT,
           created_at TEXT NOT NULL,
           updated_at TEXT NOT NULL
         );
@@ -120,6 +121,15 @@ export function getDb(): Promise<SQLiteDatabase> {
       for (const col of ['note_id TEXT', 'deleted_at TEXT']) {
         try {
           await db.execAsync(`ALTER TABLE chats ADD COLUMN ${col};`);
+        } catch {
+          /* Spalte existiert bereits */
+        }
+      }
+      // Papierkorb der Abendbetrachtung (v1.62.0) — bis dahin verschwand sie
+      // als einziger Inhalt der App sofort und endgültig.
+      for (const col of ['deleted_at TEXT']) {
+        try {
+          await db.execAsync(`ALTER TABLE journal ADD COLUMN ${col};`);
         } catch {
           /* Spalte existiert bereits */
         }

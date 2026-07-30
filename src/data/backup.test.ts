@@ -194,7 +194,7 @@ describe('Backup', () => {
       { id: 'd1', eventId: 'ev-9', name: 'Flugticket Rom.pdf', uri: 'file:///old/t.pdf', addedAt: '2026-07-02T10:00:00.000Z' },
       { id: 'd2', eventId: 'ev-9', name: 'Riesig.zip', uri: 'file:///old/big.zip', addedAt: '2026-07-02T10:00:01.000Z' },
     ]);
-    await getJournalRepository().upsert({ id: 'j1', date: '2026-07-02', text: 'Ruhiger Tag.', createdAt: '2026-07-02T21:00:00.000Z', updatedAt: '2026-07-02T21:00:00.000Z' });
+    await getJournalRepository().upsert({ id: 'j1', date: '2026-07-02', text: 'Ruhiger Tag.', deletedAt: null, createdAt: '2026-07-02T21:00:00.000Z', updatedAt: '2026-07-02T21:00:00.000Z' });
 
     // Fake-IO: das große Dokument liefert null (Limit) → nur Verknüpfung im Export.
     const bytes: Record<string, string | null> = { 'file:///old/t.pdf': 'PDFDATA', 'file:///old/big.zip': null };

@@ -1,8 +1,12 @@
 // journal.tsx — Verlauf der Abendbetrachtung: alle Einträge, neueste zuerst.
 // Tippen öffnet einen Eintrag zum Nachbearbeiten; Löschen zweistufig —
 // auch ein Tagebuch darf Seiten verlieren, aber nie aus Versehen.
+//
+// Seit v1.62.0 landet Gelöschtes für 30 Tage im Papierkorb (wie Notizen,
+// Chats, Aufgaben, Listen). Bis dahin war ausgerechnet das Persönlichste der
+// einzige Inhalt der App, der sofort und endgültig verschwand.
 import { useRouter } from 'expo-router';
-import { ChevronLeft, MoonStar } from 'lucide-react-native';
+import { ChevronLeft, MoonStar, RotateCcw, Trash2 } from 'lucide-react-native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { TextInput, View } from 'react-native';
 
@@ -16,8 +20,16 @@ import { Screen } from '@/components/Screen';
 import { Seam } from '@/components/Seam';
 import { EmptyState } from '@/components/StateView';
 import { Type } from '@/components/Type';
-import { useJournal, useRemoveJournal, useSaveJournal } from '@/data/journalQueries';
-import { formatDueDate, todayStr } from '@/lib/dates';
+import {
+  JOURNAL_TRASH_DAYS,
+  useJournal,
+  useJournalTrash,
+  useRemoveJournal,
+  useRestoreJournal,
+  useSaveJournal,
+  useTrashJournal,
+} from '@/data/journalQueries';
+import { addDays, formatDueDate, toDateStr, todayStr } from '@/lib/dates';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { groupJournal, journalStreak } from '@/lib/journalLogic';
 import { webNoOutline } from '@/theme/layout';
@@ -28,13 +40,36 @@ export default function JournalScreen() {
   const colors = useColors();
   const router = useRouter();
   const { data: entries } = useJournal();
+  const { data: papierkorb } = useJournalTrash();
   const save = useSaveJournal();
+  const trash = useTrashJournal();
+  const restore = useRestoreJournal();
   const remove = useRemoveJournal();
   const today = todayStr();
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [papierkorbOffen, setPapierkorbOffen] = useState(false);
+  const [confirmPurge, setConfirmPurge] = useState<string | null>(null);
+
+  // Was älter als 30 Tage im Papierkorb liegt, geht endgültig — genau wie bei
+  // Notizen und Chats. Einmal pro Aufschlagen, nicht bei jedem Rendern.
+  const cutoff = addDays(today, -JOURNAL_TRASH_DAYS);
+  const abgeraeumt = useRef(false);
+  useEffect(() => {
+    if (abgeraeumt.current || !papierkorb) return;
+    const abgelaufen = papierkorb.filter((e) => e.deletedAt !== null && toDateStr(new Date(e.deletedAt)) < cutoff);
+    if (abgelaufen.length === 0) return;
+    abgeraeumt.current = true;
+    for (const e of abgelaufen) remove.mutate(e.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [papierkorb, cutoff]);
+
+  const imPapierkorb = useMemo(
+    () => (papierkorb ?? []).filter((e) => e.deletedAt !== null && toDateStr(new Date(e.deletedAt)) >= cutoff),
+    [papierkorb, cutoff],
+  );
 
   const list = useMemo(() => (entries ?? []).filter((e) => e.text.trim().length > 0), [entries]);
   const streak = useMemo(() => journalStreak(entries ?? [], today), [entries, today]);
@@ -86,7 +121,8 @@ export default function JournalScreen() {
       return;
     }
     hapticSuccess();
-    remove.mutate(id);
+    // In den Papierkorb, nicht ins Nichts. Endgültig geht nur von dort aus.
+    trash.mutate(id);
     setEditingId(null);
     setConfirmDelete(false);
   };
@@ -198,7 +234,7 @@ export default function JournalScreen() {
                         style={{ paddingVertical: Spacing.xs }}
                       >
                         <Type variant="caption" tone="indigo">
-                          {confirmDelete ? 'Wirklich löschen? Nochmal tippen.' : 'Eintrag löschen'}
+                          {confirmDelete ? 'In den Papierkorb? Nochmal tippen.' : 'Eintrag löschen'}
                         </Type>
                       </PressableScale>
                       <PressableScale
@@ -231,6 +267,94 @@ export default function JournalScreen() {
           </View>
         )}
       </Reveal>
+
+      {/* Papierkorb — dieselbe Grammatik wie im Verwalter: zugeklappte Zeile
+          mit Zähler, darin Wiederherstellen (Tipp) und Endgültig (zweistufig).
+          Er erscheint nur, wenn etwas drin liegt; eine leere Zeile „Papierkorb
+          (0)" wäre eine Erinnerung an nichts. */}
+      {imPapierkorb.length > 0 && (
+        <Reveal delay={110}>
+          <GlassPanel>
+            <PressableScale
+              accessibilityLabel={`Papierkorb ${papierkorbOffen ? 'zuklappen' : 'aufklappen'}`}
+              accessibilityState={{ expanded: papierkorbOffen }}
+              onPress={() => {
+                hapticSelect();
+                setPapierkorbOffen((v) => !v);
+                setConfirmPurge(null);
+              }}
+              pressedScale={0.99}
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: Spacing.xs }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+                <Trash2 size={16} color={colors.text3} strokeWidth={2} />
+                <Type variant="eyebrow" tone="text3">Papierkorb</Type>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+                <Type variant="caption" tone="text3" tabular>{imPapierkorb.length}</Type>
+                <DisclosureChevron open={papierkorbOffen} color={colors.text3} size={14} />
+              </View>
+            </PressableScale>
+
+            {papierkorbOffen && (
+              <View style={{ marginTop: Spacing.sm }}>
+                <Type variant="caption" tone="text3" style={{ marginBottom: Spacing.sm }}>
+                  Nach {JOURNAL_TRASH_DAYS} Tagen geht ein Abend von selbst.
+                </Type>
+                {imPapierkorb.map((e, i) => (
+                  <View key={e.id}>
+                    {i > 0 && <Seam marginVertical={Spacing.sm} />}
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm, paddingVertical: Spacing.xs }}>
+                      <View style={{ flex: 1 }}>
+                        <Type variant="label" tone="text2" tabular>{formatDueDate(e.date, today)}</Type>
+                        <Type variant="caption" tone="text3" numberOfLines={2} style={{ marginTop: 2 }}>
+                          {e.text.trim()}
+                        </Type>
+                      </View>
+                      <PressableScale
+                        accessibilityLabel={`Betrachtung vom ${e.date} wiederherstellen`}
+                        onPress={() => {
+                          hapticSuccess();
+                          restore.mutate(e.id);
+                          setConfirmPurge(null);
+                        }}
+                        style={{ padding: Spacing.xs }}
+                      >
+                        <RotateCcw size={17} color={colors.teal} strokeWidth={2} />
+                      </PressableScale>
+                      <PressableScale
+                        accessibilityLabel={
+                          confirmPurge === e.id
+                            ? `Betrachtung vom ${e.date} endgültig löschen`
+                            : `Betrachtung vom ${e.date} endgültig löschen — bestätigen`
+                        }
+                        onPress={() => {
+                          if (confirmPurge !== e.id) {
+                            hapticSelect();
+                            setConfirmPurge(e.id);
+                            return;
+                          }
+                          hapticSuccess();
+                          remove.mutate(e.id);
+                          setConfirmPurge(null);
+                        }}
+                        style={{ padding: Spacing.xs }}
+                      >
+                        {confirmPurge === e.id ? (
+                          <Type variant="caption" tone="indigo">Endgültig?</Type>
+                        ) : (
+                          <Trash2 size={17} color={colors.indigo} strokeWidth={2} />
+                        )}
+                      </PressableScale>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+          </GlassPanel>
+        </Reveal>
+      )}
+
       <KeyboardDoneBar />
     </Screen>
   );

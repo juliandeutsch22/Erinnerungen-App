@@ -4,7 +4,7 @@ import type { JournalEntry } from '@/data/JournalRepository';
 import { groupJournal, journalStreak } from './journalLogic';
 
 const e = (date: string, text = 'Guter Tag.'): JournalEntry => ({
-  id: date, date, text, createdAt: `${date}T21:00:00.000Z`, updatedAt: `${date}T21:00:00.000Z`,
+  id: date, date, text, deletedAt: null, createdAt: `${date}T21:00:00.000Z`, updatedAt: `${date}T21:00:00.000Z`,
 });
 
 describe('journalStreak', () => {

@@ -225,8 +225,8 @@ describe('SqliteNoteRepository', () => {
 describe('SqliteJournalRepository', () => {
   it('hält pro Tag genau einen Eintrag — der zweite ersetzt den Text, nicht die Zeile', async () => {
     const { journal } = await frisch();
-    await journal.upsert({ id: 'j1', date: '2026-07-30', text: 'Ruhiger Tag.', createdAt: 'A', updatedAt: 'A' });
-    await journal.upsert({ id: 'j2', date: '2026-07-30', text: 'Doch nicht so ruhig.', createdAt: 'B', updatedAt: 'B' });
+    await journal.upsert({ id: 'j1', date: '2026-07-30', text: 'Ruhiger Tag.', deletedAt: null, createdAt: 'A', updatedAt: 'A' });
+    await journal.upsert({ id: 'j2', date: '2026-07-30', text: 'Doch nicht so ruhig.', deletedAt: null, createdAt: 'B', updatedAt: 'B' });
     const alle = await journal.getAll();
     expect(alle).toHaveLength(1);
     // id und createdAt gehören dem ERSTEN Eintrag des Tages.
@@ -236,10 +236,37 @@ describe('SqliteJournalRepository', () => {
     expect(alle[0].updatedAt).toBe('B');
   });
 
+  it('legt in den Papierkorb, holt zurück und löscht erst dann endgültig', async () => {
+    const { journal } = await frisch();
+    await journal.upsert({ id: 'j1', date: '2026-07-30', text: 'Ruhiger Tag.', deletedAt: null, createdAt: 'A', updatedAt: 'A' });
+    await journal.setDeletedAt('j1', '2026-07-31T20:00:00.000Z');
+    expect((await journal.getAll())[0].deletedAt).toBe('2026-07-31T20:00:00.000Z');
+    // Die Zeile ist noch DA — genau das ist der Unterschied zu vorher.
+    expect(await journal.getAll()).toHaveLength(1);
+
+    await journal.setDeletedAt('j1', null);
+    expect((await journal.getAll())[0].deletedAt).toBeNull();
+
+    await journal.remove('j1');
+    expect(await journal.getAll()).toEqual([]);
+  });
+
+  it('holt einen Abend zurück, sobald man an dem Tag wieder schreibt', async () => {
+    const { journal } = await frisch();
+    await journal.upsert({ id: 'j1', date: '2026-07-30', text: 'Erst so.', deletedAt: null, createdAt: 'A', updatedAt: 'A' });
+    await journal.setDeletedAt('j1', '2026-07-31T20:00:00.000Z');
+    // Ohne diese Zusage stünde der neue Text da, der Eintrag bliebe gelöscht.
+    await journal.upsert({ id: 'j9', date: '2026-07-30', text: 'Doch anders.', deletedAt: null, createdAt: 'B', updatedAt: 'B' });
+    const [e] = await journal.getAll();
+    expect(e.deletedAt).toBeNull();
+    expect(e.text).toBe('Doch anders.');
+    expect(e.id).toBe('j1');
+  });
+
   it('gibt die neuesten Tage zuerst', async () => {
     const { journal } = await frisch();
     for (const d of ['2026-07-28', '2026-07-30', '2026-07-29']) {
-      await journal.upsert({ id: `j-${d}`, date: d, text: d, createdAt: d, updatedAt: d });
+      await journal.upsert({ id: `j-${d}`, date: d, text: d, deletedAt: null, createdAt: d, updatedAt: d });
     }
     expect((await journal.getAll()).map((e: { date: string }) => e.date)).toEqual(['2026-07-30', '2026-07-29', '2026-07-28']);
   });

@@ -423,6 +423,8 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
       id: str(j.id) ? j.id : newId(),
       date: j.date,
       text: j.text,
+      // Ältere Backups kennen den Papierkorb nicht — dort lebt alles.
+      deletedAt: str(j.deletedAt) ? j.deletedAt : null,
       createdAt: str(j.createdAt) ? j.createdAt : new Date().toISOString(),
       updatedAt: str(j.updatedAt) ? j.updatedAt : new Date().toISOString(),
     });

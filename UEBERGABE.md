@@ -1273,6 +1273,35 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
       Dateisystem-Verhalten, WAL, Migration einer bestehenden Installation mit
       Altdaten. Dafür gibt es nur das Gerät.
 
+58. **Die Abendbetrachtung bekommt einen Papierkorb** (v1.62.0). Sie war der
+    EINZIGE Inhalt der App, der beim Löschen sofort und endgültig verschwand:
+    Aufgaben, Listen, Notizen und Chats haben alle ihre 30 Tage. Ausgerechnet
+    das Persönlichste hatte keine — und ein Abend, den man aus einer Laune
+    löscht, war unwiederbringlich.
+    · `JournalEntry.deletedAt` (Migration `ALTER TABLE journal ADD COLUMN
+      deleted_at TEXT`), `setDeletedAt(id, wert)` legt hinein und holt zurück,
+      `remove` bleibt das Endgültige.
+    · **Getrennt wird in den Hooks, nicht in den Bildschirmen:** `useJournal()`
+      liefert nur Lebendes, `useJournalTrash()` nur den Papierkorb. Damit
+      bleiben Abendkarte, stille Kette, Gruppierung und „Heute" richtig, ohne
+      dass jeder Aufrufer an `deletedAt` denken muss — genau die Buchhaltung,
+      die man beim dritten vergisst.
+    · **Schreiben holt zurück.** Schreibt man an einem Tag erneut, dessen
+      Eintrag im Papierkorb liegt, lebt er wieder. Sonst stünde der neue Text
+      da und der Eintrag bliebe gelöscht — eine Falle, kein Verhalten.
+    · Im Verlauf erscheint der Papierkorb NUR, wenn etwas drin liegt (eine
+      Zeile „Papierkorb (0)" wäre eine Erinnerung an nichts). Tipp stellt
+      wieder her, Endgültig ist zweistufig, nach 30 Tagen räumt der Bildschirm
+      beim Aufschlagen selbst ab — dieselbe Grammatik wie im Verwalter.
+    · **Ein Fund beim Bauen, den die Tour gefangen hat:** die erste Fassung von
+      `InMemoryJournalRepository.setDeletedAt` änderte den Eintrag AN ORT UND
+      STELLE (`e.deletedAt = …`). Die Änderung wanderte damit rückwirkend in
+      den bereits ausgelieferten Cache von TanStack Query; dessen
+      Struktur-Vergleich fand keinen Unterschied und rendert nicht neu — der
+      Eintrag war gelöscht und stand trotzdem noch da. Alle anderen InMemory-
+      Repositories machten es von Anfang an richtig (`{ ...existing, ...patch }`).
+      Ein Test hält es jetzt fest.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**
