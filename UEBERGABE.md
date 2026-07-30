@@ -1395,6 +1395,56 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
       einem Sheet mit 32 px Eckradius — Inhalt, der unter eine gerundete Ecke
       rutscht, sieht falsch aus. Braucht eine eigene Überlegung.
 
+62. **„Neu anlegen" spricht endlich eine Sprache** (`components/NeuKnopf.tsx`,
+    v1.66.0). Es gab SIEBEN Formen für dieselbe Handlung, und keine war eine
+    Entscheidung — sie waren nacheinander entstanden: nacktes Plus auf Heute
+    und Notizen; dasselbe Plus im Assistenten, aber eine Zeile HÖHER in der
+    Kopfleiste; `CalendarPlus` statt `Plus` im Kalender; Geister-Karte am
+    Rasterende auf Listen; teal Textlink „Neuer Filter"; satter blauer
+    Primär-Knopf im Listen-Detail; Plus 18 inline in der Notiz-Checkliste.
+    · **Das Problem war nie die Zahl der Formen** — ein Raster braucht eine
+      andere Geste als eine Kopfzeile. Es war, dass es keine REGEL gab, die
+      man aussprechen kann. Jetzt hat sie vier Sätze: `NeuKnopf` = Nebenweg
+      des BILDSCHIRMS (Kopfzeile, ganz rechts, auf Titelhöhe) · `NeuLink` =
+      Nebenweg eines ABSCHNITTS (neben der Eyebrow) · Geister-Karte = Nebenweg
+      in einem RASTER · Primär-Knopf = HAUPTHANDLUNG eines Detail-Bildschirms.
+    · **Der letzte Fall ist fast leer.** Solange die EINE Zeile unten steht und
+      dasselbe tut, ist Anlegen fast nie die Haupthandlung — deshalb ist der
+      Knopf im Listen-Detail jetzt sekundär. Vorher war er das Lauteste auf dem
+      Bildschirm, für einen Nebenweg, während der Hauptweg darunter flüsterte.
+    · Die Glyphe ist IMMER `Plus`. `CalendarPlus` erklärte nichts, was der
+      Bildschirm nicht schon sagt, und machte aus einem wiedererkennbaren
+      Symbol vier.
+    · **`ScreenKopf` legt die Aktionen in die TITELZEILE**, nicht neben die
+      ganze Kopf-Spalte. Mit `alignItems: 'flex-end'` über Titel UND Zähl-Zeile
+      rutschte das Plus auf die Höhe der Zähl-Zeile — auf „Notizen" saß es
+      dadurch 21 px unter dem Titel, im „Assistenten" (ohne Zähl-Zeile in
+      derselben Zeile) genau richtig. Dasselbe Bauteil, zwei Höhen.
+    · **Das negative Margin gehört in die Komponente.** Die Trefferfläche ist
+      rundum 8 px größer als die Glyphe; ohne Ausgleich steht das Plus optisch
+      8 px vor dem Inhaltsrand. Als Aufruf-Argument hatten es zwei von drei
+      Bildschirmen — die Tour hat den Unterschied gemessen (406 vs 414).
+
+    **Und der eigentliche Punkt: der ausführliche Weg ERBT jetzt.**
+    Steht „Winterreifen einlagern" in der EINEN Zeile und man tippt auf das
+    Plus, öffnet der Editor mit genau diesem Titel. Vorher war der halbe Satz
+    weg, und die beiden Wege standen als Konkurrenten nebeneinander — zwei
+    Pluse auf einem Bildschirm, beide legen an, und der Nutzer muss raten.
+    Jetzt ist es eine Steigerung: **unten anfangen, oben weitermachen.**
+    · **Geleert wird die Zeile erst beim Anlegen**, nicht beim Öffnen. Dafür
+      tragen `TaskEditorSheet` und `EventEditorSheet` ein `onSaved` neben
+      `onClose`. Wer den Editor abbricht, findet seinen Entwurf unten wieder —
+      hätte die Zeile beim Öffnen geleert, wäre das eine neue Falle gewesen.
+    · Bei der NOTIZ gibt es kein Abbrechen (sie entsteht sofort), dort wandert
+      der Entwurf in den Rumpf und die Zeile wird direkt geleert.
+    · `defaultTitle` wirkt nur beim ANLEGEN — beim Bearbeiten gehört der Titel
+      der Sache. Und nur der ausdrückliche „Neu"-Knopf erbt: andere Aufrufer
+      von `setEditorTask(null)` setzen `neuTitel` nicht.
+    · Nebenbei: der Notizen-Leerzustand nennt nicht mehr NUR das Plus.
+    · `scratchpad/anlegen.mjs` (16 Prüfungen) misst die Höhen gegen die
+      Titel-Grundlinie, die rechte Kante über drei Bildschirme, die Füllung des
+      Listen-Detail-Knopfs und die ganze Erb-Kette inklusive „abbrechen".
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

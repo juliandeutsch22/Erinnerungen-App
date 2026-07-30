@@ -6,13 +6,15 @@
 // „Zuletzt gelöscht" (30 Tage) unten: Tippen stellt wieder her,
 // Swipe links löscht endgültig; Abgelaufenes wird beim Öffnen entfernt.
 import { useRouter } from 'expo-router';
-import { ListChecks, NotebookPen, Pin, Plus } from 'lucide-react-native';
+import { ListChecks, NotebookPen, Pin } from 'lucide-react-native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import ReanimatedSwipeable, { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 
 import { DisclosureChevron } from '@/components/DisclosureChevron';
 import { GlassPanel } from '@/components/GlassPanel';
+import { NeuKnopf, ScreenKopf } from '@/components/NeuKnopf';
+import { useZeileDraft } from '@/lib/zeileDraft';
 import { PressableScale } from '@/components/PressableScale';
 import { Reveal } from '@/components/Reveal';
 import { QuickAdd } from '@/components/QuickAdd';
@@ -54,30 +56,35 @@ export default function NotizenScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notes, today]);
 
+  // „+" erbt, was in der EINEN Zeile steht: eine Notiz entsteht sofort, also
+  // wandert der Entwurf mit hinein und die Zeile wird geleert. Anders als bei
+  // Aufgabe und Termin gibt es hier kein „abbrechen" — die Notiz ist da.
+  const zeileText = useZeileDraft((s) => s.text);
+  const zeileLeeren = useZeileDraft((s) => s.leeren);
   const openNew = () => {
     hapticSuccess();
+    const anfang = zeileText.trim();
     createNote.mutate(
-      {},
+      anfang.length > 0 ? { body: anfang } : {},
       { onSuccess: (note) => router.push(`/notiz/${note.id}`) },
     );
+    if (anfang.length > 0) zeileLeeren();
   };
 
   return (
     <View style={{ flex: 1 }}>
     <Screen contentContainerStyle={{ paddingBottom: TAB_BAR_SAFE_BOTTOM + QUICK_ADD_CLEARANCE }}>
       <Reveal>
-        <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-          <View style={{ gap: Spacing.xs, flex: 1 }}>
-            <Type variant="title">Notizen</Type>
-            {/* Ruhige Zähl-Zeile — dieselbe Stimme wie die anderen Tabs. */}
-            <Type variant="caption" tone="text3" tabular>
+        <ScreenKopf
+          titel={<Type variant="title">Notizen</Type>}
+          /* Ruhige Zähl-Zeile — dieselbe Stimme wie die anderen Tabs. */
+          unter={
+            <Type variant="caption" tone="text3" style={{ marginTop: Spacing.xs }} tabular>
               {active.length === 1 ? '1 Notiz' : `${active.length} Notizen`}
             </Type>
-          </View>
-          <PressableScale accessibilityLabel="Neue Notiz" onPress={openNew} style={{ padding: Spacing.sm }}>
-            <Plus size={22} color={colors.teal} strokeWidth={2.2} />
-          </PressableScale>
-        </View>
+          }
+          aktionen={<NeuKnopf label="Neue Notiz" onPress={openNew} />}
+        />
       </Reveal>
 
       <Reveal delay={90}>
@@ -88,7 +95,7 @@ export default function NotizenScreen() {
             <EmptyState
               icon={<NotebookPen size={20} color={colors.teal} strokeWidth={2} />}
               title="Noch keine Notizen"
-              body="Gedanken, Ideen, Mitschriften — alles, was keine Aufgabe ist. Tippe auf das Plus."
+              body="Gedanken, Ideen, Mitschriften — alles, was keine Aufgabe ist. Schreib unten in die Zeile oder tippe oben auf das Plus."
             />
           ) : (
             <>

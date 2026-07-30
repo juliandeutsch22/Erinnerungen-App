@@ -53,13 +53,25 @@ export function TaskEditorSheet({
   task,
   defaultListId,
   defaultDueDate,
+  defaultTitle,
   onClose,
+  onSaved,
 }: {
   /** null = neue Aufgabe. */
   task: Task | null;
   defaultListId?: string;
   defaultDueDate?: string | null;
+  /**
+   * Starttitel für eine NEUE Aufgabe — das, was schon in der EINEN Zeile
+   * stand, als der ausführliche Weg aufgerufen wurde. Damit sind die beiden
+   * Wege keine Konkurrenz, sondern eine Steigerung: unten anfangen, oben
+   * weitermachen. Beim BEARBEITEN wirkungslos (der Titel gehört der Aufgabe).
+   */
+  defaultTitle?: string;
   onClose: () => void;
+  /** Wurde wirklich etwas angelegt/gesichert? Erst dann darf der Aufrufer die
+   *  Zeile leeren — bei „abbrechen" bleibt der Entwurf, wo er war. */
+  onSaved?: () => void;
 }) {
   const colors = useColors();
   const today = todayStr();
@@ -69,7 +81,7 @@ export function TaskEditorSheet({
   const deleteTask = useDeleteTask();
   const defaultDueTime = useSettings((s) => s.defaultDueTime);
 
-  const [title, setTitle] = useState(task?.title ?? '');
+  const [title, setTitle] = useState(task?.title ?? defaultTitle ?? '');
   const [note, setNote] = useState(task?.note ?? '');
   const [listId, setListId] = useState(task?.listId ?? defaultListId ?? lists?.[0]?.id ?? 'default');
   const [dueDate, setDueDate] = useState<string | null>(task?.dueDate ?? defaultDueDate ?? null);
@@ -185,6 +197,7 @@ export function TaskEditorSheet({
       createTask.mutate(payload);
       hapticSuccess();
     }
+    onSaved?.();
     onClose();
   };
 

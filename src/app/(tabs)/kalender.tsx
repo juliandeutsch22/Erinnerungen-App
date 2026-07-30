@@ -3,7 +3,7 @@
 // EventKit) UND die eigenen Erinnerungen des Tages. Termine lassen sich
 // anlegen, bearbeiten und löschen; Erinnerungen öffnen ihren Editor.
 import { useRouter } from 'expo-router';
-import { CalendarPlus, Images, Sun, Target } from 'lucide-react-native';
+import { Images, Sun, Target } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 
@@ -14,6 +14,8 @@ import { EventEditorSheet } from '@/components/EventEditorSheet';
 import { WeekStrip } from '@/components/WeekStrip';
 import { EventRow } from '@/components/EventRow';
 import { GlassPanel } from '@/components/GlassPanel';
+import { NeuKnopf } from '@/components/NeuKnopf';
+import { useZeileDraft } from '@/lib/zeileDraft';
 import { PressableScale } from '@/components/PressableScale';
 import { RescheduleSheet } from '@/components/RescheduleSheet';
 import { Reveal } from '@/components/Reveal';
@@ -61,6 +63,16 @@ export default function KalenderScreen() {
     setAnchor({ year: d.getFullYear(), month: d.getMonth() });
   };
   const [editorEvent, setEditorEvent] = useState<DeviceEvent | null | undefined>(undefined);
+
+  // „+" erbt, was in der EINEN Zeile steht (siehe „Heute"). Geleert wird sie
+  // erst, wenn wirklich ein Termin entstanden ist.
+  const zeileText = useZeileDraft((s) => s.text);
+  const zeileLeeren = useZeileDraft((s) => s.leeren);
+  const [neuTitel, setNeuTitel] = useState('');
+  const oeffneTermin = () => {
+    setNeuTitel(zeileText.trim());
+    setEditorEvent(null);
+  };
   const [editorTask, setEditorTask] = useState<Task | null>(null);
   const [rescheduleTask, setRescheduleTask] = useState<Task | null>(null);
   const [quickTask, setQuickTask] = useState<Task | null>(null);
@@ -185,13 +197,7 @@ export default function KalenderScreen() {
               <Images size={21} color={colors.text3} strokeWidth={2} />
             </PressableScale>
             {granted && writableExists && (
-              <PressableScale
-                accessibilityLabel="Neuer Termin"
-                onPress={() => setEditorEvent(null)}
-                style={{ padding: Spacing.sm }}
-              >
-                <CalendarPlus size={22} color={colors.teal} strokeWidth={2.2} />
-              </PressableScale>
+              <NeuKnopf label="Neuer Termin" onPress={oeffneTermin} />
             )}
           </View>
         </View>
@@ -357,8 +363,15 @@ export default function KalenderScreen() {
         <EventEditorSheet
           event={editorEvent}
           defaultDate={selected}
+          defaultTitle={neuTitel}
           calendars={calendars ?? []}
-          onClose={() => setEditorEvent(undefined)}
+          onClose={() => {
+            setEditorEvent(undefined);
+            setNeuTitel('');
+          }}
+          onSaved={() => {
+            if (neuTitel.length > 0) zeileLeeren();
+          }}
         />
       )}
       {editorTask && <TaskEditorSheet task={editorTask} onClose={() => setEditorTask(null)} />}

@@ -22,6 +22,7 @@ import { Screen } from '@/components/Screen';
 import { Seam } from '@/components/Seam';
 import { EmptyState } from '@/components/StateView';
 import { TaskEditorSheet } from '@/components/TaskEditorSheet';
+import { useZeileDraft } from '@/lib/zeileDraft';
 import { TaskQuickSheet } from '@/components/TaskQuickSheet';
 import { TaskRow } from '@/components/TaskRow';
 import { Type } from '@/components/Type';
@@ -63,6 +64,15 @@ export default function ListeDetailScreen() {
   const reopenList = useReopenList();
 
   const [editorTask, setEditorTask] = useState<Task | null | undefined>(undefined);
+
+  // „Neue Aufgabe" erbt, was in der EINEN Zeile steht (siehe „Heute").
+  const zeileText = useZeileDraft((s) => s.text);
+  const zeileLeeren = useZeileDraft((s) => s.leeren);
+  const [neuTitel, setNeuTitel] = useState('');
+  const oeffneAufgabe = () => {
+    setNeuTitel(zeileText.trim());
+    setEditorTask(null);
+  };
   const [rescheduleTask, setRescheduleTask] = useState<Task | null>(null);
   const [quickTask, setQuickTask] = useState<Task | null>(null);
   const [editList, setEditList] = useState(false);
@@ -295,10 +305,15 @@ export default function ListeDetailScreen() {
         </GlassPanel>
       </Reveal>
 
+      {/* SEKUNDÄR, nicht primär (§8.62). Bis v1.65 war das hier ein satter
+          blauer Block über die volle Breite — das Lauteste auf dem Bildschirm,
+          für einen NEBENweg: die EINE Zeile steht darunter und tut dasselbe.
+          Ein Nebenweg, der schreit, während der Hauptweg flüstert, verkehrt
+          die Rangfolge. Als ruhige Glas-Well sagt er „auch das geht". */}
       <Reveal delay={150}>
-        <GlassButton accessibilityLabel="Neue Aufgabe" onPress={() => setEditorTask(null)}>
-          <Plus size={18} color="#FFFFFF" strokeWidth={2.4} />
-          <Type variant="label" style={{ color: '#FFFFFF' }}>Neue Aufgabe</Type>
+        <GlassButton variant="secondary" accessibilityLabel="Neue Aufgabe" onPress={oeffneAufgabe}>
+          <Plus size={18} color={colors.teal} strokeWidth={2.4} />
+          <Type variant="label" tone="teal">Neue Aufgabe</Type>
         </GlassButton>
       </Reveal>
 
@@ -307,7 +322,14 @@ export default function ListeDetailScreen() {
           task={editorTask}
           defaultListId={list?.id}
           defaultDueDate={id === 'geplant' ? today : null}
-          onClose={() => setEditorTask(undefined)}
+          defaultTitle={neuTitel}
+          onClose={() => {
+            setEditorTask(undefined);
+            setNeuTitel('');
+          }}
+          onSaved={() => {
+            if (neuTitel.length > 0) zeileLeeren();
+          }}
         />
       )}
       {rescheduleTask && <RescheduleSheet task={rescheduleTask} onClose={() => setRescheduleTask(null)} />}

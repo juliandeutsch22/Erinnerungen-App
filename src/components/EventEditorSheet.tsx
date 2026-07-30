@@ -50,14 +50,20 @@ type WhenRow = 'start' | 'end';
 export function EventEditorSheet({
   event,
   defaultDate,
+  defaultTitle,
   calendars,
   onClose,
+  onSaved,
 }: {
   /** null = neuer Termin. */
   event: DeviceEvent | null;
   defaultDate: string;
+  /** Starttitel für einen NEUEN Termin — siehe TaskEditorSheet. */
+  defaultTitle?: string;
   calendars: DeviceCalendar[];
   onClose: () => void;
+  /** Es wurde wirklich etwas angelegt/gesichert. */
+  onSaved?: () => void;
 }) {
   const colors = useColors();
   const today = todayStr();
@@ -77,7 +83,7 @@ export function EventEditorSheet({
       : toDateStr(event.end)
     : defaultDate;
 
-  const [title, setTitle] = useState(event?.title ?? '');
+  const [title, setTitle] = useState(event?.title ?? defaultTitle ?? '');
   const [ort, setOrt] = useState(event?.location ?? '');
   const [notes, setNotes] = useState(event?.notes ?? '');
   const [calendarId, setCalendarId] = useState(event?.calendarId ?? writable[0]?.id ?? '');
@@ -145,6 +151,7 @@ export function EventEditorSheet({
       createEvent.mutate({ calendarId, draft });
       hapticSuccess();
     }
+    onSaved?.();
     onClose();
   };
 

@@ -10,6 +10,7 @@ import ReanimatedSwipeable, { SwipeableMethods } from 'react-native-gesture-hand
 import { DisclosureChevron } from '@/components/DisclosureChevron';
 import { Glass } from '@/components/Glass';
 import { GlassPanel } from '@/components/GlassPanel';
+import { NeuLink } from '@/components/NeuKnopf';
 import { ListEditorSheet } from '@/components/ListEditorSheet';
 import { listIcon } from '@/components/listMeta';
 import { PressableScale } from '@/components/PressableScale';
@@ -111,10 +112,9 @@ export default function ListenScreen() {
         <View style={{ gap: Spacing.sm }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <Type variant="eyebrow" tone="text3">Filter</Type>
-            <PressableScale accessibilityLabel="Neuer Filter" onPress={() => router.push('/filter')} style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, padding: Spacing.xs }}>
-              <SlidersHorizontal size={14} color={colors.teal} strokeWidth={2} />
-              <Type variant="label" tone="teal">Neuer Filter</Type>
-            </PressableScale>
+            {/* Gehört zum ABSCHNITT „Filter", nicht zum Bildschirm — deshalb
+                ein Link neben der Eyebrow und kein Plus in der Kopfzeile. */}
+            <NeuLink label="Neuer Filter" icon={SlidersHorizontal} onPress={() => router.push('/filter')} />
           </View>
           {savedFilters.length > 0 && (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm }}>

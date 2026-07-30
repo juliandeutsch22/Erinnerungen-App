@@ -3,12 +3,14 @@
 // Uhrzeit auf EINER Glass-Fläche mit Seams, plus dünne Fortschrittslinie und
 // einklappbare „Erledigt heute"-Sektion. Abhaken = Teal-Puls + Haptik.
 import { useRouter } from 'expo-router';
-import { CalendarCheck, CalendarDays, Mic, Plus, Settings, Sparkles, Sun } from 'lucide-react-native';
+import { CalendarCheck, CalendarDays, Mic, Settings, Sparkles, Sun } from 'lucide-react-native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { TextInput, View } from 'react-native';
 
 import { DisclosureChevron } from '@/components/DisclosureChevron';
 import { EventEditorSheet } from '@/components/EventEditorSheet';
+import { NeuKnopf } from '@/components/NeuKnopf';
+import { useZeileDraft } from '@/lib/zeileDraft';
 import { EventRow } from '@/components/EventRow';
 import { GlassPanel } from '@/components/GlassPanel';
 import { JournalCard } from '@/components/JournalCard';
@@ -89,6 +91,19 @@ export default function HeuteScreen() {
   const intention = useSettings((st) => st.dayIntentions[today]);
   const setDayIntention = useSettings((st) => st.setDayIntention);
   const [intentionSheet, setIntentionSheet] = useState(false);
+
+  // „+" — der ausführliche Weg ERBT, was schon in der EINEN Zeile steht.
+  // Vorher war der halbe Satz beim Tippen aufs Plus einfach weg, und die
+  // beiden Wege standen als Konkurrenten nebeneinander. Geleert wird die
+  // Zeile erst, wenn der Editor wirklich etwas angelegt hat — wer abbricht,
+  // findet seinen Entwurf unten wieder.
+  const zeileText = useZeileDraft((s) => s.text);
+  const zeileLeeren = useZeileDraft((s) => s.leeren);
+  const [neuTitel, setNeuTitel] = useState('');
+  const oeffneAufgabe = () => {
+    setNeuTitel(zeileText.trim());
+    setEditorTask(null);
+  };
   const [intentionDraft, setIntentionDraft] = useState('');
   const listById = useMemo(() => new Map((lists ?? []).map((l) => [l.id, l])), [lists]);
 
@@ -459,13 +474,7 @@ export default function HeuteScreen() {
                 </View>
               )}
             </PressableScale>
-            <PressableScale
-              accessibilityLabel="Neue Aufgabe"
-              onPress={() => setEditorTask(null)}
-              style={{ padding: Spacing.sm, marginRight: -Spacing.sm }}
-            >
-              <Plus size={22} color={colors.teal} strokeWidth={2.2} />
-            </PressableScale>
+            <NeuKnopf label="Neue Aufgabe" onPress={oeffneAufgabe} />
           </View>
         </View>
 
@@ -626,7 +635,18 @@ export default function HeuteScreen() {
       )}
 
       {editorTask !== undefined && (
-        <TaskEditorSheet task={editorTask} defaultDueDate={today} onClose={() => setEditorTask(undefined)} />
+        <TaskEditorSheet
+          task={editorTask}
+          defaultDueDate={today}
+          defaultTitle={neuTitel}
+          onClose={() => {
+            setEditorTask(undefined);
+            setNeuTitel('');
+          }}
+          onSaved={() => {
+            if (neuTitel.length > 0) zeileLeeren();
+          }}
+        />
       )}
       {rescheduleTask && <RescheduleSheet task={rescheduleTask} onClose={() => setRescheduleTask(null)} />}
       {quickTask && (

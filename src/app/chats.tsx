@@ -3,13 +3,14 @@
 // Kalender-Glyph. Swipe links = löschen. Ohne API-Schlüssel erklärt die
 // Seite die Einrichtung (Feature ist strikt opt-in).
 import { useRouter } from 'expo-router';
-import { BrainCircuit, CalendarDays, ChevronLeft, ListTodo, NotebookPen, Plus, Sparkles } from 'lucide-react-native';
+import { BrainCircuit, CalendarDays, ChevronLeft, ListTodo, NotebookPen, Sparkles } from 'lucide-react-native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import ReanimatedSwipeable, { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 
 import { DisclosureChevron } from '@/components/DisclosureChevron';
 import { GlassPanel } from '@/components/GlassPanel';
+import { NeuKnopf, ScreenKopf } from '@/components/NeuKnopf';
 import { PressableScale } from '@/components/PressableScale';
 import { Reveal } from '@/components/Reveal';
 import { SchluesselWeg } from '@/components/SchluesselWeg';
@@ -118,23 +119,26 @@ export default function ChatsScreen() {
   return (
     <Screen withTabBar={false}>
       <Reveal>
+        {/* Nur der Zurück-Pfeil steht in der Kopfleiste. Das Plus saß hier
+            früher daneben — eine Zeile HÖHER als auf allen anderen Tabs, sodass
+            es beim Wechsel sprang. Es gehört auf Titelhöhe (§8.62). */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <PressableScale accessibilityLabel="Zurück" onPress={() => router.back()} style={{ padding: Spacing.sm, marginLeft: -Spacing.sm }}>
             <ChevronLeft size={24} color={colors.text2} strokeWidth={2} />
           </PressableScale>
-          {apiKey.length > 0 && (
-            <PressableScale accessibilityLabel="Neuer Chat" onPress={openNew} style={{ padding: Spacing.sm }}>
-              <Plus size={22} color={colors.teal} strokeWidth={2.2} />
-            </PressableScale>
-          )}
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.xs }}>
-          <Sparkles size={24} color={colors.teal} strokeWidth={2} />
-          <Type variant="title">Assistent</Type>
+        <View style={{ marginTop: Spacing.xs }}>
+          <ScreenKopf
+            links={<Sparkles size={24} color={colors.teal} strokeWidth={2} />}
+            titel={<Type variant="title">Assistent</Type>}
+            unter={
+              <Type variant="caption" tone="text3" style={{ marginTop: 2 }} tabular>
+                {active.length === 1 ? '1 Chat' : `${active.length} Chats`}
+              </Type>
+            }
+            aktionen={apiKey.length > 0 ? <NeuKnopf label="Neuer Chat" onPress={openNew} /> : undefined}
+          />
         </View>
-        <Type variant="caption" tone="text3" style={{ marginTop: 2 }} tabular>
-          {active.length === 1 ? '1 Chat' : `${active.length} Chats`}
-        </Type>
       </Reveal>
 
       {apiKey.length > 0 && (
