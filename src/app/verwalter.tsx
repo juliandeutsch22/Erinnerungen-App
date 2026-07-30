@@ -17,6 +17,7 @@ import { LIST_COLORS } from '@/components/listMeta';
 import { MarkdownText } from '@/components/MarkdownText';
 import { PressableScale } from '@/components/PressableScale';
 import { Reveal } from '@/components/Reveal';
+import { SchluesselWeg } from '@/components/SchluesselWeg';
 import { Screen } from '@/components/Screen';
 import { Type } from '@/components/Type';
 import { useCreateAssistantEvents, useDeviceEvents } from '@/data/calendarQueries';
@@ -226,9 +227,15 @@ export default function VerwalterScreen() {
 
       {apiKey.length === 0 ? (
         <Reveal delay={40}>
-          <Type variant="caption" tone="text3" style={{ marginTop: Spacing.md }}>
-            Dafür brauchst du den Assistenten — Schlüssel unter Einstellungen → Assistent.
-          </Type>
+          <View style={{ marginTop: Spacing.md }}>
+            <Type variant="caption" tone="text3">
+              Dafür brauchst du den Assistenten. Er nutzt deinen eigenen Google-Schlüssel und bleibt
+              aus, bis du einen hinterlegst.
+            </Type>
+            {/* Die letzte Stelle, die die Wege-Runde (§8.56) übersehen hat: hier
+                stand ein Verweis auf die Einstellungen ohne Weg dorthin. */}
+            <SchluesselWeg />
+          </View>
         </Reveal>
       ) : (
         <>

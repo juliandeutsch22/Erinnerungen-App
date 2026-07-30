@@ -20,7 +20,7 @@ import { SchluesselWeg } from '@/components/SchluesselWeg';
 import { betrifftSchluessel } from '@/lib/schluessel';
 import { Type } from '@/components/Type';
 import type { Task } from '@/data/types';
-import { type AssistantAction, describeAenderung, describeExtras, describeSchritte, ortZusatz, terminDatum, resolveTaskHandle } from '@/lib/assistant';
+import { type AssistantAction, describeAenderung, describeExtras, describeSchritte, terminUnter, resolveTaskHandle } from '@/lib/assistant';
 import type { AssistantRun } from '@/lib/assistantRun';
 import { formatDueDate } from '@/lib/dates';
 import { warteText, type AssistentGrund } from '@/lib/inputRoute';
@@ -67,7 +67,7 @@ export function omniZeilen(a: AssistantAction, tasks: Task[], today: string): Om
     ...a.termine.map((t, i) => ({
       key: `t${i}`,
       titel: t.titel,
-      unter: `${terminDatum(t, (d) => formatDueDate(d, today))}${t.start ? ` · ${t.start}` : ' · ganztägig'}${ortZusatz(t)}`,
+      unter: terminUnter(t, (d) => formatDueDate(d, today)),
       art: 'Termin',
       editierbar: true,
     })),

@@ -24,7 +24,7 @@ import type { Task } from '@/data/types';
 import { newId } from '@/data/types';
 import { todayStr } from '@/lib/dates';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
-import { applyFilter, type FilterRange, tagCounts } from '@/lib/taskFilters';
+import { filterGrund, applyFilter, type FilterRange, tagCounts } from '@/lib/taskFilters';
 import { webNoOutline } from '@/theme/layout';
 import { useSettings } from '@/theme/settings.store';
 import { useColors } from '@/theme/ThemeProvider';
@@ -37,6 +37,23 @@ const RANGES: { value: FilterRange; label: string }[] = [
   { value: 'overdue', label: 'Überfällig' },
   { value: 'undated', label: 'Ohne Datum' },
 ];
+
+/** Der Satz zum Grund. Bewusst hier und nicht in `taskFilters`: das ist
+ *  Sprache, keine Ableitung — und die Sprache gehört zum Bildschirm. */
+function leerText(grund: ReturnType<typeof filterGrund>): string {
+  if (grund.art === 'keine-aufgaben') return 'Es gibt noch gar keine Aufgaben — ein Filter kann nichts finden, was nicht da ist.';
+  if (grund.art === 'zusammen') return 'Die Kriterien zusammen lassen nichts übrig. Nimm eines davon zurück.';
+  switch (grund.feld) {
+    case 'tags':
+      return 'Keine Aufgabe trägt alle diese Schlagwörter. Ohne sie gäbe es Treffer.';
+    case 'flagged':
+      return 'Keine der Aufgaben ist geflaggt. Ohne die Flagge gäbe es Treffer.';
+    case 'range':
+      return 'In diesem Zeitraum liegt nichts. Über alle Zeiträume gäbe es Treffer.';
+    case 'erledigte':
+      return 'Alles davon ist schon erledigt — nimm „Erledigte" dazu, dann siehst du es.';
+  }
+}
 
 export default function FilterScreen() {
   // `id` öffnet einen gespeicherten Filter; `tag` öffnet eine Ad-hoc-Ansicht
@@ -202,7 +219,7 @@ export default function FilterScreen() {
       <Reveal delay={130}>
         <GlassPanel>
           {results.length === 0 ? (
-            <EmptyState title="Keine Treffer" body="Passe die Kriterien an, um Aufgaben zu finden." />
+            <EmptyState title="Keine Treffer" body={leerText(filterGrund(tasks ?? [], criteria, today))} />
           ) : (
             <View>
               {results.map((t) => (

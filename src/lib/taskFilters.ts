@@ -80,3 +80,48 @@ export function taskMatchesQuery(task: Task, q: string): boolean {
     task.subtasks.some((s) => s.title.toLowerCase().includes(q))
   );
 }
+
+/**
+ * WARUM ist die Filter-Ausbeute leer?
+ *
+ * „Passe die Kriterien an" war die alte Antwort — sie schiebt dem Nutzer die
+ * Arbeit zu und sagt nicht, WELCHES der vier Kriterien alles wegräumt. Hier
+ * wird jedes einzeln gelockert: hilft genau EINES, ist es der Schuldige und
+ * wird benannt. Helfen mehrere oder keines, war es die Kombination — auch das
+ * ist eine ehrliche Auskunft, nur eben eine andere.
+ */
+export type FilterFeld = 'tags' | 'flagged' | 'range' | 'erledigte';
+
+export type FilterGrund =
+  | { art: 'keine-aufgaben' }
+  | { art: 'kriterium'; feld: FilterFeld }
+  | { art: 'zusammen' };
+
+type Kriterien = Omit<SavedFilter, 'id' | 'name'>;
+
+/** Schränkt dieses Kriterium überhaupt ein? Ein unbenutztes kann nicht schuld sein. */
+function schraenktEin(f: Kriterien, feld: FilterFeld): boolean {
+  switch (feld) {
+    case 'tags':
+      return f.tags.length > 0;
+    case 'flagged':
+      return f.flagged;
+    case 'range':
+      return f.range !== 'all';
+    case 'erledigte':
+      return !f.includeCompleted;
+  }
+}
+
+export function filterGrund(tasks: Task[], f: Kriterien, today: string): FilterGrund {
+  if (tasks.length === 0) return { art: 'keine-aufgaben' };
+
+  const gelockert: { feld: FilterFeld; ohne: Kriterien }[] = [
+    { feld: 'tags', ohne: { ...f, tags: [] } },
+    { feld: 'flagged', ohne: { ...f, flagged: false } },
+    { feld: 'range', ohne: { ...f, range: 'all' } },
+    { feld: 'erledigte', ohne: { ...f, includeCompleted: true } },
+  ];
+  const helfen = gelockert.filter((k) => schraenktEin(f, k.feld) && applyFilter(tasks, k.ohne, today).length > 0);
+  return helfen.length === 1 ? { art: 'kriterium', feld: helfen[0].feld } : { art: 'zusammen' };
+}

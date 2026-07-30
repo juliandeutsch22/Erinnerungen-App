@@ -32,7 +32,7 @@ import { useCreateAssistantEvents } from '@/data/calendarQueries';
 import { useCreateNote } from '@/data/noteQueries';
 import { useCompleteTask, useCreateList, useCreateTask, useDeleteTask, useLists, useUpdateTask } from '@/data/queries';
 import type { ChatMessage } from '@/data/types';
-import { type AssistantAction, askAssistant, buildBraindumpContext, describeExtras, describeSchritte, extractActions, hasCapturableActions, ortZusatz, terminDatum } from '@/lib/assistant';
+import { type AssistantAction, askAssistant, buildBraindumpContext, describeExtras, describeSchritte, extractActions, hasCapturableActions, terminUnter } from '@/lib/assistant';
 import { applyAssistantActions } from '@/lib/applyActions';
 import { RUN_QUICKVOICE, useAssistantRuns } from '@/lib/assistantRun';
 import { formatDueDate, parseDateStr, todayStr } from '@/lib/dates';
@@ -247,7 +247,7 @@ export function QuickVoiceView({
     ...(actions?.termine ?? []).map((t, i) => ({
       key: `t${i}`,
       title: t.titel,
-      sub: `${terminDatum(t, (d) => formatDueDate(d, today))}${t.start ? ` · ${t.start}${t.ende ? `–${t.ende}` : ''}` : ' · ganztägig'}${ortZusatz(t)}`,
+      sub: terminUnter(t, (d) => formatDueDate(d, today)),
       kind: 'Termin' as const,
       editable: true,
     })),

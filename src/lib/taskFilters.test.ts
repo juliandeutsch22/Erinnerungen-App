@@ -1,6 +1,6 @@
 // taskFilters.test.ts — Smart-Filter (Tags/Flagge/Zeitraum) + Tag-Zählung.
 import type { Task } from '@/data/types';
-import { applyFilter, emptyFilter, subtaskProgress, tagCounts, taskMatchesQuery } from './taskFilters';
+import { applyFilter, emptyFilter, filterGrund, subtaskProgress, tagCounts, taskMatchesQuery } from './taskFilters';
 
 const TODAY = '2026-07-03';
 
@@ -90,5 +90,56 @@ describe('taskMatchesQuery', () => {
   it('kein Treffer, wenn nichts passt; leere Query trifft nie', () => {
     expect(taskMatchesQuery(task({ title: 'Anrufen', tags: ['büro'] }), 'urlaub')).toBe(false);
     expect(taskMatchesQuery(task({ title: 'Anything' }), '')).toBe(false);
+  });
+});
+
+describe('filterGrund — WARUM ist die Ausbeute leer?', () => {
+  // „Passe die Kriterien an" war die alte Antwort: sie schiebt dem Nutzer die
+  // Arbeit zu und sagt nicht, welches der vier Kriterien alles wegräumt.
+  const offen = task({ id: 'o', title: 'Offen', tags: ['arbeit'] });
+  const erledigt = task({ id: 'e', title: 'Erledigt', completedAt: '2026-07-02T10:00:00.000Z' });
+  const geplant = task({ id: 'g', title: 'Geplant', dueDate: '2026-09-01' });
+
+  it('sagt es geradeheraus, wenn es GAR keine Aufgaben gibt', () => {
+    expect(filterGrund([], emptyFilter(), TODAY)).toEqual({ art: 'keine-aufgaben' });
+  });
+
+  it('benennt die Schlagwörter, wenn nur sie im Weg stehen', () => {
+    expect(filterGrund([offen], { ...emptyFilter(), tags: ['urlaub'] }, TODAY)).toEqual({
+      art: 'kriterium',
+      feld: 'tags',
+    });
+  });
+
+  it('benennt die Flagge', () => {
+    expect(filterGrund([offen], { ...emptyFilter(), flagged: true }, TODAY)).toEqual({
+      art: 'kriterium',
+      feld: 'flagged',
+    });
+  });
+
+  it('benennt den Zeitraum', () => {
+    expect(filterGrund([geplant], { ...emptyFilter(), range: 'today' }, TODAY)).toEqual({
+      art: 'kriterium',
+      feld: 'range',
+    });
+  });
+
+  it('benennt die ausgeblendeten Erledigten — der Fall, der am meisten verwirrt', () => {
+    expect(filterGrund([erledigt], emptyFilter(), TODAY)).toEqual({ art: 'kriterium', feld: 'erledigte' });
+  });
+
+  it('sagt „zusammen", wenn kein EINZELNES Lockern hilft', () => {
+    // Weder ohne Tag noch ohne Flagge gäbe es einen Treffer — erst beides.
+    const nur = task({ id: 'n', tags: ['arbeit'], flagged: false });
+    const g = filterGrund([nur], { ...emptyFilter(), tags: ['urlaub'], flagged: true }, TODAY);
+    expect(g).toEqual({ art: 'zusammen' });
+  });
+
+  it('zählt ein UNBENUTZTES Kriterium nie als schuldig', () => {
+    // Der Zeitraum steht auf „alle" — er kann nichts wegnehmen, also darf er
+    // auch nicht genannt werden.
+    const g = filterGrund([offen], { ...emptyFilter(), tags: ['urlaub'] }, TODAY);
+    expect(g).toEqual({ art: 'kriterium', feld: 'tags' });
   });
 });

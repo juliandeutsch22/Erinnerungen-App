@@ -15,7 +15,23 @@ import { R, Spacing } from '@/theme/theme.tokens';
 
 const THUMB = 76;
 
-export function PhotoStrip({ eventId }: { eventId: string }) {
+export function PhotoStrip({
+  eventId,
+  /**
+   * Wie viel Innen-Padding der Behälter hat — die Reihe hebt es auf und gibt
+   * es im Inhalt zurück, damit der Schnitt an der ECHTEN Kante liegt.
+   *
+   * Dieselbe Sache wie bei den Such-Chips (§8.61): endet der Scroll-Behälter
+   * INNERHALB des Paddings, wird die letzte sichtbare Kachel mittendrin
+   * abgeschnitten und daneben steht ein leerer Streifen — das liest sich wie
+   * ein Fehler, nicht wie „hier geht es weiter". Der Wert kommt vom Aufrufer,
+   * weil nur DER sein Padding kennt; im Sheet sind es `Spacing.lg`.
+   */
+  randAusgleich = 0,
+}: {
+  eventId: string;
+  randAusgleich?: number;
+}) {
   const colors = useColors();
   const { data: photos } = useEventPhotos(eventId);
   const addPhotos = useAddPhotos();
@@ -44,7 +60,12 @@ export function PhotoStrip({ eventId }: { eventId: string }) {
   return (
     <View style={{ gap: Spacing.sm }}>
       <Type variant="caption" tone="text3">Rückblick</Type>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: Spacing.sm }}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={{ marginHorizontal: -randAusgleich }}
+        contentContainerStyle={{ gap: Spacing.sm, paddingHorizontal: randAusgleich }}
+      >
         {photosAvailable && (
           <PressableScale
             accessibilityLabel="Foto hinzufügen"

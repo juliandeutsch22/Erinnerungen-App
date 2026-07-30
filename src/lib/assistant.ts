@@ -1022,6 +1022,24 @@ export function ortZusatz(t: { ort?: string }): string {
   return o ? ` · ${o}` : '';
 }
 
+/**
+ * Die GANZE Unterzeile eines vorgeschlagenen Termins: Datum · Zeit · Ort.
+ *
+ * Bis v1.68 baute jede der vier Anzeigestellen sie selbst zusammen — mit drei
+ * verschiedenen Zeitformaten für dieselbe Sache (`10:00` in der EINEN Zeile,
+ * `10:00–11:00` im Braindump und im Sprach-Sheet, `10:00–11:00 Uhr` im Chat).
+ * Derselbe Vorschlag sah je nach Weg anders aus, ohne dass das etwas bedeutet
+ * hätte. Was VOR der Zeile steht („Termin · "), bleibt Sache des Aufrufers —
+ * das ist Kontext des Bildschirms, nicht des Termins.
+ */
+export function terminUnter(
+  t: { datum: string; enddatum?: string; start?: string; ende?: string; ort?: string },
+  fmt: (d: string) => string,
+): string {
+  const zeit = t.start ? `${t.start}${t.ende ? `–${t.ende}` : ''}` : 'ganztägig';
+  return `${terminDatum(t, fmt)} · ${zeit}${ortZusatz(t)}`;
+}
+
 /** Antworttext aus der Gemini-Response ziehen (defensiv). */
 export function extractText(response: unknown): string | null {
   if (typeof response !== 'object' || response === null) return null;

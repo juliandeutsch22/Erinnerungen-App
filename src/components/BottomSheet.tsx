@@ -135,7 +135,15 @@ export function BottomSheet({
       <GestureHandlerRootView style={{ flex: 1 }}>
         {/* Backdrop dimmt (mit der Zieh-Distanz) und schließt beim Tap. */}
         <Animated.View style={[StyleSheet.absoluteFill, backdropStyle]} pointerEvents="box-none">
-          <Pressable accessibilityLabel="Schließen" onPress={close} style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.4)' }]} />
+          {/* Eigener Name: das X heißt „Schließen". Hießen beide gleich, kündigte
+              VoiceOver zwei identische Knöpfe an, von denen einer der ganze
+              Bildschirm ist — und jede Prüfung, die „Schließen" sucht, träfe
+              per Zufall den einen oder den anderen. */}
+          <Pressable
+            accessibilityLabel="Außerhalb tippen, um zu schließen"
+            onPress={close}
+            style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.4)' }]}
+          />
         </Animated.View>
         <View style={{ flex: 1, justifyContent: 'flex-end' }} pointerEvents="box-none">
           {/* Tastaturhöhe als Sockel: hebt das Sheet exakt über die Tastatur. */}

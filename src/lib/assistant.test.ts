@@ -1,7 +1,7 @@
 // assistant.test.ts — Prompt-Bau, Antwort-Extraktion, Fehlertexte.
 import type { ChatMessage, Task } from '@/data/types';
 
-import { ortZusatz, terminDatum, parseGeminiFehler, istSchluesselFehler, buildAppContext,  buildBraindumpContext, buildRequestBody, createSseParser, describeError, describeSchritte, extractActions, extractChunkText, extractText, pickModelsFromList, promptChips, resolveListId, sanitizeChatTitle, SYSTEM_PROMPT, subtasksFromSchritte, describeExtras, describeAenderung, MEMORY_LIMIT, resolveTaskHandle, taskHandle, ASSISTANT_TOOLS, extractCalls, runAssistantTool, type ToolData, MAX_TOOL_ROUNDS, actionDueDate, hasCapturableActions, SCHRITTE_LIMIT, IMAGE_LIMIT, type AssistantImage, systemPrompt, usesNewConfigDialect, tuneForModel, MODEL_CHAIN, LITE_CHAIN } from './assistant';
+import { ortZusatz, terminDatum, terminUnter, parseGeminiFehler, istSchluesselFehler, buildAppContext,  buildBraindumpContext, buildRequestBody, createSseParser, describeError, describeSchritte, extractActions, extractChunkText, extractText, pickModelsFromList, promptChips, resolveListId, sanitizeChatTitle, SYSTEM_PROMPT, subtasksFromSchritte, describeExtras, describeAenderung, MEMORY_LIMIT, resolveTaskHandle, taskHandle, ASSISTANT_TOOLS, extractCalls, runAssistantTool, type ToolData, MAX_TOOL_ROUNDS, actionDueDate, hasCapturableActions, SCHRITTE_LIMIT, IMAGE_LIMIT, type AssistantImage, systemPrompt, usesNewConfigDialect, tuneForModel, MODEL_CHAIN, LITE_CHAIN } from './assistant';
 
 const msg = (role: 'user' | 'assistant', content: string, at: string): ChatMessage => ({
   id: `m-${at}`, chatId: 'c1', role, content, createdAt: at,
@@ -874,5 +874,32 @@ describe('HTTP 400 ist kein Anmelde-Fehler', () => {
   it('meldet den abgelehnten Schlüssel weiterhin klar', () => {
     expect(describeError(400, { reason: 'API_KEY_INVALID' })).toContain('Schlüssel wurde abgelehnt');
     expect(describeError(403)).toContain('Schlüssel wurde abgelehnt');
+  });
+});
+
+describe('terminUnter — EINE Form für alle vier Anzeigestellen', () => {
+  const fmt = (d: string) => `${d.slice(8)}.${d.slice(5, 7)}.`;
+
+  it('Datum · Zeit · Ort', () => {
+    expect(terminUnter({ datum: '2026-08-03', start: '10:00', ende: '11:00', ort: 'Bahnhofstraße 4' }, fmt)).toBe(
+      '03.08. · 10:00–11:00 · Bahnhofstraße 4',
+    );
+  });
+
+  it('ohne Uhrzeit: ganztägig', () => {
+    expect(terminUnter({ datum: '2026-08-03' }, fmt)).toBe('03.08. · ganztägig');
+  });
+
+  it('ohne Endzeit steht nur der Beginn', () => {
+    expect(terminUnter({ datum: '2026-08-03', start: '10:00' }, fmt)).toBe('03.08. · 10:00');
+  });
+
+  it('mehrtägig wird zur Spanne', () => {
+    expect(terminUnter({ datum: '2026-08-03', enddatum: '2026-08-10' }, fmt)).toBe('03.08. – 10.08. · ganztägig');
+  });
+
+  it('kein leerer Trenner, wenn der Ort fehlt', () => {
+    expect(terminUnter({ datum: '2026-08-03', start: '10:00' }, fmt).endsWith('·')).toBe(false);
+    expect(terminUnter({ datum: '2026-08-03', start: '10:00' }, fmt)).not.toContain('·  ');
   });
 });

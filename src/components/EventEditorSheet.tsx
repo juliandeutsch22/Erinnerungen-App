@@ -388,7 +388,11 @@ export function EventEditorSheet({
         <View style={{ marginTop: Spacing.md }}>
           <Hairline />
           <View style={{ marginTop: Spacing.md }}>
-            <PhotoStrip eventId={event.id} />
+            {/* Der Ausgleich ist genau das Padding, das `BottomSheet` innen
+                setzt — die Kacheln rutschen dadurch unter die Sheet-Kante
+                statt vor ihr abzubrechen. Die gerundeten Ecken stören dabei
+                nicht: die Reihe sitzt in der Mitte, nicht an den Enden. */}
+            <PhotoStrip eventId={event.id} randAusgleich={Spacing.lg} />
           </View>
         </View>
       )}

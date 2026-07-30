@@ -1549,6 +1549,47 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
     · Der manuelle Termin-Editor konnte das immer schon (startDay/endDay); es
       fehlte NUR der Assistenten-Weg.
 
+67. **Feinschliff-Runde** (v1.69.0) — sechs Kanten, die beim Arbeiten
+    aufgefallen sind. Jede für sich klein, zusammen der Unterschied zwischen
+    „fast fertig" und „fertig".
+    · **Der Verwalter ohne Schlüssel** war die letzte Stelle, die §8.56
+      übersehen hatte: ein Verweis auf die Einstellungen ohne Weg dorthin.
+      Jetzt trägt er den `SchluesselWeg` wie alle anderen.
+    · **Der Filter-Leerzustand sagte „Passe die Kriterien an."** Das schiebt
+      dem Nutzer die Arbeit zu und verrät nicht, WELCHES der vier Kriterien
+      alles wegräumt. `filterGrund()` lockert jedes einzeln: hilft genau EINES,
+      wird es benannt („Keine der Aufgaben ist geflaggt. Ohne die Flagge gäbe
+      es Treffer."); helfen mehrere oder keines, war es die Kombination — auch
+      das ist eine Auskunft, nur eine andere. Ein unbenutztes Kriterium kann nie
+      schuld sein. Die SÄTZE liegen im Bildschirm, die ABLEITUNG in `lib/` (7
+      Tests).
+    · **„An" und „09:00" waren beide teal-gefüllte Pillen** in der
+      Sammel-Erinnerung und in der Abendbetrachtung — ein SCHALTER und eine
+      AUSWAHL in identischer Form; man las die Reihe als eine Gruppe. Die Farbe
+      kann das nicht trennen (Iron Rule, zwei Akzente), also trennt es die
+      Form: der Schalter trägt eine Glocke (`Bell`/`BellOff`), und ein kleines
+      „um" dazwischen macht aus der Reihe einen Satz.
+    · **Der `PhotoStrip` hatte den Chip-Fehler aus §8.61** — der Scroll-Behälter
+      endete im Padding, die letzte Kachel brach vor der Kante ab. Der
+      Ausgleich kommt hier als PROP (`randAusgleich`), nicht als Konstante:
+      nur der Aufrufer kennt sein Padding. Die gerundeten Sheet-Ecken stören
+      nicht, weil die Reihe in der Mitte sitzt.
+    · **Die vier Termin-Unterzeilen sind eine geworden** (`terminUnter`). Sie
+      hatten drei verschiedene Zeitformate für dieselbe Sache (`10:00` in der
+      EINEN Zeile, `10:00–11:00` im Braindump und im Sprach-Sheet,
+      `10:00–11:00 Uhr` im Chat) — derselbe Vorschlag sah je nach Weg anders
+      aus, ohne dass das etwas bedeutet hätte. Was VOR der Zeile steht
+      („Termin · "), bleibt Sache des Aufrufers.
+    · **Zwei verschiedene Ziele hießen beide „Schließen"**: das X im
+      Sheet-Kopf und der dimmende Hintergrund darunter. VoiceOver kündigte
+      zwei identische Knöpfe an, von denen einer der ganze Bildschirm ist —
+      und jede Prüfung, die „Schließen" sucht, traf per Zufall den einen oder
+      den anderen. Der Hintergrund heißt jetzt „Außerhalb tippen, um zu
+      schließen".
+    · Harnisch-Notiz: `tor.mjs` rannte gegen die Slide-Animation. Der Text
+      steht sofort im DOM, das Sheet gleitet aber noch — `waitForFunction` auf
+      Text allein reicht bei Sheets nicht, wenn danach GETIPPT wird.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

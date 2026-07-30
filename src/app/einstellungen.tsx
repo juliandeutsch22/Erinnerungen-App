@@ -3,7 +3,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, ClipboardPaste, CloudDownload, Download, FolderOpen, Upload } from 'lucide-react-native';
+import { Bell, BellOff, ChevronLeft, ClipboardPaste, CloudDownload, Download, FolderOpen, Upload } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { TextInput, View } from 'react-native';
 
@@ -298,8 +298,15 @@ export default function EinstellungenScreen() {
           <Type variant="caption" tone="text3" style={{ marginTop: 2 }}>
             Eine Mitteilung „X Dinge für heute" für Aufgaben ohne Uhrzeit.
           </Type>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginTop: Spacing.sm }}>
+          {/* „An" und „09:00" standen bis v1.68 als gleich aussehende Pillen
+              nebeneinander — beide teal gefüllt, obwohl das eine ein SCHALTER
+              ist und das andere eine AUSWAHL. Man las die Reihe als eine
+              Gruppe. Die Farbe kann das nicht trennen (zwei Akzente, Iron
+              Rule), also trennt es die Form: der Schalter trägt eine Glocke,
+              und das kleine „um" davor macht aus der Reihe einen Satz. */}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.sm }}>
             <Chip
+              icon={summaryEnabled ? Bell : BellOff}
               label={summaryEnabled ? 'An' : 'Aus'}
               active={summaryEnabled}
               onPress={() => {
@@ -307,18 +314,22 @@ export default function EinstellungenScreen() {
                 requestReschedule();
               }}
             />
-            {summaryEnabled &&
-              SUMMARY_TIMES.map((t) => (
-                <Chip
-                  key={t}
-                  label={t}
-                  active={summaryTime === t}
-                  onPress={() => {
-                    setSummaryTime(t);
-                    requestReschedule();
-                  }}
-                />
-              ))}
+            {summaryEnabled && (
+              <>
+                <Type variant="caption" tone="text3">um</Type>
+                {SUMMARY_TIMES.map((t) => (
+                  <Chip
+                    key={t}
+                    label={t}
+                    active={summaryTime === t}
+                    onPress={() => {
+                      setSummaryTime(t);
+                      requestReschedule();
+                    }}
+                  />
+                ))}
+              </>
+            )}
           </View>
 
           <Seam />
@@ -327,8 +338,9 @@ export default function EinstellungenScreen() {
           <Type variant="caption" tone="text3" style={{ marginTop: 2 }}>
             Eine stille tägliche Erinnerung an die Frage des Abends.
           </Type>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginTop: Spacing.sm }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.sm }}>
             <Chip
+              icon={journalReminderEnabled ? Bell : BellOff}
               label={journalReminderEnabled ? 'An' : 'Aus'}
               active={journalReminderEnabled}
               onPress={() => {
@@ -337,18 +349,22 @@ export default function EinstellungenScreen() {
                 void rescheduleJournalReminder(next, journalReminderTime);
               }}
             />
-            {journalReminderEnabled &&
-              JOURNAL_TIMES.map((t) => (
-                <Chip
-                  key={t}
-                  label={t}
-                  active={journalReminderTime === t}
-                  onPress={() => {
-                    setJournalReminderTime(t);
-                    void rescheduleJournalReminder(true, t);
-                  }}
-                />
-              ))}
+            {journalReminderEnabled && (
+              <>
+                <Type variant="caption" tone="text3">um</Type>
+                {JOURNAL_TIMES.map((t) => (
+                  <Chip
+                    key={t}
+                    label={t}
+                    active={journalReminderTime === t}
+                    onPress={() => {
+                      setJournalReminderTime(t);
+                      void rescheduleJournalReminder(true, t);
+                    }}
+                  />
+                ))}
+              </>
+            )}
           </View>
         </GlassPanel>
       </Reveal>
