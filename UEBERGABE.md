@@ -73,9 +73,17 @@ nur auf Nachfrage.
 ```bash
 cd /home/user/Erinnerungen-App        # Shell-cwd springt gern auf /home/user zurück!
 npx tsc --noEmit
-npx jest --ci                          # aktuell 134 Tests
+npx jest --ci                          # aktuell 382 Tests
 npx expo export --platform web --clear # Web-Build als Smoke-Test
 ```
+
+**Was Jest seit v1.61.0 mitprüft:** `data/sqliteRepositories.test.ts` führt die
+sieben `Sqlite*`-Repositories gegen echtes SQLite aus (`node:sqlite` statt
+`expo-sqlite`, siehe `data/testing/expoSqliteNode.ts`). Damit ist der Code, der
+auf dem Telefon die Daten hält, kein toter Text mehr — vorher wurde er von
+keiner Stufe der Pipeline ausgeführt (§8.39/§8.57). Ein Stellvertreter, kein
+Beweis: was dort rot ist, geht auf dem Gerät sicher schief; grün heißt nur
+„kein Fehler dieser Klasse".
 
 **Playwright-Tour gegen `dist`** (UI-Änderungen immer so verifizieren):
 - Chromium: `/opt/pw-browsers/chromium`, Modul:
@@ -709,6 +717,10 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
       Tabelle im Schema steht. Grob, aber es fängt genau diese Klasse. Der Test
       wurde gegengeprüft: Fehler wieder einbauen → rot.
     · **Wer eine SQL-Zeichenkette anfasst, verlässt sich auf nichts anderes.**
+      → **Seit v1.61.0 nicht mehr allein:** `sqliteRepositories.test.ts` führt
+      alle sieben Repositories gegen echtes SQLite aus (§8.57). Der
+      Text-Wächter bleibt daneben stehen, weil er ALLE INSERTs sieht — auch
+      die, die der Laufzeit-Test nicht anfasst.
     · Zweiter Teil des Befunds: Das Scheitern war **stumm**. `apply()` hatte
       kein try/catch, die abgewiesene Zusage lief ins Leere — der Knopf tat
       scheinbar nichts, die Vorschlagskarte blieb stehen, keine Meldung. Alle
@@ -1230,6 +1242,36 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
     · `scratchpad/wege.mjs` (16 Prüfungen) belegt, dass der Knopf wirklich das
       Portal öffnet, dass er in den Einstellungen nicht doppelt steht und dass
       die Fehlerkarte beim Weggehen zugeht.
+
+57. **SQLite läuft endlich wirklich** (`data/testing/expoSqliteNode.ts`,
+    `data/sqliteRepositories.test.ts`, v1.61.0) — der größte blinde Fleck aus
+    §8.39 ist geschlossen. Bis hierher lief die ganze Pipeline im Web, wo alle
+    Repositories InMemory sind: die sieben `Sqlite*`-Klassen, also der Code,
+    der auf dem Telefon WIRKLICH die Daten hält, wurden nie ausgeführt.
+    Jetzt ersetzt `jest.mock('expo-sqlite')` das native Modul durch
+    `node:sqlite` (in Node 22 eingebaut — keine neue Abhängigkeit, kein
+    Kompilat) gegen `:memory:`. Derselbe Repository-Code, dasselbe Schema aus
+    `db.ts`, dieselben Migrationen, derselbe Seed. 22 Prüfungen decken alle
+    sieben Repositories ab, dazu Transaktionen (Rollback!) und `kvStorage`,
+    dessen nativer Pfad ebenfalls nie gelaufen war.
+    · **Es ist ein Stellvertreter, kein Beweis.** Beide sprechen SQLite, aber
+      Bindungsregeln und Fehlertexte können abweichen. Was hier grün ist, kann
+      auf dem Gerät noch schiefgehen; was hier rot ist, geht dort sicher schief.
+    · Zwei Stellen ahmen bewusst NACH, statt durchzureichen — sonst meldete der
+      Prüfstand Fehler, die es auf dem Telefon nicht gibt:
+      **(a)** `expo-sqlite` nimmt `boolean` als Bindungswert und macht 0/1
+      daraus, `node:sqlite` wirft. Die App verlässt sich darauf (`evening`).
+      **(b)** Fremdschlüssel. `node:sqlite` schaltet sie ein, SQLite selbst hat
+      sie aus, und expo-sqlite setzt das Pragma nirgends — auf dem Telefon sind
+      sie also AUS. Das `REFERENCES lists(id)` in `db.ts` ist dort
+      Dokumentation, keine Bedingung; eine Aufgabe darf in einer Liste liegen,
+      die es nicht gibt. Ein eigener Test hält das ausdrücklich fest, damit
+      niemand es später für einen Fehler des Prüfstands hält.
+    · `sqliteSchema.test.ts` bleibt: es liest ALLE INSERTs als Text, auch die,
+      die der Laufzeit-Test nicht anfasst. Die beiden ergänzen sich.
+    · Was weiterhin NICHT geprüft wird: das echte expo-sqlite auf echtem iOS,
+      Dateisystem-Verhalten, WAL, Migration einer bestehenden Installation mit
+      Altdaten. Dafür gibt es nur das Gerät.
 
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
