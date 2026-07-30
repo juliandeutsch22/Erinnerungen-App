@@ -9,9 +9,20 @@ import { betrifftSchluessel, SCHLUESSEL_URL } from './schluessel';
 
 describe('betrifftSchluessel', () => {
   it('greift beim abgelehnten Schlüssel — dem Fall, für den es das gibt', () => {
-    for (const status of [400, 401, 403]) {
-      expect(betrifftSchluessel(describeError(status))).toBe(true);
-    }
+    expect(betrifftSchluessel(describeError(401))).toBe(true);
+    expect(betrifftSchluessel(describeError(403))).toBe(true);
+    // 400 nur, wenn Google den Schlüssel WIRKLICH meint (seit v1.68.0).
+    expect(betrifftSchluessel(describeError(400, { reason: 'API_KEY_INVALID' }))).toBe(true);
+  });
+
+  it('greift NICHT bei einem bloßen 400 — das ist ein Formfehler der Anfrage', () => {
+    // Bis v1.67 war das der häufigste Fall in der EINEN Zeile: die App warf
+    // 400 mit 401/403 in einen Topf und schickte den Nutzer los, einen völlig
+    // intakten Schlüssel zu prüfen.
+    expect(betrifftSchluessel(describeError(400))).toBe(false);
+    expect(
+      betrifftSchluessel(describeError(400, { status: 'INVALID_ARGUMENT', message: 'Unknown name "x"' })),
+    ).toBe(false);
   });
 
   it('greift auch, wenn kein Modell gefunden wurde (oft ein falscher Schlüssel)', () => {

@@ -68,10 +68,10 @@ const P_AKTIONEN_KOPF =
 // (kein Chat zu einer Notiz) — ein Feld zu zeigen, das hinterher verworfen
 // wird, lädt das Modell nur ein, es zu füllen.
 const AKTIONEN_JSON_VOLL =
-  '{"aufgaben":[{"titel":"…","datum":"YYYY-MM-DD","zeit":"HH:MM","schritte":["…"],"wiederholung":"weekly","tags":["…"],"notiz":"…"}],"termine":[{"titel":"…","datum":"YYYY-MM-DD","start":"HH:MM","ende":"HH:MM","ort":"…","notiz":"…"}],"listen":[{"name":"…","ziel":"…","deadline":"YYYY-MM-DD"}],"aenderungen":[{"handle":"abc123","erledigt":true,"datum":"YYYY-MM-DD","zeit":"HH:MM","titel":"…","liste":"…","papierkorb":true}],"checkliste":["…"],"notizen":["…"]}';
+  '{"aufgaben":[{"titel":"…","datum":"YYYY-MM-DD","zeit":"HH:MM","schritte":["…"],"wiederholung":"weekly","tags":["…"],"notiz":"…"}],"termine":[{"titel":"…","datum":"YYYY-MM-DD","enddatum":"YYYY-MM-DD","start":"HH:MM","ende":"HH:MM","ort":"…","notiz":"…"}],"listen":[{"name":"…","ziel":"…","deadline":"YYYY-MM-DD"}],"aenderungen":[{"handle":"abc123","erledigt":true,"datum":"YYYY-MM-DD","zeit":"HH:MM","titel":"…","liste":"…","papierkorb":true}],"checkliste":["…"],"notizen":["…"]}';
 
 const AKTIONEN_JSON_ERFASSEN =
-  '{"aufgaben":[{"titel":"…","datum":"YYYY-MM-DD","zeit":"HH:MM","schritte":["…"],"wiederholung":"weekly","tags":["…"],"notiz":"…"}],"termine":[{"titel":"…","datum":"YYYY-MM-DD","start":"HH:MM","ende":"HH:MM","ort":"…","notiz":"…"}],"listen":[{"name":"…","ziel":"…","deadline":"YYYY-MM-DD"}],"notizen":["…"]}';
+  '{"aufgaben":[{"titel":"…","datum":"YYYY-MM-DD","zeit":"HH:MM","schritte":["…"],"wiederholung":"weekly","tags":["…"],"notiz":"…"}],"termine":[{"titel":"…","datum":"YYYY-MM-DD","enddatum":"YYYY-MM-DD","start":"HH:MM","ende":"HH:MM","ort":"…","notiz":"…"}],"listen":[{"name":"…","ziel":"…","deadline":"YYYY-MM-DD"}],"notizen":["…"]}';
 
 const P_AKTIONEN_RUMPF =
   '\n```\n' +
@@ -97,6 +97,14 @@ const P_AKTIONEN_RUMPF =
   // man ihm ansieht, dass jemand ihn eingetragen hat.
   '„ort" nur, wenn im Text wirklich einer steht (Adresse, Lokal, Raum, „Zoom", „bei Oma") — ' +
   'niemals raten oder ausschmücken; fehlt er, lass das Feld weg. ' +
+  // Bis v1.67 fehlte „enddatum" ganz. Das Modell hatte gar keinen Platz für
+  // das Ende einer Reise und schrieb es folgerichtig in die Notiz — der Termin
+  // stand dann einen Tag im Kalender, und das Ende war nur Prosa.
+  'Zieht sich ein Termin über MEHRERE TAGE (Urlaub, Reise, Messe, Seminar, ' +
+  'Krankschreibung), gehört der letzte Tag in „enddatum" — NICHT in die Notiz. ' +
+  '„enddatum" ist der letzte Tag EINSCHLIESSLICH: „3. bis 10. August" heißt ' +
+  'datum 2026-08-03 und enddatum 2026-08-10. Bei einem eintägigen Termin lass ' +
+  'es weg. ' +
   'Im Zweifel: fester Zeitpunkt/Verabredung → Termin, etwas zu TUN → Aufgabe. ';
 
 const P_CHECKLISTE = '„checkliste" nur, wenn der Chat zu einer Notiz gehört; ';
@@ -166,6 +174,7 @@ const ACTION_SCHEMA = {
         properties: {
           titel: { type: 'STRING' },
           datum: { type: 'STRING' },
+          enddatum: { type: 'STRING' },
           start: { type: 'STRING' },
           ende: { type: 'STRING' },
           ort: { type: 'STRING' },
@@ -261,7 +270,7 @@ export type AssistantAction = {
     notiz?: string;
   }[];
   /** Feste Verabredungen → Gerätekalender. datum Pflicht; ohne start = ganztägig. */
-  termine: { titel: string; datum: string; start?: string; ende?: string; ort?: string; notiz?: string }[];
+  termine: { titel: string; datum: string; enddatum?: string; start?: string; ende?: string; ort?: string; notiz?: string }[];
   /** Neue Projekte/Listen. Werden VOR den Aufgaben angelegt, damit deren
    *  „liste" auf die frische Liste zeigen kann. */
   listen: { name: string; ziel?: string; deadline?: string }[];
@@ -472,6 +481,14 @@ function parseActionJson(jsonText: string): AssistantAction | null {
           .map((t) => ({
             titel: (t.titel as string).trim(),
             datum: t.datum as string,
+            // Nur ein echtes Datum, und nur wenn es NACH dem Beginn liegt —
+            // ein „enddatum" davor wäre ein Termin, der vor seinem Anfang endet.
+            enddatum:
+              typeof t.enddatum === 'string' &&
+              /^\d{4}-\d{2}-\d{2}$/.test(t.enddatum) &&
+              (t.enddatum as string) > (t.datum as string)
+                ? (t.enddatum as string)
+                : undefined,
             start: typeof t.start === 'string' && /^\d{2}:\d{2}$/.test(t.start) ? (t.start as string) : undefined,
             ende: typeof t.ende === 'string' && /^\d{2}:\d{2}$/.test(t.ende) ? (t.ende as string) : undefined,
             // Freier Text — keine Form zu prüfen, nur leer auszusortieren.
@@ -991,6 +1008,15 @@ export function createSseParser(onEvent?: (event: unknown) => void): { push: (ch
  * Ein gemeinsamer Zusatz sorgt wenigstens dafür, dass der Ort überall gleich
  * aussieht — und dass ein Test alle vier auf einmal absichern kann.
  */
+/**
+ * Das Datum eines vorgeschlagenen Termins — als Spanne, wenn er mehrere Tage
+ * dauert. Sonst stünde bei einem Urlaub nur der Anreisetag da, und man sähe
+ * dem Vorschlag nicht an, dass die Woche schon richtig erfasst ist.
+ */
+export function terminDatum(t: { datum: string; enddatum?: string }, fmt: (d: string) => string): string {
+  return t.enddatum && t.enddatum > t.datum ? `${fmt(t.datum)} – ${fmt(t.enddatum)}` : fmt(t.datum);
+}
+
 export function ortZusatz(t: { ort?: string }): string {
   const o = t.ort?.trim();
   return o ? ` · ${o}` : '';
@@ -1007,10 +1033,81 @@ export function extractText(response: unknown): string | null {
   return text.length > 0 ? text : null;
 }
 
+/** Was Google im Fehler-Körper mitschickt — soweit es uns interessiert. */
+export type GeminiFehler = { status?: string; message?: string; reason?: string };
+
+/**
+ * Den Fehler-Körper von Gemini lesen. Defensiv: bei allem Unerwarteten leer.
+ *
+ * Google antwortet bei Fehlern mit
+ * `{"error":{"code":400,"message":"…","status":"INVALID_ARGUMENT",
+ *   "details":[{"reason":"API_KEY_INVALID",…}]}}`.
+ * Bis v1.67 hat die App diesen Körper WEGGEWORFEN und nur den HTTP-Status
+ * angesehen — und damit die einzige Stelle verschenkt, an der steht, was
+ * wirklich los war.
+ */
+export function parseGeminiFehler(roh: string): GeminiFehler {
+  try {
+    const j = JSON.parse(roh) as { error?: { status?: unknown; message?: unknown; details?: unknown[] } };
+    const e = j?.error;
+    if (typeof e !== 'object' || e === null) return {};
+    const details = Array.isArray(e.details) ? e.details : [];
+    const reason = details
+      .map((d) => (typeof d === 'object' && d !== null ? (d as { reason?: unknown }).reason : undefined))
+      .find((r): r is string => typeof r === 'string');
+    return {
+      status: typeof e.status === 'string' ? e.status : undefined,
+      message: typeof e.message === 'string' ? e.message : undefined,
+      reason,
+    };
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Sagt der Fehler-Körper, dass der SCHLÜSSEL das Problem ist?
+ *
+ * Das ist der Kern des Befunds von v1.68.0: **HTTP 400 ist kein
+ * Anmelde-Fehler.** Google antwortet mit 400 sowohl auf einen ungültigen
+ * Schlüssel (`API_KEY_INVALID`) als auch auf jede Anfrage, die ihm formal
+ * nicht passt — ein Feld, das das Modell nicht kennt, ein `responseSchema`,
+ * das es nicht kann, ein leerer Text-Part. Die App hat 400 mit 401/403 in
+ * einen Topf geworfen und daraufhin JEDEN Formfehler als „dein Schlüssel
+ * wurde abgelehnt" gemeldet. Wer dann seinen (völlig intakten) Schlüssel
+ * prüft, sucht an der falschen Stelle — und ausgerechnet die EINE Zeile
+ * verschickt die aufwendigste Anfrage der App (Werkzeuge + Verlauf +
+ * Schnappschuss + Streaming), also trifft es sie am häufigsten.
+ */
+export function istSchluesselFehler(status: number, grund: GeminiFehler = {}): boolean {
+  if (status === 401 || status === 403) return true;
+  if (status !== 400) return false;
+  if (grund.reason === 'API_KEY_INVALID') return true;
+  if (grund.status === 'UNAUTHENTICATED' || grund.status === 'PERMISSION_DENIED') return true;
+  return /api[ _-]?key/i.test(grund.message ?? '');
+}
+
+/** Googles Meldung ist englisch und kann lang sein — gekürzt, aber unverfälscht. */
+function kurzeMeldung(m: string): string {
+  const eine = m.replace(/\s+/g, ' ').trim();
+  return eine.length > 160 ? `${eine.slice(0, 157)}…` : eine;
+}
+
 /** Fehler in eine ruhige deutsche Meldung übersetzen. */
-export function describeError(status: number): string {
-  if (status === 400 || status === 401 || status === 403)
+export function describeError(status: number, grund: GeminiFehler = {}): string {
+  if (istSchluesselFehler(status, grund))
     return 'Der API-Schlüssel wurde abgelehnt. Prüfe ihn in den Einstellungen.';
+  if (status === 400) {
+    // ⚠️ Das Wort „Schlüssel" darf hier NICHT vorkommen: `betrifftSchluessel`
+    // (lib/schluessel.ts) entscheidet daran, ob der Weg zum Portal angeboten
+    // wird — und der wäre hier ein falscher Rat.
+    const grundText = grund.message ? ` (${kurzeMeldung(grund.message)})` : '';
+    return (
+      `Gemini hat die Anfrage abgelehnt${grundText}. ` +
+      'Das liegt an der Anfrage, nicht an deiner Einrichtung — versuch es noch einmal, ' +
+      'und wenn es bleibt, melde diese Meldung.'
+    );
+  }
   if (status === 404)
     return (
       'Kein verfügbares Gemini-Modell gefunden — auch die Alternativen nicht. ' +
@@ -1023,6 +1120,22 @@ export function describeError(status: number): string {
   if (status >= 500)
     return 'Gemini ist gerade überlastet oder nicht erreichbar — die App hat es mehrfach probiert. In ein paar Minuten erneut versuchen.';
   return `Anfrage fehlgeschlagen (HTTP ${status}).`;
+}
+
+/**
+ * Eine gescheiterte Antwort in eine Meldung verwandeln — MIT ihrem Körper.
+ *
+ * Der Körper darf hier gelesen werden: bei `!res.ok` hat den Stream noch
+ * niemand angefasst.
+ */
+export async function beschreibeAntwort(res: Response): Promise<string> {
+  let roh = '';
+  try {
+    roh = await res.text();
+  } catch {
+    /* Kein Körper — dann eben nur der Status. */
+  }
+  return describeError(res.status, parseGeminiFehler(roh));
 }
 
 /** Modell-Liste des Dienstes → bestes Flash- und Lite-Modell (rein, testbar).
@@ -1376,7 +1489,7 @@ export async function askAssistant(
   for (let round = 0; ; round += 1) {
     const body = { ...base, contents: [...baseContents, ...extra] };
     const res = await requestWithFallbacks(apiKey, body, stream);
-    if (!res.ok) throw new Error(describeError(res.status));
+    if (!res.ok) throw new Error(await beschreibeAntwort(res));
 
     const calls: ToolCall[] = [];
     let text: string;

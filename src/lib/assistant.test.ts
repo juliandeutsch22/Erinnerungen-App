@@ -1,7 +1,7 @@
 // assistant.test.ts — Prompt-Bau, Antwort-Extraktion, Fehlertexte.
 import type { ChatMessage, Task } from '@/data/types';
 
-import { ortZusatz, buildAppContext,  buildBraindumpContext, buildRequestBody, createSseParser, describeError, describeSchritte, extractActions, extractChunkText, extractText, pickModelsFromList, promptChips, resolveListId, sanitizeChatTitle, SYSTEM_PROMPT, subtasksFromSchritte, describeExtras, describeAenderung, MEMORY_LIMIT, resolveTaskHandle, taskHandle, ASSISTANT_TOOLS, extractCalls, runAssistantTool, type ToolData, MAX_TOOL_ROUNDS, actionDueDate, hasCapturableActions, SCHRITTE_LIMIT, IMAGE_LIMIT, type AssistantImage, systemPrompt, usesNewConfigDialect, tuneForModel, MODEL_CHAIN, LITE_CHAIN } from './assistant';
+import { ortZusatz, terminDatum, parseGeminiFehler, istSchluesselFehler, buildAppContext,  buildBraindumpContext, buildRequestBody, createSseParser, describeError, describeSchritte, extractActions, extractChunkText, extractText, pickModelsFromList, promptChips, resolveListId, sanitizeChatTitle, SYSTEM_PROMPT, subtasksFromSchritte, describeExtras, describeAenderung, MEMORY_LIMIT, resolveTaskHandle, taskHandle, ASSISTANT_TOOLS, extractCalls, runAssistantTool, type ToolData, MAX_TOOL_ROUNDS, actionDueDate, hasCapturableActions, SCHRITTE_LIMIT, IMAGE_LIMIT, type AssistantImage, systemPrompt, usesNewConfigDialect, tuneForModel, MODEL_CHAIN, LITE_CHAIN } from './assistant';
 
 const msg = (role: 'user' | 'assistant', content: string, at: string): ChatMessage => ({
   id: `m-${at}`, chatId: 'c1', role, content, createdAt: at,
@@ -782,5 +782,97 @@ describe('Prompt-Regel zum Ort', () => {
     expect(SYSTEM_PROMPT).toContain('niemals raten');
     // Die JSON-Vorlage muss das Feld nennen, sonst kommt es nie zurück.
     expect(SYSTEM_PROMPT).toContain('"ort"');
+  });
+});
+
+describe('mehrtägige Termine im Aktions-Block', () => {
+  it('liest ein enddatum mit — und wirft eines vor dem Beginn weg', () => {
+    const text =
+      '```stoa-aktionen\n{"termine":[' +
+      '{"titel":"Urlaub","datum":"2026-08-03","enddatum":"2026-08-10"},' +
+      '{"titel":"Kino","datum":"2026-08-03"},' +
+      '{"titel":"Unsinn","datum":"2026-08-10","enddatum":"2026-08-03"},' +
+      '{"titel":"Krumm","datum":"2026-08-03","enddatum":"10.8."}]}\n```';
+    const { actions } = extractActions(text);
+    expect(actions?.termine[0].enddatum).toBe('2026-08-10');
+    expect(actions?.termine[1].enddatum).toBeUndefined();
+    // Ein Ende VOR dem Anfang wäre ein Termin, der vor seinem Anfang endet.
+    expect(actions?.termine[2].enddatum).toBeUndefined();
+    // Kein ISO-Datum → weg, statt es dem Kalender unterzuschieben.
+    expect(actions?.termine[3].enddatum).toBeUndefined();
+  });
+
+  it('der Prompt verlangt das Ende im Feld statt in der Notiz', () => {
+    expect(SYSTEM_PROMPT).toContain('enddatum');
+    expect(SYSTEM_PROMPT).toContain('NICHT in die Notiz');
+  });
+});
+
+describe('terminDatum', () => {
+  const fmt = (d: string) => d.slice(8) + '.' + d.slice(5, 7) + '.';
+
+  it('zeigt eine Spanne, wenn der Termin mehrere Tage dauert', () => {
+    expect(terminDatum({ datum: '2026-08-03', enddatum: '2026-08-10' }, fmt)).toBe('03.08. – 10.08.');
+  });
+
+  it('zeigt EIN Datum, wenn es nur einen Tag gibt', () => {
+    expect(terminDatum({ datum: '2026-08-03' }, fmt)).toBe('03.08.');
+    expect(terminDatum({ datum: '2026-08-03', enddatum: '2026-08-03' }, fmt)).toBe('03.08.');
+  });
+});
+
+describe('HTTP 400 ist kein Anmelde-Fehler', () => {
+  const koerper = (o: unknown) => JSON.stringify({ error: o });
+
+  it('liest Googles Fehler-Körper', () => {
+    const g = parseGeminiFehler(
+      koerper({ code: 400, message: 'API key not valid. Please pass a valid API key.', status: 'INVALID_ARGUMENT', details: [{ reason: 'API_KEY_INVALID' }] }),
+    );
+    expect(g.reason).toBe('API_KEY_INVALID');
+    expect(g.status).toBe('INVALID_ARGUMENT');
+    expect(g.message).toContain('API key not valid');
+  });
+
+  it('bleibt bei Unsinn im Körper einfach leer', () => {
+    expect(parseGeminiFehler('')).toEqual({});
+    expect(parseGeminiFehler('<html>502</html>')).toEqual({});
+    expect(parseGeminiFehler('{"nichts":1}')).toEqual({});
+  });
+
+  it('nennt den Schlüssel NUR, wenn Google ihn wirklich meint', () => {
+    expect(istSchluesselFehler(401)).toBe(true);
+    expect(istSchluesselFehler(403)).toBe(true);
+    expect(istSchluesselFehler(400, { reason: 'API_KEY_INVALID' })).toBe(true);
+    expect(istSchluesselFehler(400, { status: 'PERMISSION_DENIED' })).toBe(true);
+    expect(istSchluesselFehler(400, { message: 'API key not valid' })).toBe(true);
+    // Ein Formfehler der ANFRAGE — genau der Fall, der bis v1.67 als
+    // „dein Schlüssel wurde abgelehnt" gemeldet wurde.
+    expect(istSchluesselFehler(400, { status: 'INVALID_ARGUMENT', message: 'Unknown name "enddatum" at ...' })).toBe(false);
+    expect(istSchluesselFehler(400)).toBe(false);
+    expect(istSchluesselFehler(429)).toBe(false);
+  });
+
+  it('sagt bei einem Formfehler, dass es NICHT an der Einrichtung liegt', () => {
+    const m = describeError(400, { status: 'INVALID_ARGUMENT', message: 'Invalid JSON payload received.' });
+    expect(m).toContain('Gemini hat die Anfrage abgelehnt');
+    expect(m).toContain('Invalid JSON payload received.');
+    // ⚠️ Das Wort darf NICHT vorkommen: `betrifftSchluessel` böte sonst den
+    // Weg zum Portal an — ein falscher Rat.
+    expect(m).not.toContain('Schlüssel');
+  });
+
+  it('kürzt eine ausufernde Google-Meldung, ohne sie zu verfälschen', () => {
+    const lang = 'x'.repeat(400);
+    const m = describeError(400, { message: lang });
+    // Der zitierte Teil ist gedeckelt (160), der Rahmensatz bleibt ganz.
+    const zitat = m.slice(m.indexOf('(') + 1, m.indexOf(')'));
+    expect(zitat.length).toBeLessThanOrEqual(160);
+    expect(zitat.endsWith('…')).toBe(true);
+    expect(m).toContain('Gemini hat die Anfrage abgelehnt');
+  });
+
+  it('meldet den abgelehnten Schlüssel weiterhin klar', () => {
+    expect(describeError(400, { reason: 'API_KEY_INVALID' })).toContain('Schlüssel wurde abgelehnt');
+    expect(describeError(403)).toContain('Schlüssel wurde abgelehnt');
   });
 });

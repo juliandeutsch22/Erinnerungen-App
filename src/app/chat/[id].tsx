@@ -33,7 +33,7 @@ import { useCreateNote, useNotes, useUpdateNote } from '@/data/noteQueries';
 import { useCompleteTask, useCreateList, useCreateTask, useDeleteTask, useLists, useTasks, useUpdateTask } from '@/data/queries';
 import type { Chat, ChatMessage, Task } from '@/data/types';
 import { applyAssistantActions } from '@/lib/applyActions';
-import { askAssistant, type AssistantAction, buildAppContext, buildNoteContext, buildTaskContext, type ChatLink, describeAenderung, describeExtras, describeSchritte, extractActions, generateChatTitle, ortZusatz, promptChips, resolveTaskHandle, type ToolData } from '@/lib/assistant';
+import { askAssistant, type AssistantAction, buildAppContext, buildNoteContext, buildTaskContext, type ChatLink, describeAenderung, describeExtras, describeSchritte, extractActions, generateChatTitle, ortZusatz, terminDatum, promptChips, resolveTaskHandle, type ToolData } from '@/lib/assistant';
 import { runKeyForChat, useAssistantRuns } from '@/lib/assistantRun';
 import { addDays, formatDueDate, toDateStr, todayStr } from '@/lib/dates';
 import { hasCalendarPermission } from '@/lib/deviceCalendar';
@@ -219,7 +219,7 @@ function ActionCard({
         row(
           `t${i}`,
           t.titel,
-          `Termin · ${formatDueDate(t.datum, today)}${t.start ? ` · ${t.start}${t.ende ? `–${t.ende}` : ''} Uhr` : ' · ganztägig'}${ortZusatz(t)}`,
+          `Termin · ${terminDatum(t, (d) => formatDueDate(d, today))}${t.start ? ` · ${t.start}${t.ende ? `–${t.ende}` : ''} Uhr` : ' · ganztägig'}${ortZusatz(t)}`,
         ),
       )}
       {/* Änderungen zuletzt: sie fassen Bestehendes an, das liest man mit

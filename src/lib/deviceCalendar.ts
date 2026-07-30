@@ -145,25 +145,51 @@ export async function createDeviceEvent(calendarId: string, draft: EventDraft): 
 }
 
 // ——— Termin aus einer Assistenten-Aktion (Sprach-Sheet, Chat, Braindump). ———
-export type AssistantEventInput = { titel: string; datum: string; start?: string; ende?: string; notiz?: string; ort?: string };
+export type AssistantEventInput = {
+  titel: string;
+  datum: string;
+  /** Letzter Tag EINSCHLIESSLICH — mehrtägige Termine (Urlaub, Reise, Messe). */
+  enddatum?: string;
+  start?: string;
+  ende?: string;
+  notiz?: string;
+  ort?: string;
+};
 
 /** Baut aus {datum, start, ende} einen EventDraft — rein & testbar (lokale Zeit,
  *  KEIN UTC). Ohne start: ganztägig. Ende ≤ Start oder fehlend → eine Stunde. */
 export function buildEventDraft(input: AssistantEventInput): EventDraft {
   const base = parseDateStr(input.datum);
+  // Der letzte Tag, sofern er wirklich nach dem ersten liegt. Ein „enddatum"
+  // davor wäre ein Termin, der vor seinem Anfang endet — dann gilt der erste.
+  const letzterTag = input.enddatum && input.enddatum > input.datum ? parseDateStr(input.enddatum) : null;
+
   if (!input.start) {
-    const end = new Date(base);
+    // Ganztägig: EventKit speichert das Ende EXKLUSIV, also der Tag NACH dem
+    // letzten. Bis v1.67 kannte diese Zeile nur `base` — ein Urlaub vom 3. bis
+    // 10. stand einen einzigen Tag im Kalender, und das Ende landete als Prosa
+    // in der Notiz, weil das Modell keinen anderen Platz dafür hatte.
+    const end = new Date(letzterTag ?? base);
     end.setDate(end.getDate() + 1);
     return { title: input.titel, notes: input.notiz ?? null, location: input.ort ?? null, allDay: true, start: base, end };
   }
+
   const [sh, sm] = input.start.split(':').map(Number);
   const start = new Date(base);
   start.setHours(sh, sm, 0, 0);
+  // Mit Uhrzeit UND mehreren Tagen: das Ende liegt am letzten Tag (Zugfahrt
+  // über Nacht, Seminar Fr 9 Uhr bis So 16 Uhr).
+  const endTag = letzterTag ?? base;
   let end: Date;
   if (input.ende) {
     const [eh, em] = input.ende.split(':').map(Number);
-    end = new Date(base);
+    end = new Date(endTag);
     end.setHours(eh, em, 0, 0);
+  } else if (letzterTag) {
+    // Kein Ende genannt, aber mehrere Tage → bis zur selben Uhrzeit am
+    // letzten Tag; eine Stunde wäre hier offensichtlich falsch.
+    end = new Date(endTag);
+    end.setHours(sh, sm, 0, 0);
   } else {
     end = new Date(start.getTime() + 60 * 60 * 1000);
   }

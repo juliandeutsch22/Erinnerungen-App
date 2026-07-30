@@ -1496,6 +1496,59 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
       nicht nachstellbar. Es schließt die Klasse, die am besten passt — mehr
       sagt es nicht.
 
+65. **HTTP 400 ist KEIN Anmelde-Fehler** (v1.68.0, vom Nutzer gemeldet: „in
+    der EINEN Zeile kommt oft, der Schlüssel sei abgelehnt — im Chat und im
+    Braindump nie"). Das war kein Zufall und kein Schlüssel-Problem, sondern
+    ein Fehler in der Übersetzung:
+    · `describeError` warf **400 mit 401/403 in einen Topf**. Google antwortet
+      aber mit 400 sowohl auf einen ungültigen Schlüssel (`API_KEY_INVALID`)
+      als auch auf jede Anfrage, die ihm FORMAL nicht passt — ein Feld, das
+      das Modell nicht kennt, ein `responseSchema`, das es nicht kann, ein
+      leerer Text-Part. Jeder Formfehler wurde damit als „dein Schlüssel wurde
+      abgelehnt" gemeldet, und der Nutzer prüfte einen völlig intakten Schlüssel.
+    · **Warum ausgerechnet die EINE Zeile:** sie verschickt die aufwendigste
+      Anfrage der App — Werkzeuge + Verlauf (§8.55) + App-Schnappschuss +
+      Streaming. Der Braindump fährt schmal (`mode: 'erfassen'`, ohne
+      Werkzeuge, kleine Kette). Wo mehr im Körper steht, kann mehr nicht
+      passen. Der Code WUSSTE das übrigens: der Kommentar an
+      `requestWithFallbacks` sagt seit jeher „400 heißt ‚so nicht' — meist der
+      Schlüssel, es kann aber auch unsere Feinsteuerung sein". Die Meldung sagte
+      es nur nicht.
+    · Zweiter Teil des Befunds: **die App hat Googles Antwort weggeworfen.** Im
+      Fehler-Körper steht `{"error":{"message":…,"status":…,"details":[{"reason":
+      "API_KEY_INVALID"}]}}` — die einzige Stelle, an der steht, was wirklich
+      los war. `describeError(status)` sah nur die Zahl. Jetzt liest
+      `beschreibeAntwort(res)` den Körper (bei `!res.ok` hat den Stream noch
+      niemand angefasst), `parseGeminiFehler` zieht Status/Meldung/Grund heraus,
+      und `istSchluesselFehler` entscheidet.
+    · ⚠️ **Die 400-Meldung darf das Wort „Schlüssel" NICHT enthalten** —
+      `betrifftSchluessel` (lib/schluessel.ts) entscheidet daran, ob der Weg
+      zum Portal angeboten wird, und der wäre hier ein falscher Rat. Ein Test
+      hält das fest.
+    · Nebeneffekt für die Fehlersuche: die Meldung zitiert jetzt Googles Grund
+      (gekappt auf 160 Zeichen). Wenn es in der Zeile wieder auftritt, steht
+      dort im Klartext, welches Feld nicht passt.
+
+66. **Mehrtägige Termine** (v1.68.0, vom Nutzer gemeldet: „er nimmt den ersten
+    Tag und schreibt das Enddatum in die Beschreibung"). Genau so musste es
+    kommen: das Aktions-Schema hatte `datum`, `start` und `ende` — `ende` ist
+    eine UHRZEIT. Für den letzten TAG gab es kein Feld, also hat das Modell das
+    einzig Verbliebene getan und es in die Notiz geschrieben.
+    · `enddatum` (letzter Tag EINSCHLIESSLICH) in beiden JSON-Vorlagen, im
+      `responseSchema`, im Typ, im Parser und in `AssistantEventInput`.
+    · `buildEventDraft` spannt jetzt: ganztägig endet exklusiv am Tag NACH dem
+      letzten; mit Uhrzeit liegt das Ende am letzten Tag. Ohne genannte Endzeit
+      bei mehreren Tagen gilt dieselbe Uhrzeit am letzten Tag — eine Stunde
+      wäre bei einer Reise offensichtlich falsch.
+    · Der Parser wirft ein `enddatum` weg, das VOR dem Beginn liegt oder kein
+      ISO-Datum ist; `ActionEditSheet` löst die Spanne, wenn man den Beginn
+      hinter das Ende schiebt.
+    · `terminDatum()` zeigt die Spanne in der Unterzeile (alle vier
+      Anzeigestellen) — sonst stünde bei einem Urlaub nur der Anreisetag da,
+      und man sähe dem Vorschlag nicht an, dass die Woche richtig erfasst ist.
+    · Der manuelle Termin-Editor konnte das immer schon (startDay/endDay); es
+      fehlte NUR der Assistenten-Weg.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

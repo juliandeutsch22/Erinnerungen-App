@@ -25,7 +25,7 @@ import { useCreateAssistantEvents } from '@/data/calendarQueries';
 import { useCreateNote } from '@/data/noteQueries';
 import { useCompleteTask, useCreateList, useCreateTask, useDeleteTask, useLists, useUpdateTask } from '@/data/queries';
 import type { ChatMessage } from '@/data/types';
-import { askAssistant, type AssistantImage, buildBraindumpContext, IMAGE_LIMIT, describeExtras, describeSchritte, extractActions, hasCapturableActions, ortZusatz, type AssistantAction } from '@/lib/assistant';
+import { askAssistant, type AssistantImage, buildBraindumpContext, IMAGE_LIMIT, describeExtras, describeSchritte, extractActions, hasCapturableActions, ortZusatz, terminDatum, type AssistantAction } from '@/lib/assistant';
 import { ActionEditSheet, type EditTarget } from '@/components/ActionEditSheet';
 import { applyAssistantActions } from '@/lib/applyActions';
 import { RUN_BRAINDUMP, useAssistantRuns } from '@/lib/assistantRun';
@@ -517,7 +517,7 @@ export default function BraindumpScreen() {
                       >
                         <Type variant="body" numberOfLines={1}>{t.titel}</Type>
                         <Type variant="caption" tone="text3" tabular>
-                          {formatDueDate(t.datum, today)}{t.start ? ` · ${t.start}${t.ende ? `–${t.ende}` : ''}` : ' · ganztägig'}{ortZusatz(t)}
+                          {terminDatum(t, (d) => formatDueDate(d, today))}{t.start ? ` · ${t.start}${t.ende ? `–${t.ende}` : ''}` : ' · ganztägig'}{ortZusatz(t)}
                         </Type>
                       </PressableScale>
                       <Type variant="caption" tone="text3">Termin</Type>

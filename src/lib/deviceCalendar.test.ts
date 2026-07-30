@@ -33,6 +33,44 @@ describe('buildEventDraft', () => {
     expect(buildEventDraft({ titel: 'Umzug', datum: '2026-08-05', ort: 'Alte Wohnung' }).location).toBe('Alte Wohnung');
   });
 
+  it('spannt einen ganztägigen Termin über MEHRERE Tage', () => {
+    // Urlaub 3.–10. August. Bis v1.67 stand hier ein einziger Tag, und das
+    // Ende landete als Prosa in der Notiz.
+    const d = buildEventDraft({ titel: 'Urlaub', datum: '2026-08-03', enddatum: '2026-08-10' });
+    expect(d.allDay).toBe(true);
+    expect(d.start.getDate()).toBe(3);
+    // EventKit speichert das Ende EXKLUSIV: der Tag NACH dem letzten.
+    expect(d.end.getDate()).toBe(11);
+    expect(d.end.getHours()).toBe(0);
+  });
+
+  it('spannt auch einen Termin MIT Uhrzeit über mehrere Tage', () => {
+    // Seminar Freitag 9 Uhr bis Sonntag 16 Uhr.
+    const d = buildEventDraft({ titel: 'Seminar', datum: '2026-08-07', enddatum: '2026-08-09', start: '09:00', ende: '16:00' });
+    expect(d.allDay).toBe(false);
+    expect(d.start.getDate()).toBe(7);
+    expect(d.start.getHours()).toBe(9);
+    expect(d.end.getDate()).toBe(9);
+    expect(d.end.getHours()).toBe(16);
+  });
+
+  it('ohne Endzeit endet ein mehrtägiger Termin zur selben Uhrzeit — nicht nach einer Stunde', () => {
+    const d = buildEventDraft({ titel: 'Messe', datum: '2026-08-07', enddatum: '2026-08-09', start: '10:00' });
+    expect(d.end.getDate()).toBe(9);
+    expect(d.end.getHours()).toBe(10);
+  });
+
+  it('ignoriert ein Enddatum, das VOR dem Beginn liegt', () => {
+    const d = buildEventDraft({ titel: 'Unsinn', datum: '2026-08-10', enddatum: '2026-08-03' });
+    expect(d.start.getDate()).toBe(10);
+    expect(d.end.getDate()).toBe(11);
+  });
+
+  it('ein Enddatum GLEICH dem Beginn bleibt ein Ein-Tages-Termin', () => {
+    const d = buildEventDraft({ titel: 'Kino', datum: '2026-08-03', enddatum: '2026-08-03' });
+    expect(d.end.getDate()).toBe(4);
+  });
+
   it('ohne start: ganztägig (start = Tag 0 Uhr, ende = Folgetag)', () => {
     const d = buildEventDraft({ titel: 'Geburtstag', datum: '2026-08-05' });
     expect(d.allDay).toBe(true);

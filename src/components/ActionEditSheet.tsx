@@ -82,10 +82,15 @@ export function ActionEditSheet({
     } else if (target.kind === 'termin') {
       const next = [...actions.termine];
       // Ein Termin OHNE Datum ergibt keinen Kalendereintrag — dann bleibt das alte stehen.
+      const neuesDatum = datum ?? next[target.index].datum;
+      const altesEnde = next[target.index].enddatum;
       next[target.index] = {
         ...next[target.index],
         titel: text,
-        datum: datum ?? next[target.index].datum,
+        datum: neuesDatum,
+        // Schiebt man den Beginn hinter das Ende, ist die Spanne hinfällig —
+        // sonst stünde ein Termin da, der vor seinem Anfang endet.
+        enddatum: altesEnde && altesEnde > neuesDatum ? altesEnde : undefined,
         start: zeit ?? undefined,
         // Leer geräumt heißt: doch kein Ort. `undefined` und nicht '' — so
         // sieht der Kalender-Weg gar keinen Ort, statt einen leeren.
