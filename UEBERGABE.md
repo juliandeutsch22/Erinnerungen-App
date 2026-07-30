@@ -1445,6 +1445,57 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
       Titel-Grundlinie, die rechte Kante über drei Bildschirme, die Füllung des
       Listen-Detail-Knopfs und die ganze Erb-Kette inklusive „abbrechen".
 
+63. **Der Absturz: ein echter Crash-Report — und was er sagt** (v1.67.0).
+    Julian hat den Bericht aus den iOS-Analysedaten geschickt. Was drinsteht:
+    · `EXC_CRASH (SIGABRT)`, `abort() called`, Thread 0 = `com.apple.main-thread`.
+    · Der Stapel ist der Lehrbuch-Abdruck einer **unbehandelten
+      Objective-C-Ausnahme, die bis in die Run-Loop durchschlägt**:
+      `CFRunLoopRunSpecific` → `objc_exception_rethrow` → `__cxa_rethrow` →
+      `std::__terminate` → `_objc_terminate()` → `abort`. Kein Speicherfehler
+      (kein `EXC_BAD_ACCESS`), kein Watchdog (kein `0x8badf00d`), kein
+      JS-Fehler (der JS-Thread wartet ruhig in seiner eigenen Run-Loop).
+    · **Es fehlt der „Last Exception Backtrace".** Ohne ihn ist aus dem
+      Bericht allein NICHT ablesbar, welche Ausnahme es war. Wer hier eine
+      Zeile Code benennt, rät.
+    · **Entscheidend ist die Kopfzeile:** `CFBundleShortVersionString 1.58.1`,
+      `CFBundleVersion 96` — bei einem Absturz von HEUTE. Das Gerät läuft also
+      noch auf dem letzten Build VOR dem Modal-Übergabe-Fix (v1.58.2 = Build
+      97). Alles seit dem 29. Juli ist auf diesem Telefon nie gelaufen. Die
+      IPA-Builds selbst sind in Ordnung (Run 92–99 haben Artefakte).
+    · Passt zum Bild: `procLaunch` 14:11:33, `captureTime` 14:11:51 — der
+      Absturz kam **18 Sekunden nach dem Start**. Und `lowPowerMode: 1` auf
+      einem iPhone XS (`iPhone11,2`): Stromsparmodus und A12 verlangsamen die
+      Übergänge, was ein überlappendes Präsentieren/Entlassen WAHRSCHEINLICHER
+      macht — eine Erklärung dafür, warum er es sieht und die Pipeline nie.
+
+64. **Das Tor: die Modal-Pause ist keine gemerkte Regel mehr** (v1.67.0,
+    `lib/sheetPresence.ts`). §8.54 hatte die Gegenmaßnahme als Merksatz
+    formuliert — „an dieser Stelle 340 ms warten" — und genau EINE Stelle hielt
+    ihn ein. Eine Regel, die man an jeder neuen Aufrufstelle wieder einhalten
+    muss, ist keine Lösung, sondern eine Wette.
+    · Jetzt stempelt JEDES Sheet beim Verschwinden eine Sperre (`sperren()` in
+      der Aufräumfunktion) und fragt beim Erscheinen, ob sie abgelaufen ist
+      (`useSheetTor`). `BottomSheet`, `PhotoViewer` und `ReorderSheet` hängen
+      alle daran; wer künftig ein Sheet aus einem Sheet öffnet, muss nichts
+      mehr wissen. Der `setTimeout` in `TaskQuickSheet` ist entfallen.
+    · **Die Reihenfolge stimmt von selbst:** React führt in einem Commit erst
+      alle Aufräumfunktionen aus und dann alle neuen Effekte. Schließt ein
+      Sheet und öffnet im selben Zug das nächste, ist die Sperre gesetzt,
+      bevor das nächste fragt.
+    · `restSperre` deckelt die Wartezeit bei einer Übergabe — sonst bliebe bei
+      zurückgestellter Systemuhr das nächste Sheet minutenlang unsichtbar, und
+      niemand käme auf die Idee, die Uhr zu verdächtigen (7 Unit-Tests).
+    · `scratchpad/tor.mjs` (7 Prüfungen) misst die WIRKUNG statt der Ursache:
+      ein einzelnes Sheet steht nach ~110 ms, bei der Übergabe entsteht eine
+      Lücke, in der KEINES von beiden steht, und das zweite kommt erst danach.
+      Harnisch-Falle dabei: „Neu planen" taugt nicht als Marker — die
+      Wisch-Aktion der Aufgaben-Zeile trägt denselben Text und steht schon im
+      DOM. Der Umplan-Bogen ist an „Heute Abend" eindeutig.
+    · ⚠️ Was das NICHT beweist: dass der Absturz damit weg ist. Der Bericht
+      nennt die Ausnahme nicht, und der Grund für die Pause ist im Web gar
+      nicht nachstellbar. Es schließt die Klasse, die am besten passt — mehr
+      sagt es nicht.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

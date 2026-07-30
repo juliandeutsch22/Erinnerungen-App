@@ -11,7 +11,7 @@ import { PressableScale } from '@/components/PressableScale';
 import { Type } from '@/components/Type';
 import type { EventPhoto } from '@/data/PhotoRepository';
 import { hapticSelect } from '@/lib/haptics';
-import { useSheetRegistration } from '@/lib/sheetPresence';
+import { useSheetTor } from '@/lib/sheetPresence';
 import { Spacing } from '@/theme/theme.tokens';
 
 export function PhotoViewer({
@@ -28,7 +28,9 @@ export function PhotoViewer({
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   // Der Viewer wird nur gerendert, wenn er offen ist — deshalb fest `true`.
-  useSheetRegistration(true);
+  // Das Tor sorgt dafür, dass er nicht aufgeht, während ein anderes Sheet noch
+  // entlassen wird (sheetPresence.ts).
+  const darfZeigen = useSheetTor(true);
   const [current, setCurrent] = useState(index);
   const [confirm, setConfirm] = useState(false);
 
@@ -57,7 +59,7 @@ export function PhotoViewer({
   const contentStyle = useAnimatedStyle(() => ({ transform: [{ translateY: dragY.value }] }));
   const bgStyle = useAnimatedStyle(() => ({ opacity: Math.max(0.3, 1 - dragY.value / 500) }));
 
-  if (!photo) return null;
+  if (!photo || !darfZeigen) return null;
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>

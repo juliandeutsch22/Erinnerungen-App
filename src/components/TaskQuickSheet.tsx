@@ -15,15 +15,6 @@ import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { useColors } from '@/theme/ThemeProvider';
 import { Spacing } from '@/theme/theme.tokens';
 
-/**
- * Pause zwischen dem Schließen dieses Sheets und dem Öffnen des nächsten.
- *
- * RN-Modals sind auf iOS echte View-Controller; `animationType="slide"` braucht
- * rund 300 ms zum Entlassen. Wer in dieser Zeit den nächsten präsentiert,
- * bekommt im besten Fall ein hängendes Sheet, im schlechteren einen Absturz.
- */
-const MODAL_UEBERGABE_MS = 340;
-
 // Eine Zeile des Aktions-Bogens. Liegt bewusst AUSSERHALB der Komponente:
 // innen waere sie bei jedem Rendern ein neuer Komponententyp — React baut sie
 // dann jedes Mal neu auf, statt sie zu aktualisieren (Zustand und Animation
@@ -94,13 +85,10 @@ export function TaskQuickSheet({
               onPress={() => {
                 hapticSelect();
                 onClose();
-                // ⚠️ NICHT im selben Zug öffnen. `onClose` baut diesen Modal ab,
-                // `onReschedule` baut den nächsten auf — im selben React-Commit
-                // präsentiert iOS einen View-Controller, während der vorherige
-                // noch entlassen wird. Das ist der klassische Weg in einen
-                // Absturz beim Aufziehen des zweiten Sheets. Erst wenn die
-                // Schließ-Animation durch ist, geht der nächste auf.
-                setTimeout(onReschedule, MODAL_UEBERGABE_MS);
+                // Die Pause zwischen den beiden Sheets liegt seit v1.67.0 im
+                // Tor (`lib/sheetPresence.ts`) und nicht mehr hier: sie galt
+                // sonst an genau DIESER Stelle und an keiner künftigen.
+                onReschedule();
               }}
             />
             <RowDivider />
