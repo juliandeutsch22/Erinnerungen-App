@@ -1368,6 +1368,33 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
       statt den Text — „Termin X ändern" ist die Zeile, „Termin X abwählen"
       das Kästchen.
 
+61. **Die Bereichs-Chips der Suche liefen mittendrin ins Leere** (v1.65.0,
+    vom Nutzer gemeldet). Die Reihe ist mit sieben Bereichen breiter als der
+    Bildschirm (726 px auf 430) — das ist richtig so. Falsch war, WO sie
+    endete: der Scroll-Behälter saß INNERHALB des lg-Paddings vom `Screen`,
+    also von 24 bis 406. Der letzte sichtbare Chip wurde dadurch mittendrin
+    abgeschnitten, und daneben stand ein 24 px breiter leerer Streifen. Das
+    liest sich wie ein Darstellungsfehler, nicht wie „hier geht es weiter".
+    · Behoben mit dem Standard-Griff für scrollende Reihen in einem
+      gepolsterten Bildschirm: `marginHorizontal: -Spacing.lg` am Scroller
+      hebt das Padding auf, `paddingHorizontal: Spacing.lg` im
+      `contentContainerStyle` bringt es im Inhalt zurück. Der erste Chip
+      fluchtet weiter mit der Überschrift (24 px), aber der Schnitt liegt jetzt
+      an der ECHTEN Kante — ein Chip, der unter den Bildschirmrand rutscht,
+      sagt genau das Richtige.
+    · `scratchpad/chips.mjs` (8 Prüfungen) misst GEOMETRIE, nicht Text: dass
+      der Behälter von 0 bis zur Bildschirmbreite reicht, dass der erste Chip
+      trotzdem bei 24 steht, dass der letzte nach dem Scrollen vollständig und
+      nicht randbündig dasteht, und dass der Body nicht seitwärts scrollt.
+    · Beim Testen aufgefallen: RN Web schreibt `accessibilityState={{selected}}`
+      für `role="button"` NICHT ins DOM — `aria-selected` fehlt an den Chips.
+      Auf iOS greift es. Für Touren heißt das: den Zustand an der Füllung
+      messen (Kuppel-Blau `rgb(43, 95, 166)`), nicht am Attribut.
+    · **Dieselbe Stelle steckt noch in `PhotoStrip`** (horizontale Foto-Reihe im
+      Termin-Editor). Dort ist der Griff aber NICHT derselbe: die Reihe sitzt in
+      einem Sheet mit 32 px Eckradius — Inhalt, der unter eine gerundete Ecke
+      rutscht, sieht falsch aus. Braucht eine eigene Überlegung.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

@@ -168,9 +168,23 @@ export default function SucheScreen() {
         </Glass>
       </Reveal>
 
-      {/* Bereichs-Chips: „Alle" oder ein Bereich — nochmal tippen hebt auf. */}
+      {/* Bereichs-Chips: „Alle" oder ein Bereich — nochmal tippen hebt auf.
+          Die Reihe ist breiter als der Bildschirm (sieben Bereiche, „Abend-
+          betrachtung" allein 150 px). Sie muss deshalb bis an die ECHTE Kante
+          reichen: der Screen setzt lg-Padding, und ohne das negative Gegenstück
+          endete die Reihe 24 px vor dem Rand — der letzte sichtbare Chip war
+          mittendrin abgeschnitten und daneben stand leerer Streifen. Das liest
+          sich wie ein Fehler, nicht wie „hier geht es weiter". Jetzt schiebt
+          sich der Chip unter den Bildschirmrand, was genau das sagt; das
+          Padding wandert in den Inhalt, damit der erste Chip weiter mit der
+          Überschrift fluchtet. */}
       <Reveal delay={75}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: Spacing.sm }}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ marginHorizontal: -Spacing.lg }}
+          contentContainerStyle={{ gap: Spacing.sm, paddingHorizontal: Spacing.lg }}
+        >
           {SCOPES.map((s) => (
             <Chip
               key={s.value}
