@@ -16,6 +16,8 @@ import { ScrollView, View } from 'react-native';
 import { Glass } from '@/components/Glass';
 import { MarkdownText } from '@/components/MarkdownText';
 import { PressableScale } from '@/components/PressableScale';
+import { SchluesselWeg } from '@/components/SchluesselWeg';
+import { betrifftSchluessel } from '@/lib/schluessel';
 import { Type } from '@/components/Type';
 import type { Task } from '@/data/types';
 import { type AssistantAction, describeAenderung, describeExtras, describeSchritte, resolveTaskHandle } from '@/lib/assistant';
@@ -125,10 +127,16 @@ export function OmniResult({
       )}
 
       {run.status === 'error' && (
-        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm }}>
-          <Type variant="caption" tone="indigo" style={{ flex: 1 }}>{run.error}</Type>
-          {schliessen}
-        </View>
+        <>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm }}>
+            <Type variant="caption" tone="indigo" style={{ flex: 1 }}>{run.error}</Type>
+            {schliessen}
+          </View>
+          {/* Sagt die Meldung „Schlüssel", muss von hier ein Weg dorthin gehen —
+              sonst steht der Nutzer mit einem Auftrag ohne Adresse da. Die Karte
+              geht dabei zu: sie läge sonst über dem neuen Bildschirm. */}
+          {betrifftSchluessel(run.error) && <SchluesselWeg onWeg={onDismiss} />}
+        </>
       )}
 
       {run.status === 'done' && (

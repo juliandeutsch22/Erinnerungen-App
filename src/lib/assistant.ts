@@ -990,7 +990,9 @@ export function describeError(status: number): string {
   if (status === 404)
     return (
       'Kein verfügbares Gemini-Modell gefunden — auch die Alternativen nicht. ' +
-      'Prüfe, ob der Schlüssel unter aistudio.google.com erstellt wurde.'
+      // Ohne Adresse im Text: den Weg trägt seit v1.60 der Knopf darunter
+      // (SchluesselWeg) — eine abgetippte URL ist auf dem Telefon keine Hilfe.
+      'Prüfe, ob der Schlüssel wirklich bei Google AI Studio erstellt wurde.'
     );
   if (status === 429)
     return 'Das Tages-Kontingent des Gratis-Schlüssels ist erschöpft — später erneut versuchen.';

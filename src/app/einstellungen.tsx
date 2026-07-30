@@ -18,6 +18,7 @@ import { GlassPanel } from '@/components/GlassPanel';
 import { InsetField } from '@/components/InsetField';
 import { PressableScale } from '@/components/PressableScale';
 import { Reveal } from '@/components/Reveal';
+import { SchluesselWeg } from '@/components/SchluesselWeg';
 import { Screen } from '@/components/Screen';
 import { Seam } from '@/components/Seam';
 import { Type } from '@/components/Type';
@@ -523,9 +524,11 @@ export default function EinstellungenScreen() {
           <Type variant="heading" style={sectionStyle}>Assistent</Type>
           <Type variant="caption" tone="text3" style={{ marginTop: 2 }}>
             Nutzt deinen eigenen Google-Gemini-Schlüssel (dauerhaft kostenloses Kontingent) — Anfragen
-            gehen direkt vom Gerät an Google, ohne Mittelsmann. Schlüssel erstellen:
-            aistudio.google.com/apikey. Ohne Schlüssel bleibt die App vollständig offline.
+            gehen direkt vom Gerät an Google, ohne Mittelsmann. Ohne Schlüssel bleibt die App
+            vollständig offline.
           </Type>
+          {/* Kein zweiter Knopf: wir stehen bereits in den Einstellungen. */}
+          <SchluesselWeg einstellungen={false} />
           <InsetField style={{ marginTop: Spacing.md }}>
             <TextInput
               value={geminiApiKey}

@@ -21,6 +21,8 @@ import { Appear } from '@/components/Appear';
 import { MarkdownText } from '@/components/MarkdownText';
 import { MicButton } from '@/components/MicButton';
 import { PressableScale } from '@/components/PressableScale';
+import { SchluesselWeg } from '@/components/SchluesselWeg';
+import { betrifftSchluessel } from '@/lib/schluessel';
 import { Type } from '@/components/Type';
 import { LIST_COLORS } from '@/components/listMeta';
 import * as Clipboard from 'expo-clipboard';
@@ -803,6 +805,10 @@ export default function ChatScreen() {
               <PressableScale accessibilityLabel="Erneut versuchen" onPress={retry} style={{ alignSelf: 'flex-start' }}>
                 <Type variant="label" tone="teal">Erneut versuchen</Type>
               </PressableScale>
+              {/* „Prüfe ihn in den Einstellungen" ohne Weg dorthin wäre eine
+                  Aufgabe, keine Hilfe — erneut versuchen allein bringt hier
+                  nichts, solange der Schlüssel derselbe ist. */}
+              {betrifftSchluessel(error) && <SchluesselWeg />}
             </View>
           )}
         </ScrollView>

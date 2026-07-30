@@ -12,6 +12,7 @@ import { DisclosureChevron } from '@/components/DisclosureChevron';
 import { GlassPanel } from '@/components/GlassPanel';
 import { PressableScale } from '@/components/PressableScale';
 import { Reveal } from '@/components/Reveal';
+import { SchluesselWeg } from '@/components/SchluesselWeg';
 import { Screen } from '@/components/Screen';
 import { Seam } from '@/components/Seam';
 import { EmptyState } from '@/components/StateView';
@@ -192,9 +193,10 @@ export default function ChatsScreen() {
               title="Assistent einrichten"
               body={
                 'Der Assistent nutzt deinen eigenen Google-Gemini-Schlüssel (dauerhaft kostenloses Kontingent, keine Kreditkarte). ' +
-                'Erstelle ihn auf aistudio.google.com/apikey und füge ihn in den Einstellungen unter „Assistent" ein. ' +
+                'Erstelle ihn bei Google und füge ihn in den Einstellungen unter „Assistent" ein. ' +
                 'Ohne Schlüssel bleibt die App vollständig offline.'
               }
+              unten={<SchluesselWeg />}
             />
           ) : active.length === 0 && trash.length === 0 ? (
             <EmptyState

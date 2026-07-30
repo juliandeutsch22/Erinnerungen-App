@@ -20,7 +20,18 @@ export function LoadingState({ label = 'Wird geladen…' }: { label?: string }) 
 
 /** Leerzustand als stille Einladung: Glyphe in runder Stein-Well, Titel als
  *  Tempel-Inschrift, ein ruhiger Satz — überall dieselbe Geste, zentriert. */
-export function EmptyState({ title, body, icon }: { title?: string; body: string; icon?: React.ReactNode }) {
+export function EmptyState({
+  title,
+  body,
+  icon,
+  unten,
+}: {
+  title?: string;
+  body: string;
+  icon?: React.ReactNode;
+  /** Ein Weg unter dem Satz — wo der Leerzustand nicht nur erklärt, sondern führt. */
+  unten?: React.ReactNode;
+}) {
   const colors = useColors();
   return (
     <View style={{ gap: Spacing.sm, paddingVertical: Spacing.lg, alignItems: 'center' }}>
@@ -45,6 +56,7 @@ export function EmptyState({ title, body, icon }: { title?: string; body: string
       <Type variant="body" tone="text3" style={{ textAlign: 'center', maxWidth: 280, lineHeight: 15 * 1.5 }}>
         {body}
       </Type>
+      {unten}
     </View>
   );
 }

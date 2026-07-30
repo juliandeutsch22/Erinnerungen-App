@@ -1205,6 +1205,32 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
       `scratchpad/rueckfrage.mjs` (27 Prüfungen, u. a. was WIRKLICH im Request
       landet, der Deckel, das Notieren nebenbei und das Ende der Runde).
 
+56. **Wege statt Verweise** (`lib/schluessel.ts`, `components/SchluesselWeg.tsx`,
+    v1.60.0). Die App stellte dem Nutzer eine Hausaufgabe: Die Adresse des
+    Google-Portals stand an drei Stellen als nackter Text im Fließtext, und
+    die Fehlermeldungen verwiesen auf „die Einstellungen", ohne dorthin zu
+    führen. Eine URL auf dem Telefon abzutippen kann niemand, und wer im Chat
+    einen abgelehnten Schlüssel gemeldet bekommt, sucht den Weg danach selbst.
+    Jetzt trägt ein Knopf-Paar den Weg — „Schlüssel erstellen" (öffnet das
+    Portal) und „Einstellungen" — an fünf Stellen in derselben Reihenfolge:
+    Verwalter-Leerzustand, Einstellungen (dort ohne den zweiten Knopf, das
+    wäre eine Sackgasse), die Fehlerkarte der EINEN Zeile, der Braindump und
+    der Chat. Aus dem Sprach-Sheet heraus schließt der Weg vorher das Sheet —
+    ein offenes RN-Modal bliebe sonst über dem neuen Bildschirm stehen.
+    · Die Entscheidung „lohnt hier ein Weg?" liegt bewusst in `lib/`, nicht in
+      der Komponente: sie wird an fünf Stellen getroffen und hängt am TEXT der
+      Meldung (der Status ist an den Anzeigestellen längst weg). In der
+      Komponente wäre sie nur über einen Renderer prüfbar — und genau solche
+      Prädikate gehen still kaputt, wenn jemand einen Satz umformuliert.
+    · **Der Kontingent-Fehler (429) fällt heraus.** Er nennt zwar
+      „Gratis-Schlüssel", aber dort hilft kein neuer Schlüssel, sondern Warten;
+      ein Knopf „Schlüssel erstellen" wäre ein falscher Rat.
+    · Ein Test durchsucht `src/` danach, ob die Adresse irgendwo ZURÜCK in den
+      Fließtext wandert — sonst wäre der Knopf wieder nur Zierde.
+    · `scratchpad/wege.mjs` (16 Prüfungen) belegt, dass der Knopf wirklich das
+      Portal öffnet, dass er in den Einstellungen nicht doppelt steht und dass
+      die Fehlerkarte beim Weggehen zugeht.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

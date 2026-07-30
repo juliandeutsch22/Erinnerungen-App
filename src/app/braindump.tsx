@@ -16,6 +16,8 @@ import { InsetField } from '@/components/InsetField';
 import { KeyboardDoneBar, keyboardDoneProps } from '@/components/KeyboardDone';
 import { MicButton } from '@/components/MicButton';
 import { PressableScale } from '@/components/PressableScale';
+import { SchluesselWeg } from '@/components/SchluesselWeg';
+import { betrifftSchluessel } from '@/lib/schluessel';
 import { LoadingState } from '@/components/StateView';
 import { LIST_COLORS } from '@/components/listMeta';
 import { Type } from '@/components/Type';
@@ -392,7 +394,15 @@ export default function BraindumpScreen() {
             ) : (
               <LoadingState label="Assistent sortiert…" />
             ))}
-          {error && <Type variant="caption" tone="indigo">{error}</Type>}
+          {error && (
+            <View>
+              <Type variant="caption" tone="indigo">{error}</Type>
+              {/* Ein abgelehnter Schlüssel ist hier besonders bitter: der
+                  Braindump ist voll, und der Weg zum Schlüssel darf nicht
+                  aus einem Satz bestehen, den man selbst abtippen muss. */}
+              {betrifftSchluessel(error) && <SchluesselWeg />}
+            </View>
+          )}
           {done && (
             <View style={{ gap: Spacing.xs }}>
               <Type variant="label" tone="teal">{done}</Type>

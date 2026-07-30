@@ -23,6 +23,8 @@ import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTim
 
 import { ActionEditSheet, type EditTarget } from '@/components/ActionEditSheet';
 import { BottomSheet } from '@/components/BottomSheet';
+import { SchluesselWeg } from '@/components/SchluesselWeg';
+import { betrifftSchluessel } from '@/lib/schluessel';
 import { GlassButton } from '@/components/GlassButton';
 import { PressableScale } from '@/components/PressableScale';
 import { Type } from '@/components/Type';
@@ -99,6 +101,7 @@ export function QuickVoiceView({
   onSpeakFresh,
   onOpenSettings,
   onOpenCalendar,
+  onSchluesselWeg,
 }: {
   phase: QuickVoicePhase;
   interim: string;
@@ -123,6 +126,9 @@ export function QuickVoiceView({
   onSpeakFresh?: () => void;
   onOpenSettings?: () => void;
   onOpenCalendar?: () => void;
+  /** Das Sheet schließen, bevor der Schlüssel-Weg woandershin führt — ein
+   *  offenes RN-Modal bliebe sonst über dem neuen Bildschirm stehen. */
+  onSchluesselWeg?: () => void;
 }) {
   const colors = useColors();
 
@@ -205,6 +211,8 @@ export function QuickVoiceView({
     return (
       <View style={{ gap: Spacing.md, paddingVertical: Spacing.md }}>
         <Type variant="caption" tone="indigo">{error ?? 'Das hat nicht geklappt.'}</Type>
+        {/* Beim Schlüssel hilft „noch einmal sprechen" nicht — nur der Weg dorthin. */}
+        {betrifftSchluessel(error) && <SchluesselWeg onWeg={onSchluesselWeg} />}
         <GlassButton accessibilityLabel="Noch einmal sprechen" onPress={onSpeakAgain}>
           <Mic size={17} color="#FFFFFF" strokeWidth={2.2} />
           <Type variant="label" style={{ color: '#FFFFFF' }}>Noch einmal sprechen</Type>
@@ -624,6 +632,7 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
           onSpeakAgain={speakAgain}
           onSpeakFresh={speakFresh}
           onOpenSettings={() => void Linking.openSettings()}
+          onSchluesselWeg={onClose}
           onOpenCalendar={() => {
             onClose();
             router.push('/kalender');
