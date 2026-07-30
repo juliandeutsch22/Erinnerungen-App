@@ -1331,12 +1331,42 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
       unerreichbar (§8.5). Geprüft sind nur `buildEventDraft` und
       `updateDeviceEvent`; Feld, Karten-Knopf und Zeile gehören am Gerät
       gegengeprüft.
-    · **Noch offen:** der Assistent kann keinen Ort setzen. `AssistantEventInput`
-      trägt bereits `ort` und `buildEventDraft` reicht es durch — es fehlen
-      Prompt, JSON-Schema, `extractActions` und die drei Anzeigestellen
-      (OmniResult, Braindump, Sprach-Sheet) samt `ActionEditSheet`. Wer
-      „Zahnarzt Dienstag 10 Uhr in der Bahnhofstraße" diktiert, bekommt den Ort
-      also noch nicht in den Termin.
+    · Der Assistent konnte zunächst keinen Ort setzen — **mit v1.64.0
+      nachgezogen (§8.60)**.
+
+60. **Der Assistent trägt den Ort mit** (v1.64.0) — der offene Faden aus
+    §8.59. „Zahnarzt Dienstag 10 Uhr Bahnhofstraße 4" landete bis hierher
+    ohne Ort im Kalender, obwohl das Feld seit v1.63.0 existierte.
+    · Kette: JSON-Vorlage (beide Fassungen) → `responseSchema.termine.ort` →
+      `AssistantAction['termine']` → Parser in `extractActions` → über
+      `AssistantEventInput.ort` und `buildEventDraft` in den Kalender. Die
+      Weitergabe an `createEvents` brauchte gar keine Änderung: die Typen sind
+      strukturell dieselben.
+    · **Die Prompt-Regel verbietet das Erfinden.** „ort" nur, wenn im Text
+      wirklich einer steht — niemals raten oder ausschmücken. Ein ausgedachter
+      Ort ist schlimmer als keiner: man sieht ihm nicht an, dass er geraten
+      war, und er steht dann im Gerätekalender.
+    · `ortZusatz()` liefert den Zusatz für die Unterzeile. Klein, aber an VIER
+      Stellen gebraucht (EINE Zeile, Braindump, Chat, Sprach-Sheet), die ihre
+      Unterzeile bis heute jede für sich zusammenbauen — mit drei
+      verschiedenen Zeitformaten. Der gemeinsame Zusatz sorgt wenigstens
+      dafür, dass der Ort überall gleich aussieht und ein Test alle vier auf
+      einmal absichert. **Die vier Unterzeilen zu vereinheitlichen steht noch
+      aus** und gehört zum Punkt „vier ‚Neu anlegen'-Muster".
+    · `ActionEditSheet` bekommt ein Ort-Feld — aber NUR beim Termin. Leer
+      geräumt wird `undefined`, nicht `''`: der Kalender-Weg soll gar keinen
+      Ort sehen, nicht einen leeren.
+    · Diese Kette IST im Web prüfbar, anders als der Termin-Editor selbst: die
+      Antwort kommt aus dem Mock, die Vorschlagskarte rendert normal.
+      `scratchpad/ort.mjs` (12 Prüfungen) geht Parser → Unterzeile →
+      Schnell-Editor → geänderter Stand → Ort wieder entfernen und prüft, dass
+      eine AUFGABE kein Ort-Feld bekommt.
+    · Harnisch-Notiz: Eingaben müssen über `BEFEHL`/`FRAGEWORT` an den
+      Assistenten geroutet werden („Plane meine Woche: …"), sonst legt die
+      Zeile lokal an und der Knopf heißt „Aufgabe anlegen". Und beim Klicken in
+      der Vorschlagskarte trifft ein zu weites Label das KÄSTCHEN (Abwahl)
+      statt den Text — „Termin X ändern" ist die Zeile, „Termin X abwählen"
+      das Kästchen.
 
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 

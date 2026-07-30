@@ -1,7 +1,7 @@
 // assistant.test.ts — Prompt-Bau, Antwort-Extraktion, Fehlertexte.
 import type { ChatMessage, Task } from '@/data/types';
 
-import { buildAppContext,  buildBraindumpContext, buildRequestBody, createSseParser, describeError, describeSchritte, extractActions, extractChunkText, extractText, pickModelsFromList, promptChips, resolveListId, sanitizeChatTitle, SYSTEM_PROMPT, subtasksFromSchritte, describeExtras, describeAenderung, MEMORY_LIMIT, resolveTaskHandle, taskHandle, ASSISTANT_TOOLS, extractCalls, runAssistantTool, type ToolData, MAX_TOOL_ROUNDS, actionDueDate, hasCapturableActions, SCHRITTE_LIMIT, IMAGE_LIMIT, type AssistantImage, systemPrompt, usesNewConfigDialect, tuneForModel, MODEL_CHAIN, LITE_CHAIN } from './assistant';
+import { ortZusatz, buildAppContext,  buildBraindumpContext, buildRequestBody, createSseParser, describeError, describeSchritte, extractActions, extractChunkText, extractText, pickModelsFromList, promptChips, resolveListId, sanitizeChatTitle, SYSTEM_PROMPT, subtasksFromSchritte, describeExtras, describeAenderung, MEMORY_LIMIT, resolveTaskHandle, taskHandle, ASSISTANT_TOOLS, extractCalls, runAssistantTool, type ToolData, MAX_TOOL_ROUNDS, actionDueDate, hasCapturableActions, SCHRITTE_LIMIT, IMAGE_LIMIT, type AssistantImage, systemPrompt, usesNewConfigDialect, tuneForModel, MODEL_CHAIN, LITE_CHAIN } from './assistant';
 
 const msg = (role: 'user' | 'assistant', content: string, at: string): ChatMessage => ({
   id: `m-${at}`, chatId: 'c1', role, content, createdAt: at,
@@ -57,6 +57,24 @@ describe('extractActions', () => {
       { titel: 'Geburtstag', datum: '2026-08-05', start: undefined, ende: undefined },
     ]);
   });
+  it('liest den Ort eines Termins mit — und lässt ihn weg, wenn keiner da ist', () => {
+    const text =
+      '```stoa-aktionen\n{"termine":[{"titel":"Zahnarzt","datum":"2026-08-03","start":"10:00","ort":"Bahnhofstraße 4"},' +
+      '{"titel":"Kino","datum":"2026-08-04"},{"titel":"Leer","datum":"2026-08-05","ort":"   "}]}\n```';
+    const { actions } = extractActions(text);
+    expect(actions?.termine[0].ort).toBe('Bahnhofstraße 4');
+    expect(actions?.termine[1].ort).toBeUndefined();
+    // Nur Leerzeichen ist kein Ort — sonst stünde ein leerer Punkt in der Zeile.
+    expect(actions?.termine[2].ort).toBeUndefined();
+  });
+
+  it('nimmt einen Ort, der kein Ort im engen Sinn ist — „Zoom" zählt auch', () => {
+    const { actions } = extractActions(
+      '```stoa-aktionen\n{"termine":[{"titel":"Standup","datum":"2026-08-03","start":"09:00","ort":"Zoom"}]}\n```',
+    );
+    expect(actions?.termine[0].ort).toBe('Zoom');
+  });
+
   it('liest die vorgeschlagene Liste an einer Aufgabe mit', () => {
     const { actions } = extractActions('```stoa-aktionen\n{"aufgaben":[{"titel":"Reifen","liste":"Auto"},{"titel":"Ohne"}]}\n```');
     expect(actions?.aufgaben[0].liste).toBe('Auto');
@@ -743,5 +761,26 @@ describe('Abgeschnittene Antworten (Token-Limit)', () => {
 
   it('reine Prosa ohne Klammer bleibt unangetastet', () => {
     expect(extractActions('Klingt gut.').clean).toBe('Klingt gut.');
+  });
+});
+
+describe('ortZusatz', () => {
+  it('hängt den Ort mit Trenner an — an allen vier Anzeigestellen dieselbe Form', () => {
+    expect(ortZusatz({ ort: 'Bahnhofstraße 4' })).toBe(' · Bahnhofstraße 4');
+  });
+
+  it('bleibt leer, wenn kein Ort da ist', () => {
+    expect(ortZusatz({})).toBe('');
+    expect(ortZusatz({ ort: '' })).toBe('');
+    expect(ortZusatz({ ort: '   ' })).toBe('');
+  });
+});
+
+describe('Prompt-Regel zum Ort', () => {
+  it('erlaubt freie Orte, verbietet aber das Erfinden', () => {
+    expect(SYSTEM_PROMPT).toContain('„ort" nur, wenn im Text wirklich einer steht');
+    expect(SYSTEM_PROMPT).toContain('niemals raten');
+    // Die JSON-Vorlage muss das Feld nennen, sonst kommt es nie zurück.
+    expect(SYSTEM_PROMPT).toContain('"ort"');
   });
 });

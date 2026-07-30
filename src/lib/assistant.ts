@@ -68,10 +68,10 @@ const P_AKTIONEN_KOPF =
 // (kein Chat zu einer Notiz) — ein Feld zu zeigen, das hinterher verworfen
 // wird, lädt das Modell nur ein, es zu füllen.
 const AKTIONEN_JSON_VOLL =
-  '{"aufgaben":[{"titel":"…","datum":"YYYY-MM-DD","zeit":"HH:MM","schritte":["…"],"wiederholung":"weekly","tags":["…"],"notiz":"…"}],"termine":[{"titel":"…","datum":"YYYY-MM-DD","start":"HH:MM","ende":"HH:MM","notiz":"…"}],"listen":[{"name":"…","ziel":"…","deadline":"YYYY-MM-DD"}],"aenderungen":[{"handle":"abc123","erledigt":true,"datum":"YYYY-MM-DD","zeit":"HH:MM","titel":"…","liste":"…","papierkorb":true}],"checkliste":["…"],"notizen":["…"]}';
+  '{"aufgaben":[{"titel":"…","datum":"YYYY-MM-DD","zeit":"HH:MM","schritte":["…"],"wiederholung":"weekly","tags":["…"],"notiz":"…"}],"termine":[{"titel":"…","datum":"YYYY-MM-DD","start":"HH:MM","ende":"HH:MM","ort":"…","notiz":"…"}],"listen":[{"name":"…","ziel":"…","deadline":"YYYY-MM-DD"}],"aenderungen":[{"handle":"abc123","erledigt":true,"datum":"YYYY-MM-DD","zeit":"HH:MM","titel":"…","liste":"…","papierkorb":true}],"checkliste":["…"],"notizen":["…"]}';
 
 const AKTIONEN_JSON_ERFASSEN =
-  '{"aufgaben":[{"titel":"…","datum":"YYYY-MM-DD","zeit":"HH:MM","schritte":["…"],"wiederholung":"weekly","tags":["…"],"notiz":"…"}],"termine":[{"titel":"…","datum":"YYYY-MM-DD","start":"HH:MM","ende":"HH:MM","notiz":"…"}],"listen":[{"name":"…","ziel":"…","deadline":"YYYY-MM-DD"}],"notizen":["…"]}';
+  '{"aufgaben":[{"titel":"…","datum":"YYYY-MM-DD","zeit":"HH:MM","schritte":["…"],"wiederholung":"weekly","tags":["…"],"notiz":"…"}],"termine":[{"titel":"…","datum":"YYYY-MM-DD","start":"HH:MM","ende":"HH:MM","ort":"…","notiz":"…"}],"listen":[{"name":"…","ziel":"…","deadline":"YYYY-MM-DD"}],"notizen":["…"]}';
 
 const P_AKTIONEN_RUMPF =
   '\n```\n' +
@@ -92,6 +92,11 @@ const P_AKTIONEN_RUMPF =
   'voneinander erledigt werden (verschiedene Orte, verschiedene Tage, verschiedene Anlässe). ' +
   '„termine" sind feste Verabredungen zu einem Zeitpunkt (Arzttermin, Meeting, Kino, Zug, Geburtstag) — ' +
   'sie landen im Gerätekalender; datum ist Pflicht, start/ende optional (ohne start = ganztägig). ' +
+  // Der Ort ist genau das EventKit-Feld — er darf frei sein („Küche", „Zoom"),
+  // aber NICHT erfunden: ein ausgedachter Ort ist schlimmer als keiner, weil
+  // man ihm ansieht, dass jemand ihn eingetragen hat.
+  '„ort" nur, wenn im Text wirklich einer steht (Adresse, Lokal, Raum, „Zoom", „bei Oma") — ' +
+  'niemals raten oder ausschmücken; fehlt er, lass das Feld weg. ' +
   'Im Zweifel: fester Zeitpunkt/Verabredung → Termin, etwas zu TUN → Aufgabe. ';
 
 const P_CHECKLISTE = '„checkliste" nur, wenn der Chat zu einer Notiz gehört; ';
@@ -163,6 +168,7 @@ const ACTION_SCHEMA = {
           datum: { type: 'STRING' },
           start: { type: 'STRING' },
           ende: { type: 'STRING' },
+          ort: { type: 'STRING' },
           notiz: { type: 'STRING' },
         },
         required: ['titel', 'datum'],
@@ -255,7 +261,7 @@ export type AssistantAction = {
     notiz?: string;
   }[];
   /** Feste Verabredungen → Gerätekalender. datum Pflicht; ohne start = ganztägig. */
-  termine: { titel: string; datum: string; start?: string; ende?: string; notiz?: string }[];
+  termine: { titel: string; datum: string; start?: string; ende?: string; ort?: string; notiz?: string }[];
   /** Neue Projekte/Listen. Werden VOR den Aufgaben angelegt, damit deren
    *  „liste" auf die frische Liste zeigen kann. */
   listen: { name: string; ziel?: string; deadline?: string }[];
@@ -468,6 +474,8 @@ function parseActionJson(jsonText: string): AssistantAction | null {
             datum: t.datum as string,
             start: typeof t.start === 'string' && /^\d{2}:\d{2}$/.test(t.start) ? (t.start as string) : undefined,
             ende: typeof t.ende === 'string' && /^\d{2}:\d{2}$/.test(t.ende) ? (t.ende as string) : undefined,
+            // Freier Text — keine Form zu prüfen, nur leer auszusortieren.
+            ort: typeof t.ort === 'string' && (t.ort as string).trim().length > 0 ? (t.ort as string).trim() : undefined,
             notiz: typeof t.notiz === 'string' && (t.notiz as string).trim().length > 0 ? (t.notiz as string).trim() : undefined,
           }))
       : [];
@@ -973,6 +981,19 @@ export function createSseParser(onEvent?: (event: unknown) => void): { push: (ch
       return t !== null ? [t] : [];
     },
   };
+}
+
+/**
+ * Der Ort eines vorgeschlagenen Termins als Zusatz für die Unterzeile.
+ *
+ * Klein, aber an VIER Stellen gebraucht (die EINE Zeile, Braindump, Chat,
+ * Sprach-Sheet), und jede baut ihre Unterzeile bis heute selbst zusammen.
+ * Ein gemeinsamer Zusatz sorgt wenigstens dafür, dass der Ort überall gleich
+ * aussieht — und dass ein Test alle vier auf einmal absichern kann.
+ */
+export function ortZusatz(t: { ort?: string }): string {
+  const o = t.ort?.trim();
+  return o ? ` · ${o}` : '';
 }
 
 /** Antworttext aus der Gemini-Response ziehen (defensiv). */

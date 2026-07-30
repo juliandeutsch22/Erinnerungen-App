@@ -58,6 +58,8 @@ export function ActionEditSheet({
   const [datum, setDatum] = useState<string | null>(aufgabe?.datum ?? termin?.datum ?? null);
   const [zeit, setZeit] = useState<string | null>(aufgabe?.zeit ?? termin?.start ?? null);
   const [liste, setListe] = useState<string | undefined>(aufgabe?.liste);
+  // Nur Termine haben einen Ort — Aufgaben und Notizen kennen ihn nicht.
+  const [ort, setOrt] = useState(termin?.ort ?? '');
   const [zeigeDatum, setZeigeDatum] = useState(false);
 
   const feld = {
@@ -80,7 +82,15 @@ export function ActionEditSheet({
     } else if (target.kind === 'termin') {
       const next = [...actions.termine];
       // Ein Termin OHNE Datum ergibt keinen Kalendereintrag — dann bleibt das alte stehen.
-      next[target.index] = { ...next[target.index], titel: text, datum: datum ?? next[target.index].datum, start: zeit ?? undefined };
+      next[target.index] = {
+        ...next[target.index],
+        titel: text,
+        datum: datum ?? next[target.index].datum,
+        start: zeit ?? undefined,
+        // Leer geräumt heißt: doch kein Ort. `undefined` und nicht '' — so
+        // sieht der Kalender-Weg gar keinen Ort, statt einen leeren.
+        ort: ort.trim() ? ort.trim() : undefined,
+      };
       onSave({ ...actions, termine: next });
     } else {
       const next = [...actions.notizen];
@@ -158,6 +168,23 @@ export function ActionEditSheet({
               {zeit !== null && <TimeField value={zeit} onChange={setZeit} accessibilityLabel="Uhrzeit wählen" />}
             </View>
           </>
+        )}
+
+        {/* Der Ort — nur beim Termin. Der Assistent trägt ihn nur ein, wenn er
+            im Gesagten stand; hier kann man ihn nachtragen oder korrigieren,
+            bevor irgendetwas im Kalender landet. */}
+        {target.kind === 'termin' && (
+          <View style={{ gap: Spacing.xs }}>
+            <Type variant="label" tone="text2">Ort</Type>
+            <TextInput
+              value={ort}
+              onChangeText={setOrt}
+              placeholder="Wo? (optional)"
+              placeholderTextColor={colors.text3}
+              accessibilityLabel="Ort des Termins"
+              style={[feld, webNoOutline]}
+            />
+          </View>
         )}
 
         {target.kind === 'aufgabe' && lists.length > 0 && (
