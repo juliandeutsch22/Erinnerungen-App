@@ -597,6 +597,9 @@ export function buildEventContext(ev: DeviceEvent): string {
     `Check-in-Datum (ISO): ${ev.start.toISOString().slice(0, 10)}`,
     `Check-out-Datum (ISO): ${ev.end.toISOString().slice(0, 10)}`,
   ];
+  // Der Ort steht VOR den Notizen: „wo bin ich da?" ist die häufigere Frage
+  // an einen Termin-Chat als „was steht in der Notiz?".
+  if (ev.location) lines.push(`Ort: ${ev.location}`);
   if (ev.notes) lines.push(`Notizen zum Termin: ${ev.notes}`);
   return lines.join('\n');
 }

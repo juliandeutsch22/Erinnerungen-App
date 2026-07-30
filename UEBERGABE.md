@@ -1302,6 +1302,42 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
       Repositories machten es von Anfang an richtig (`{ ...existing, ...patch }`).
       Ein Test hält es jetzt fest.
 
+59. **Termine bekommen einen Ort** (v1.63.0, vom Nutzer gewünscht). EventKit
+    kennt `location` seit jeher, Stoa hat es nur nie gelesen und nie
+    geschrieben — ein Termin hatte Titel, Notiz und Zeit, aber kein Wo.
+    · `DeviceEvent.location` und `EventDraft.location`; gelesen in
+      `listDeviceEvents`, geschrieben in `createDeviceEvent`/`updateDeviceEvent`.
+    · **Die Feinheit steckt im Löschen:** beim Aktualisieren geht `''` an
+      EventKit, nicht `undefined`. `undefined` hieße „nicht anfassen" — ein Ort
+      ließe sich dann setzen, aber nie wieder entfernen. Zwei Tests halten das
+      fest (`deviceCalendar.test.ts`); das ist der einzige Teil der
+      Kalender-Anbindung, der sich ohne natives Modul prüfen lässt, weil
+      `update` direkt auf dem Shared Object des Termins sitzt.
+    · Im Editor steht das Feld direkt UNTER dem Titel, nicht unten bei den
+      Details: „was" und „wo" gehören zusammen, die Notiz ist der Anhang.
+      Freier Text, keine Adress-Suche — „Küche", „Zoom", „bei Oma" sind genauso
+      gute Orte, und ein Feld, das eine gefundene Adresse verlangt, lehnt die
+      Hälfte davon ab. Ist etwas eingetragen, führt „Karte" nach
+      `maps.apple.com/?q=…`; ob die Karten-App damit etwas anfangen kann,
+      entscheidet sie selbst.
+    · In der Termin-Zeile bekommt der Ort eine EIGENE Zeile mit Nadel-Glyphe —
+      er ist Inhalt, kein Abzeichen, und zwischen Uhrzeit und Kalendername
+      gequetscht liest ihn niemand. Die Zeile entsteht nur, wenn ein Ort da
+      ist; Termine ohne bleiben so hoch wie bisher.
+    · `buildEventContext` reicht den Ort an den Assistenten weiter (vor den
+      Notizen: „wo bin ich da?" ist die häufigere Frage an einen Termin-Chat).
+    · ⚠️ **Im Web-Harnisch NICHT prüfbar.** Ohne Gerätekalender gibt es weder
+      „Neuer Termin" noch Termin-Zeilen — der Editor ist auf der Web-Seite
+      unerreichbar (§8.5). Geprüft sind nur `buildEventDraft` und
+      `updateDeviceEvent`; Feld, Karten-Knopf und Zeile gehören am Gerät
+      gegengeprüft.
+    · **Noch offen:** der Assistent kann keinen Ort setzen. `AssistantEventInput`
+      trägt bereits `ort` und `buildEventDraft` reicht es durch — es fehlen
+      Prompt, JSON-Schema, `extractActions` und die drei Anzeigestellen
+      (OmniResult, Braindump, Sprach-Sheet) samt `ActionEditSheet`. Wer
+      „Zahnarzt Dienstag 10 Uhr in der Bahnhofstraße" diktiert, bekommt den Ort
+      also noch nicht in den Termin.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

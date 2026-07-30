@@ -12,6 +12,7 @@ const ev = (h1: number, m1: number, h2: number, m2: number, title: string, allDa
   calendarId: 'c',
   title,
   notes: null,
+  location: null,
   allDay,
   start: new Date(2026, 6, 15, h1, m1),
   end: new Date(2026, 6, 15, h2, m2),

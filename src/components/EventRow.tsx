@@ -2,7 +2,7 @@
 // des Quell-Kalenders, Titel, Zeit-Label, optionaler Foto-Indikator.
 // Gesten wie die Aufgaben-Zeile (gleiche Sprache): Tap = bearbeiten,
 // Swipe rechts = Fotos anhängen (Rückblick), Swipe links = bearbeiten.
-import { ImageIcon, NotebookPen, Paperclip, Pencil } from 'lucide-react-native';
+import { ImageIcon, MapPin, NotebookPen, Paperclip, Pencil } from 'lucide-react-native';
 import React, { useMemo, useRef } from 'react';
 import { View } from 'react-native';
 import ReanimatedSwipeable, { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
@@ -79,6 +79,16 @@ export function EventRow({
             </View>
           )}
         </View>
+        {/* Der Ort bekommt eine EIGENE Zeile, keinen Platz in der Indikator-
+            Reihe: er ist Inhalt, kein Abzeichen, und „Bahnhofstraße 4" gequetscht
+            zwischen Uhrzeit und Kalendername liest niemand. Die Zeile entsteht
+            nur, wenn ein Ort da ist — Termine ohne bleiben so hoch wie bisher. */}
+        {event.location && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <MapPin size={11} color={colors.text3} strokeWidth={2} />
+            <Type variant="caption" tone="text3" numberOfLines={1} style={{ flex: 1 }}>{event.location}</Type>
+          </View>
+        )}
       </View>
     </PressableScale>
   );

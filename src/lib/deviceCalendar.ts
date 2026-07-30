@@ -24,6 +24,16 @@ export type DeviceEvent = {
   calendarId: string;
   title: string;
   notes: string | null;
+  /**
+   * Ort des Termins — genau das Feld, das EventKit `location` nennt.
+   *
+   * Bewusst ein freier Text und keine Koordinate: „Küche", „Zoom", „bei Oma"
+   * sind genauso gute Orte wie eine Adresse, und ein Feld, das auf eine
+   * gefundene Adresse besteht, lehnt die Hälfte davon ab. Wer eine Adresse
+   * einträgt, bekommt den Weg zur Karte trotzdem — das entscheidet die
+   * Karten-App, nicht wir.
+   */
+  location: string | null;
   allDay: boolean;
   start: Date;
   end: Date;
@@ -87,6 +97,7 @@ export async function listDeviceEvents(from: Date, to: Date): Promise<DeviceEven
       calendarId: e.calendarId,
       title: e.title || 'Ohne Titel',
       notes: e.notes ? e.notes : null,
+      location: e.location ? e.location : null,
       allDay: e.allDay,
       start,
       end: toDate(e.endDate),
@@ -114,6 +125,7 @@ export async function defaultCalendarId(): Promise<string | null> {
 export type EventDraft = {
   title: string;
   notes: string | null;
+  location: string | null;
   allDay: boolean;
   start: Date;
   end: Date;
@@ -125,6 +137,7 @@ export async function createDeviceEvent(calendarId: string, draft: EventDraft): 
   await cal.createEvent({
     title: draft.title,
     notes: draft.notes ?? undefined,
+    location: draft.location ?? undefined,
     allDay: draft.allDay,
     startDate: draft.start,
     endDate: draft.end,
@@ -132,7 +145,7 @@ export async function createDeviceEvent(calendarId: string, draft: EventDraft): 
 }
 
 // ——— Termin aus einer Assistenten-Aktion (Sprach-Sheet, Chat, Braindump). ———
-export type AssistantEventInput = { titel: string; datum: string; start?: string; ende?: string; notiz?: string };
+export type AssistantEventInput = { titel: string; datum: string; start?: string; ende?: string; notiz?: string; ort?: string };
 
 /** Baut aus {datum, start, ende} einen EventDraft — rein & testbar (lokale Zeit,
  *  KEIN UTC). Ohne start: ganztägig. Ende ≤ Start oder fehlend → eine Stunde. */
@@ -141,7 +154,7 @@ export function buildEventDraft(input: AssistantEventInput): EventDraft {
   if (!input.start) {
     const end = new Date(base);
     end.setDate(end.getDate() + 1);
-    return { title: input.titel, notes: input.notiz ?? null, allDay: true, start: base, end };
+    return { title: input.titel, notes: input.notiz ?? null, location: input.ort ?? null, allDay: true, start: base, end };
   }
   const [sh, sm] = input.start.split(':').map(Number);
   const start = new Date(base);
@@ -155,7 +168,7 @@ export function buildEventDraft(input: AssistantEventInput): EventDraft {
     end = new Date(start.getTime() + 60 * 60 * 1000);
   }
   if (end.getTime() <= start.getTime()) end = new Date(start.getTime() + 60 * 60 * 1000);
-  return { title: input.titel, notes: input.notiz ?? null, allDay: false, start, end };
+  return { title: input.titel, notes: input.notiz ?? null, location: input.ort ?? null, allDay: false, start, end };
 }
 
 /** Legt einen Termin im Standard-Kalender an. Kümmert sich um Berechtigung und
@@ -178,6 +191,9 @@ export async function updateDeviceEvent(ev: DeviceEvent, draft: EventDraft): Pro
   await ev.native.update({
     title: draft.title,
     notes: draft.notes ?? '',
+    // Leerer String, nicht undefined: einen Ort zu ENTFERNEN muss möglich
+    // sein, und `undefined` hieße für EventKit „nicht anfassen".
+    location: draft.location ?? '',
     allDay: draft.allDay,
     startDate: draft.start,
     endDate: draft.end,

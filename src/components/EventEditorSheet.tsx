@@ -2,9 +2,9 @@
 // Formsprache des Aufgaben-Editors: Titel + Notiz oben, kompakte Detail-Zeilen
 // (Kalender / Beginnt / Endet), Primär-Button fest im Footer. Termine können
 // sich über mehrere Tage erstrecken; Uhrzeiten über natives iOS-Rad.
-import { CalendarDays, Plus, Trash2, X } from 'lucide-react-native';
+import { CalendarDays, MapPin, Plus, Trash2, X } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { Linking, StyleSheet, TextInput, View } from 'react-native';
 
 import { BottomSheet } from '@/components/BottomSheet';
 import { DisclosureChevron } from '@/components/DisclosureChevron';
@@ -78,6 +78,7 @@ export function EventEditorSheet({
     : defaultDate;
 
   const [title, setTitle] = useState(event?.title ?? '');
+  const [ort, setOrt] = useState(event?.location ?? '');
   const [notes, setNotes] = useState(event?.notes ?? '');
   const [calendarId, setCalendarId] = useState(event?.calendarId ?? writable[0]?.id ?? '');
   const [startDay, setStartDay] = useState(event ? toDateStr(event.start) : defaultDate);
@@ -129,7 +130,16 @@ export function EventEditorSheet({
       // Gleicher Tag + Ende ≤ Beginn → mindestens eine Stunde.
       if (end.getTime() <= start.getTime()) end = new Date(start.getTime() + 60 * 60 * 1000);
     }
-    const draft = { title: title.trim(), notes: notes.trim() ? notes.trim() : null, allDay, start, end };
+    const draft = {
+      title: title.trim(),
+      notes: notes.trim() ? notes.trim() : null,
+      // Leerer Text = kein Ort. Der Unterschied zählt beim Bearbeiten: so
+      // lässt sich ein Ort auch wieder entfernen, nicht nur setzen.
+      location: ort.trim() ? ort.trim() : null,
+      allDay,
+      start,
+      end,
+    };
     if (isEdit) updateEvent.mutate({ event, draft });
     else {
       createEvent.mutate({ calendarId, draft });
@@ -181,6 +191,42 @@ export function EventEditorSheet({
           webNoOutline,
         ]}
       />
+      {/* Ort — direkt unter dem Titel, nicht unten bei den Details: „was" und
+          „wo" gehören zusammen, die Notiz ist der Anhang. Ein freier Text,
+          keine Adress-Suche: „Küche", „Zoom", „bei Oma" sind genauso gute
+          Orte, und ein Feld, das eine gefundene Adresse verlangt, lehnt die
+          Hälfte davon ab. */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+        <MapPin size={15} color={ort.trim() ? colors.indigo : colors.text3} strokeWidth={2} />
+        <TextInput
+          value={ort}
+          onChangeText={setOrt}
+          placeholder="Ort"
+          placeholderTextColor={colors.text3}
+          returnKeyType="done"
+          accessibilityLabel="Ort des Termins"
+          style={[
+            { flex: 1, fontSize: T.md, color: colors.text2, paddingVertical: Spacing.sm },
+            webNoOutline,
+          ]}
+        />
+        {/* Ein Ort, den man nicht ansteuern kann, ist Zierde. Die Karten-App
+            entscheidet selbst, ob sie mit „Küche" etwas anfangen kann — wir
+            versuchen es gar nicht erst zu beurteilen. */}
+        {ort.trim().length > 0 && (
+          <PressableScale
+            accessibilityLabel={`${ort.trim()} in Karten öffnen`}
+            onPress={() => {
+              hapticSelect();
+              void Linking.openURL(`http://maps.apple.com/?q=${encodeURIComponent(ort.trim())}`);
+            }}
+            style={{ paddingVertical: Spacing.xs, paddingHorizontal: Spacing.sm }}
+          >
+            <Type variant="label" tone="teal">Karte</Type>
+          </PressableScale>
+        )}
+      </View>
+
       <TextInput
         value={notes}
         onChangeText={setNotes}
