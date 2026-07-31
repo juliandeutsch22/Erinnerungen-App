@@ -874,7 +874,13 @@ export function QuickAdd({
               }}
               onSubmitEditing={() => submit()}
               accessibilityLabel="Schnell hinzufügen"
-              style={[{ flex: 1, fontSize: T.md, color: colors.text, paddingVertical: 2 }, webNoOutline]}
+              // `minHeight` ist hier kein Schönheitsmaß, sondern eine Reparatur:
+              // ohne sie war das Feld 21 px hoch bei 15 px Schrift — der
+              // Textkasten (17 px) kleiner als das Glyphenfeld (~18 px), und
+              // weil ein Eingabefeld `overflow: clip` hat, wurden Unterlängen
+              // (g, j) und der Punkt am Satzende leicht abgeschnitten. Man
+              // sieht es nur, wenn man es einmal gesehen hat — und dann immer.
+              style={[{ flex: 1, fontSize: T.md, color: colors.text, paddingVertical: 2, minHeight: 24 }, webNoOutline]}
             />
             {/* Das Mikrofon bleibt IMMER stehen — auch mit Text im Feld. Sonst
                 könnte man nur anfangen zu sprechen, aber nichts nachlegen und

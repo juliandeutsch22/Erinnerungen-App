@@ -1590,6 +1590,51 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
       steht sofort im DOM, das Sheet gleitet aber noch — `waitForFunction` auf
       Text allein reicht bei Sheets nicht, wenn danach GETIPPT wird.
 
+68. **Der 400er hatte einen Namen: `thought_signature`** (v1.70.0). Die
+    Meldung aus §8.65 hat beim ersten Auftreten genau geliefert, wofür sie
+    gebaut wurde — Julians Bildschirmfoto zeigte im Klartext:
+    „Function call is missing a thought_signature in functionCall parts. This
+    is required for tools to work correctly."
+    · Gemini 3 hängt an jeden `functionCall`-TEIL eine `thoughtSignature` und
+      verlangt sie UNVERÄNDERT zurück, wenn die Werkzeug-Runde weitergeht. Die
+      App baute den Zug des Modells aus `{name, args}` neu zusammen (`extra
+      .push({role:'model', parts: calls.map(...)})`) — und verlor sie dabei.
+    · **Damit ist auch das Muster erklärt**, das ohne diese Meldung nicht
+      erklärbar war: es traf ausschließlich Wege MIT Werkzeugen (die EINE
+      Zeile, den Chat) und nie den Braindump, der ohne fährt. Und es kam
+      „oft", nicht immer — nur wenn das Modell überhaupt ein Werkzeug zog.
+    · `ToolCall.thoughtSignature`; `extractCalls` liest sie vom TEIL (nicht aus
+      dem Aufruf); der Rückweg schickt sie mit. Ohne Signatur (ältere Modelle)
+      geht keine zurück, und eine LEERE wird nicht aufgenommen.
+    · `scratchpad/signatur.mjs` (8 Prüfungen) spielt beide Runden durch und
+      liest den KÖRPER der zweiten Anfrage — genau die Stelle, an der es
+      kaputt war. Vier Unit-Tests decken das Auslesen ab.
+    · **Lehre:** die Fehlermeldung aus §8.65 hat sich beim ersten echten Fall
+      bezahlt gemacht. Ohne sie hätte hier weiter „Schlüssel abgelehnt"
+      gestanden, und die Suche wäre wieder im Nichts gelandet.
+
+69. **Der Assistent konnte anlegen, was er nicht lesen konnte** (v1.70.0).
+    `buildAppContext` schrieb pro Termin nur Anfangstag und Anfangszeit — kein
+    Ende, keine Spanne, keinen Ort. Seit v1.63/68 kann der Assistent beides
+    ANLEGEN; im Überblick sah ein mehrtägiger Termin trotzdem aus wie ein
+    Ein-Tages-Termin und ein Ort existierte gar nicht.
+    · Jetzt: `Di 21.7. 14:30–15:30: Zahnarzt (Ort: …)`, mehrtägig als Spanne,
+      ganztägig mit Rückrechnung des exklusiven Endes — sonst dauerte jeder
+      Tagestermin zwei Tage.
+    · Fünf Tests, darunter der Fall aus Julians Bildschirmfoto (zwei Termine
+      an EINEM Tag, einer ganztägig, einer mit Ort).
+    · ⚠️ Ob „der Assistent sieht nur einen von zwei Terminen" damit erledigt
+      ist, steht NICHT fest: die Daten waren schon vorher vollständig
+      (`bucketEventsByDay` zeigt beide auf dem Kalender-Bildschirm). Es kann
+      auch am abgebrochenen 400er gelegen haben. Am Gerät gegenprüfen.
+
+70. **Der Platzhalter der EINEN Zeile war beschnitten** (v1.70.0, vom Nutzer
+    gemeldet). Gemessen: das Eingabefeld war **21 px hoch bei 15 px Schrift** —
+    der Textkasten (17 px) kleiner als das Glyphenfeld (~18 px). Ein
+    Eingabefeld hat `overflow: clip`, also wurden Unterlängen (g, j) und der
+    Punkt am Satzende angeschnitten. `minHeight: 24` gibt dem Kasten 20 px und
+    damit Luft. Kein Schönheitsmaß, eine Reparatur.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

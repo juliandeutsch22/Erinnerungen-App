@@ -3,7 +3,7 @@
 // laufenden Kosten, kein Mittelsmann. Reine Logik testbar (Prompt-Bau,
 // Antwort-Extraktion); der fetch selbst wird im Test nicht ausgeführt.
 import { type ChatMessage, type List, type Note, newId, normalizeTag, type Rrule, type Subtask, type Task } from '@/data/types';
-import { anchorWeekdayRrule, isRrule, rruleLabel } from '@/lib/dates';
+import { anchorWeekdayRrule, isRrule, rruleLabel, toDateStr } from '@/lib/dates';
 import { noteTitle } from '@/lib/noteLogic';
 import type { DeviceEvent } from '@/lib/deviceCalendar';
 
@@ -678,7 +678,7 @@ const WD = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 /** Baut den Überblick aus Terminen (~5 Wochen), offenen Aufgaben, Listen und
  *  Notiz-TITELN. Rein und testbar — die Daten reicht der Aufrufer herein. */
 export function buildAppContext(input: {
-  events: Pick<DeviceEvent, 'title' | 'start' | 'allDay'>[];
+  events: Pick<DeviceEvent, 'title' | 'start' | 'end' | 'allDay' | 'location'>[];
   tasks: Task[];
   lists: List[];
   notes: Note[];
@@ -689,11 +689,29 @@ export function buildAppContext(input: {
   const { events, tasks, lists, notes, today, calendarDenied } = input;
   const listName = new Map(lists.map((l) => [l.id, l.name]));
 
-  const evLine = (e: Pick<DeviceEvent, 'title' | 'start' | 'allDay'>) => {
-    const d = e.start;
-    const day = `${WD[d.getDay()]} ${d.getDate()}.${d.getMonth() + 1}.`;
-    const time = e.allDay ? 'ganztägig' : `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-    return `- ${day} ${time}: ${e.title}`;
+  const tag = (d: Date) => `${WD[d.getDay()]} ${d.getDate()}.${d.getMonth() + 1}.`;
+  const uhr = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+
+  /**
+   * Ein Termin, wie ihn der Assistent sieht.
+   *
+   * Bis v1.69 stand hier NUR der Anfangstag und die Anfangszeit. Ein Termin
+   * über mehrere Tage sah damit aus wie ein Ein-Tages-Termin, ein Termin mit
+   * Ende sah aus wie einer ohne, und der Ort war gar nicht da — obwohl die App
+   * seit v1.63/68 beides anlegen KANN. Der Assistent konnte also erzeugen, was
+   * er nicht lesen konnte.
+   */
+  const evLine = (e: Pick<DeviceEvent, 'title' | 'start' | 'end' | 'allDay' | 'location'>) => {
+    // Ganztägig endet EXKLUSIV (00:00 des Folgetags) — für die Anzeige zurück
+    // auf den letzten echten Tag, sonst dauert jeder Tagestermin zwei Tage.
+    const letzter = e.allDay ? new Date(e.end.getTime() - 1) : e.end;
+    const mehrtaegig = toDateStr(e.start) !== toDateStr(letzter);
+    const wann = e.allDay
+      ? `${tag(e.start)}${mehrtaegig ? ` bis ${tag(letzter)}` : ''} ganztägig`
+      : mehrtaegig
+        ? `${tag(e.start)} ${uhr(e.start)} bis ${tag(letzter)} ${uhr(letzter)}`
+        : `${tag(e.start)} ${uhr(e.start)}–${uhr(e.end)}`;
+    return `- ${wann}: ${e.title}${e.location ? ` (Ort: ${e.location})` : ''}`;
   };
   const eventLines = events.slice(0, CTX_EVENT_LIMIT).map(evLine);
 
@@ -761,7 +779,29 @@ export function buildAppContext(input: {
  *  damit dieses Modul rein und testbar bleibt. */
 export type ToolData = { tasks: Task[]; lists: List[]; notes: Note[]; today: string };
 
-export type ToolCall = { name: string; args: Record<string, unknown> };
+export type ToolCall = {
+  name: string;
+  args: Record<string, unknown>;
+  /**
+   * Die „Denk-Signatur", die Gemini 3 an den `functionCall`-Teil hängt.
+   *
+   * **Sie MUSS unverändert zurück.** Schickt man die Werkzeug-Runde ohne sie
+   * weiter, lehnt Google die ganze Anfrage mit 400 ab:
+   *   „Function call is missing a thought_signature in functionCall parts.
+   *    This is required for tools to work correctly."
+   *
+   * Genau das war der Fehler, den Julian am 30.7. gemeldet hat („in der EINEN
+   * Zeile kommt oft, der Schlüssel sei abgelehnt"). Er traf ausschließlich
+   * Wege MIT Werkzeugen — Zeile und Chat — und nie den Braindump, der ohne
+   * fährt. Und er kam „oft", nicht immer: nur wenn das Modell überhaupt ein
+   * Werkzeug zieht. Bis v1.68 hat die App den Aufruf aus `{name, args}` neu
+   * zusammengebaut und die Signatur dabei verloren.
+   *
+   * Ältere Modelle schicken keine — dann geht auch keine zurück, und das ist
+   * richtig so.
+   */
+  thoughtSignature?: string;
+};
 
 /** Wie viele Werkzeug-Runden höchstens, bevor eine Antwort kommen MUSS.
  *  Deckelt Kosten und Wartezeit — und verhindert eine Endlosschleife, wenn das
@@ -872,8 +912,15 @@ export function extractCalls(event: unknown): ToolCall[] {
   const out: ToolCall[] = [];
   for (const p of parts) {
     const fc = (p as { functionCall?: { name?: unknown; args?: unknown } }).functionCall;
-    if (fc && typeof fc.name === 'string')
-      out.push({ name: fc.name, args: typeof fc.args === 'object' && fc.args !== null ? (fc.args as Record<string, unknown>) : {} });
+    if (fc && typeof fc.name === 'string') {
+      // Die Signatur sitzt am TEIL, neben `functionCall` — nicht darin.
+      const sig = (p as { thoughtSignature?: unknown }).thoughtSignature;
+      out.push({
+        name: fc.name,
+        args: typeof fc.args === 'object' && fc.args !== null ? (fc.args as Record<string, unknown>) : {},
+        thoughtSignature: typeof sig === 'string' && sig.length > 0 ? sig : undefined,
+      });
+    }
   }
   return out;
 }
@@ -1527,7 +1574,15 @@ export async function askAssistant(
     }
 
     extra.push(
-      { role: 'model', parts: calls.map((c) => ({ functionCall: { name: c.name, args: c.args } })) },
+      {
+        role: 'model',
+        // Die Signatur geht unverändert mit zurück — ohne sie lehnt Gemini 3
+        // die ganze Runde mit 400 ab (siehe `ToolCall.thoughtSignature`).
+        parts: calls.map((c) => ({
+          functionCall: { name: c.name, args: c.args },
+          ...(c.thoughtSignature ? { thoughtSignature: c.thoughtSignature } : {}),
+        })),
+      },
       {
         role: 'user',
         parts: calls.map((c) => ({

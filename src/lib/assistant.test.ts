@@ -168,9 +168,17 @@ describe('buildAppContext', () => {
     createdAt: '2026-07-01T08:00:00.000Z', updatedAt: '2026-07-01T08:00:00.000Z',
   });
 
+  const ev = (title: string, start: Date, end: Date, o: { allDay?: boolean; location?: string | null } = {}) => ({
+    title,
+    start,
+    end,
+    allDay: o.allDay ?? false,
+    location: o.location ?? null,
+  });
+
   it('fasst Termine, Aufgaben, Projekte und Notiz-Titel kompakt zusammen', () => {
     const ctx = buildAppContext({
-      events: [{ title: 'Zahnarzt', start: new Date(2026, 6, 21, 14, 30), allDay: false }],
+      events: [ev('Zahnarzt', new Date(2026, 6, 21, 14, 30), new Date(2026, 6, 21, 15, 30))],
       tasks: [
         task('Steuer', { dueDate: '2026-07-22', dueTime: '18:00' }),
         task('Keller', { dueDate: '2026-07-10' }),
@@ -180,7 +188,9 @@ describe('buildAppContext', () => {
       notes: [note('Packliste Rom\n- [ ] Pass'), note('Gelöschte Notiz', '2026-07-01T00:00:00.000Z')],
       today: '2026-07-20',
     });
-    expect(ctx).toContain('Di 21.7. 14:30: Zahnarzt');
+    // Seit v1.69 steht auch das ENDE dabei — der Assistent soll nicht raten,
+    // wie lange etwas dauert.
+    expect(ctx).toContain('Di 21.7. 14:30–15:30: Zahnarzt');
     expect(ctx).toContain('Steuer · fällig 2026-07-22 18:00');
     expect(ctx).toContain('Keller · fällig 2026-07-10 (überfällig)');
     expect(ctx).not.toContain('Erledigt ·');
@@ -901,5 +911,102 @@ describe('terminUnter — EINE Form für alle vier Anzeigestellen', () => {
   it('kein leerer Trenner, wenn der Ort fehlt', () => {
     expect(terminUnter({ datum: '2026-08-03', start: '10:00' }, fmt).endsWith('·')).toBe(false);
     expect(terminUnter({ datum: '2026-08-03', start: '10:00' }, fmt)).not.toContain('·  ');
+  });
+});
+
+describe('Der Kalender-Blick des Assistenten', () => {
+  const ev = (title: string, start: Date, end: Date, o: { allDay?: boolean; location?: string | null } = {}) => ({
+    title,
+    start,
+    end,
+    allDay: o.allDay ?? false,
+    location: o.location ?? null,
+  });
+  const leer = { tasks: [], lists: [], notes: [], today: '2026-07-30' };
+
+  it('zeigt BEIDE Termine eines Tages — nicht nur den ersten', () => {
+    const ctx = buildAppContext({
+      ...leer,
+      events: [
+        ev('InsidePuff', new Date(2026, 7, 2), new Date(2026, 7, 3), { allDay: true }),
+        ev('Outdoor-Training', new Date(2026, 7, 2, 17, 0), new Date(2026, 7, 2, 19, 0), {
+          location: 'Stadionstraße 1, 8200 Gleisdorf',
+        }),
+      ],
+    });
+    expect(ctx).toContain('InsidePuff');
+    expect(ctx).toContain('Outdoor-Training');
+  });
+
+  it('nennt den Ort, wenn einer da ist', () => {
+    const ctx = buildAppContext({
+      ...leer,
+      events: [ev('Training', new Date(2026, 7, 2, 17, 0), new Date(2026, 7, 2, 19, 0), { location: 'Stadionstraße 1' })],
+    });
+    expect(ctx).toContain('(Ort: Stadionstraße 1)');
+  });
+
+  it('macht aus einem GANZTÄGIGEN Termin keinen zweitägigen', () => {
+    // EventKit speichert das Ende exklusiv (00:00 des Folgetags). Ohne die
+    // Rückrechnung stünde hier „So 2.8. bis Mo 3.8.".
+    const ctx = buildAppContext({
+      ...leer,
+      events: [ev('InsidePuff', new Date(2026, 7, 2), new Date(2026, 7, 3), { allDay: true })],
+    });
+    expect(ctx).toContain('So 2.8. ganztägig: InsidePuff');
+    expect(ctx).not.toContain('bis Mo 3.8.');
+  });
+
+  it('zeigt eine mehrtägige Spanne als Spanne', () => {
+    const ctx = buildAppContext({
+      ...leer,
+      events: [ev('Urlaub', new Date(2026, 7, 3), new Date(2026, 7, 11), { allDay: true })],
+    });
+    expect(ctx).toContain('Mo 3.8. bis Mo 10.8. ganztägig: Urlaub');
+  });
+
+  it('zeigt auch einen mehrtägigen Termin MIT Uhrzeit richtig', () => {
+    const ctx = buildAppContext({
+      ...leer,
+      events: [ev('Seminar', new Date(2026, 7, 7, 9, 0), new Date(2026, 7, 9, 16, 0))],
+    });
+    expect(ctx).toContain('Fr 7.8. 09:00 bis So 9.8. 16:00: Seminar');
+  });
+});
+
+describe('Die Denk-Signatur der Werkzeug-Runde', () => {
+  // Gemini 3 hängt sie an den `functionCall`-TEIL und verlangt sie unverändert
+  // zurück. Ging sie verloren, antwortete Google mit 400 — und die App meldete
+  // bis v1.68 „der Schlüssel wurde abgelehnt", obwohl der Schlüssel in Ordnung
+  // war. Es traf nur Wege MIT Werkzeugen (Zeile, Chat), nie den Braindump.
+  const antwort = (parts: unknown[]) => ({ candidates: [{ content: { parts } }] });
+
+  it('liest die Signatur vom TEIL, nicht aus dem Aufruf', () => {
+    const calls = extractCalls(
+      antwort([{ functionCall: { name: 'aufgaben_suchen', args: { begriff: 'reifen' } }, thoughtSignature: 'SIG-1' }]),
+    );
+    expect(calls).toHaveLength(1);
+    expect(calls[0].name).toBe('aufgaben_suchen');
+    expect(calls[0].thoughtSignature).toBe('SIG-1');
+  });
+
+  it('kommt ohne Signatur klar — ältere Modelle schicken keine', () => {
+    const calls = extractCalls(antwort([{ functionCall: { name: 'liste_inhalt', args: {} } }]));
+    expect(calls[0].thoughtSignature).toBeUndefined();
+  });
+
+  it('nimmt eine leere Signatur NICHT auf — sie zurückzuschicken wäre schlimmer als keine', () => {
+    const calls = extractCalls(antwort([{ functionCall: { name: 'liste_inhalt', args: {} }, thoughtSignature: '' }]));
+    expect(calls[0].thoughtSignature).toBeUndefined();
+  });
+
+  it('hält mehrere Aufrufe samt eigener Signatur auseinander', () => {
+    const calls = extractCalls(
+      antwort([
+        { functionCall: { name: 'aufgaben_suchen', args: { begriff: 'a' } }, thoughtSignature: 'SIG-A' },
+        { functionCall: { name: 'notiz_lesen', args: { titel: 'b' } }, thoughtSignature: 'SIG-B' },
+      ]),
+    );
+    expect(calls.map((c) => c.thoughtSignature)).toEqual(['SIG-A', 'SIG-B']);
   });
 });
