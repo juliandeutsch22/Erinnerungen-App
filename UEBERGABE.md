@@ -1635,6 +1635,35 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
     Punkt am Satzende angeschnitten. `minHeight: 24` gibt dem Kasten 20 px und
     damit Luft. Kein Schönheitsmaß, eine Reparatur.
 
+71. **Der Absturz: die Reproduktion ist da** (v1.71.0). Julian, nach dem Test
+    von Build 108: „passiert, wenn sich ein Modal öffnet und man dieses danach
+    NACH OBEN ziehen will." Damit ist es NICHT die Modal-Übergabe (§8.54/§8.64
+    — die Sperre war richtig, aber sie war es nicht), sondern die Zieh-Geste
+    des `BottomSheet` selbst, und zwar genau in der Richtung, die NICHTS tut.
+    · Bis v1.70 durfte man nach oben ziehen: Gummiband (`next * 0.25`), Klemme
+      bei −40 px im Transform. Das war reine Zierde — ein Sheet, das sich nicht
+      aufziehen lässt, verspricht mit dieser Bewegung etwas, das es nicht
+      einlöst. Und es war die Bewegung, die abstürzte.
+    · Drei Riegel, jeder für sich sinnvoll:
+      `activeOffsetY(8)` — die Geste STARTET erst nach 8 px nach unten, ein Zug
+      nach oben bringt die Gesten-Maschinerie gar nicht in Gang.
+      `failOffsetY(-8)` — und sie scheitert sauber, statt in der Schwebe zu
+      bleiben und die Berührung festzuhalten.
+      `maxPointers(1)` — zwei Finger auf der Kopfzeile sind kein Ziehen (der
+      `PhotoViewer` macht das aus demselben Grund seit jeher).
+      Dazu die Klemme im Wert selbst: `Math.max(0, …)`; `translateY` kann nicht
+      mehr negativ werden, und der −40-Deckel im Transform ist entfallen.
+    · ⚠️ **Das ist eine begründete Entfernung, kein bewiesener Fix.** Der
+      Absturz ist am Web-Harnisch nicht nachstellbar (dort sind Modals
+      gewöhnliche Overlays ohne View-Controller-Lebenszyklus), und der
+      Crash-Report aus §8.63 nennt die Ausnahme nicht. Was hier bewiesen ist:
+      die gemeldete Bewegung löst nichts mehr aus. Bleibt der Absturz, braucht
+      es den Exception-Namen aus Xcode (Devices and Simulators → View Device
+      Logs) — dann ist es keine Entfernung mehr, sondern eine Zeile.
+    · `scratchpad/hochziehen.mjs` (7 Prüfungen): nach oben bewegt sich nichts,
+      das Sheet bleibt offen; nach unten folgt es dem Finger und federt zurück;
+      weit genug nach unten schließt weiterhin.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

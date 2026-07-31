@@ -88,11 +88,31 @@ export function BottomSheet({
   };
 
   // Zieh-Geste an der Kopfzeile (keine Kopplung mit der ScrollView → absturzfrei).
+  //
+  // ⚠️ Sie geht NUR nach unten. Bis v1.70 durfte man das Sheet auch nach oben
+  // ziehen — mit Gummiband und einer Klemme bei −40 px. Das war reine Zierde:
+  // ein Sheet, das sich nicht aufziehen lässt, verspricht mit dieser Bewegung
+  // etwas, das es nicht einlöst. Und genau diese Bewegung hat Julian
+  // reproduzierbar zum Absturz gebracht („Modal öffnet, dann nach oben
+  // ziehen"). Drei Riegel, jeder für sich sinnvoll:
+  //
+  //  · `activeOffsetY(8)`  — die Geste STARTET erst nach 8 px nach unten. Ein
+  //    Zug nach oben bringt die Gesten-Maschinerie gar nicht erst in Gang.
+  //  · `failOffsetY(-8)`   — und sie scheitert sauber, statt in der Schwebe zu
+  //    bleiben und die Berührung festzuhalten.
+  //  · `maxPointers(1)`    — zwei Finger auf der Kopfzeile sind kein Ziehen.
+  //    (Der PhotoViewer macht das aus demselben Grund seit jeher.)
+  //
+  // Am Web-Harnisch ist der Absturz nicht nachstellbar (dort sind Modals
+  // gewöhnliche Overlays); prüfbar ist nur, dass ein Zug nach oben nichts mehr
+  // bewegt — `scratchpad/hochziehen.mjs`.
   const pan = Gesture.Pan()
+    .activeOffsetY(8)
+    .failOffsetY(-8)
+    .maxPointers(1)
     .onChange((e) => {
-      // Nach unten frei, nach oben mit Widerstand (leichtes Gummiband).
-      const next = translateY.value + e.changeY;
-      translateY.value = next < 0 ? next * 0.25 : next;
+      // Nur nach unten. Ein negativer Wert kann gar nicht mehr entstehen.
+      translateY.value = Math.max(0, translateY.value + e.changeY);
     })
     .onEnd((e) => {
       if (translateY.value > DISMISS_DISTANCE || e.velocityY > DISMISS_VELOCITY) {
@@ -106,11 +126,11 @@ export function BottomSheet({
       }
     });
 
-  const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: Math.max(translateY.value, -40) }] }));
-  const backdropStyle = useAnimatedStyle(() => {
-    const fade = Math.max(0, 1 - translateY.value / (DISMISS_DISTANCE * 2.4));
-    return { opacity: translateY.value > 0 ? fade : 1 };
-  });
+  // Die Klemme bei −40 ist entfallen: `translateY` wird nie mehr negativ.
+  const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: translateY.value }] }));
+  const backdropStyle = useAnimatedStyle(() => ({
+    opacity: Math.max(0, 1 - translateY.value / (DISMISS_DISTANCE * 2.4)),
+  }));
 
   // Kopf = großzügige Zieh-Fläche (Grabber + Titelzeile tragen die Geste).
   const header = (
