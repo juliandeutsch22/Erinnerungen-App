@@ -1,6 +1,6 @@
 // taskLogic.test.ts — Überfällig-Ableitung, Abhak-Semantik, Gruppierungen.
 import type { List, Task } from '@/data/types';
-import { adoptOverdueToToday, groupPlanned, listProgress, groupToday, groupUpcomingDays, isDueToday, isOverdue, recentlyCompleted, resolveCompletion, projectState, projectDeadlineLabel, projectShowsDeadline, isCurrent, isDormant, isExpired, isWaiting, expiredTasks, lifespanLabel, waitingLabel, waitingTasks } from './taskLogic';
+import { adoptOverdueToToday, groupPlanned, listProgress, groupToday, groupUpcomingDays, isDueToday, isOverdue, recentlyCompleted, resolveCompletion, projectState, projectDeadlineLabel, projectShowsDeadline, isCurrent, isDormant, isExpired, isWaiting, expiredTasks, lifespanLabel, listenGruppe, waitingLabel, waitingTasks } from './taskLogic';
 
 const TODAY = '2026-07-03';
 
@@ -326,6 +326,50 @@ describe('Warten auf — die Aufgabe liegt bei jemand anderem', () => {
     expect(waitingLabel({ ...w, waitingFor: '   ' }, null)).toBe('Wartet');
     // Nicht wartend → gar keine Zeile.
     expect(waitingLabel({ waiting: false, waitingFor: 'x', completedAt: null }, 'Anna')).toBeNull();
+  });
+});
+
+describe('Eine Aufgabe gehört in GENAU EINEN Abschnitt der Liste', () => {
+  it('sortiert den Normalfall nach „offen"', () => {
+    expect(listenGruppe(task({}), TODAY)).toBe('offen');
+  });
+
+  it('Anlass vorbei schlägt alles — daran ändert kein Warten etwas', () => {
+    expect(listenGruppe(task({ expiresOn: '2026-07-01' }), TODAY)).toBe('verfallen');
+    expect(listenGruppe(task({ expiresOn: '2026-07-01', waiting: true }), TODAY)).toBe('verfallen');
+    expect(listenGruppe(task({ expiresOn: '2026-07-01', startDate: '2026-09-01' }), TODAY)).toBe('verfallen');
+  });
+
+  it('Warten schlägt „später" — man wartet ja bereits', () => {
+    // Genau dieser Fall stand bis v1.74 in ZWEI Abschnitten.
+    expect(listenGruppe(task({ waiting: true, startDate: '2026-09-01' }), TODAY)).toBe('warten');
+    expect(listenGruppe(task({ waiting: true }), TODAY)).toBe('warten');
+  });
+
+  it('„später" bleibt für das, was schlicht noch nicht dran ist', () => {
+    expect(listenGruppe(task({ startDate: '2026-09-01' }), TODAY)).toBe('spaeter');
+  });
+
+  it('Erledigtes fällt in keine dieser Gruppen — es hat seine eigene', () => {
+    const fertig = { completedAt: '2026-07-02T10:00:00.000Z' };
+    expect(listenGruppe(task({ ...fertig, expiresOn: '2026-07-01' }), TODAY)).toBe('offen');
+    expect(listenGruppe(task({ ...fertig, waiting: true }), TODAY)).toBe('offen');
+  });
+
+  it('keine Aufgabe landet in zwei Gruppen — die Probe über alle Kombinationen', () => {
+    const kombis: Partial<Task>[] = [];
+    for (const w of [false, true]) {
+      for (const s of [null, '2026-09-01']) {
+        for (const e of [null, '2026-07-01']) kombis.push({ waiting: w, startDate: s, expiresOn: e });
+      }
+    }
+    const gezaehlt = new Map<string, number>();
+    for (const k of kombis) {
+      const g = listenGruppe(task(k), TODAY);
+      gezaehlt.set(g, (gezaehlt.get(g) ?? 0) + 1);
+    }
+    // Acht Kombinationen, acht Zuordnungen — jede genau einmal vergeben.
+    expect([...gezaehlt.values()].reduce((a, b) => a + b, 0)).toBe(8);
   });
 });
 

@@ -1,5 +1,5 @@
 // listen.tsx — Grid aus Glass-Karten (Icon, Name, offene Anzahl); Tap = Liste,
-// Long-Press = bearbeiten; „+ Neue Liste" als gestrichelte Geister-Karte.
+// Long-Press = bearbeiten; „Neue Liste" ist dieselbe Karte, nur leer.
 // Darüber die Smart-Ansichten Geplant / Alle (Fahrplan §3.3).
 import { useRouter } from 'expo-router';
 import { CalendarClock, CalendarDays, ChevronRight, Filter as FilterIcon, Layers, PauseCircle, Plus, SlidersHorizontal, UserRound } from 'lucide-react-native';
@@ -272,27 +272,38 @@ export default function ListenScreen() {
             );
           })}
 
-          {/* Geister-Karte: Neue Liste */}
+          {/* „Neue Liste" — dieselbe Karte, nur leer.
+              Bis v1.74 war das eine flache, mittig gesetzte Well: kein Marmor,
+              kein Schatten, keine Fase, und als einzige Kachel des Gitters
+              zentriert. Damit unterschied sie sich in DREI Dingen gleichzeitig
+              vom Nachbarn (Material, Ausrichtung, Rhythmus) und las sich wie
+              ein Fremdkörper statt wie ein freier Platz.
+              Jetzt: dieselbe Glas-Platte, dieselbe Geometrie, dasselbe
+              Symbolquadrat oben links — nur ohne Zahl, mit ruhigerem Schatten
+              und in Text3. Ein leerer Sockel derselben Reihe. */}
           <PressableScale
             accessibilityLabel="Neue Liste anlegen"
             onPress={() => setEditorList(null)}
             style={{ width: '47%', flexGrow: 1 }}
           >
-            {/* Tonale Well statt Strichlinie (Design-Leitplanke). */}
-            <View
-              style={{
-                borderRadius: R.xl,
-                backgroundColor: colors.chip,
-                padding: Spacing.md,
-                gap: Spacing.sm,
-                minHeight: 106,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Plus size={22} color={colors.text3} strokeWidth={2} />
-              <Type variant="label" tone="text3">Neue Liste</Type>
-            </View>
+            <Glass variant="card" radius={R.xl} style={Shadow.sm} contentStyle={{ padding: Spacing.md, gap: Spacing.sm, minHeight: 94 }}>
+              <View
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: R.md,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  // Dieselbe Tönung wie die Listen-Symbole (`${farbe}1F`), nur
+                  // im Stein-Ton: der Platz ist da, die Farbe kommt erst mit
+                  // der Liste.
+                  backgroundColor: colors.chip,
+                }}
+              >
+                <Plus size={19} color={colors.text3} strokeWidth={2.2} />
+              </View>
+              <Type variant="label" tone="text3" numberOfLines={1}>Neue Liste</Type>
+            </Glass>
           </PressableScale>
         </View>
       </Reveal>

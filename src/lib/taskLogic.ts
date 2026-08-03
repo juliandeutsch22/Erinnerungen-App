@@ -243,6 +243,35 @@ export function waitingTasks(tasks: Task[]): Task[] {
 }
 
 /**
+ * In welchen Abschnitt einer LISTE gehört die Aufgabe? Genau einen.
+ *
+ * Bis v1.74 rechnete der Listen-Bildschirm seine vier Gruppen einzeln aus, und
+ * die Bedingungen überlappten: eine Aufgabe, die WARTET und deren Startdatum
+ * noch in der Zukunft liegt, stand unter „Später" UND unter „Warten auf" —
+ * dieselbe Zeile zweimal auf einem Bildschirm, mit zwei Haken, die dasselbe
+ * meinen.
+ *
+ * Die Rangfolge ist eine Aussage, keine Willkür:
+ *  1. `verfallen` — der Anlass ist vorbei. Endgültig; daran ändert kein Warten
+ *     und kein Startdatum mehr etwas.
+ *  2. `warten`    — es liegt bei jemand anderem. Das sagt mehr über das Jetzt
+ *     als „noch nicht dran": man wartet ja bereits.
+ *  3. `spaeter`   — es ist schlicht noch nicht so weit.
+ *  4. `offen`     — der Normalfall.
+ *
+ * Erledigtes ist hier NICHT dabei: es hat seine eigene Sektion und darf nicht
+ * verschwinden, nur weil es zufällig auch verfallen wäre.
+ */
+export type ListenGruppe = 'offen' | 'warten' | 'spaeter' | 'verfallen';
+
+export function listenGruppe(t: Task, today: string): ListenGruppe {
+  if (isExpired(t, today)) return 'verfallen';
+  if (isWaiting(t)) return 'warten';
+  if (isDormant(t, today)) return 'spaeter';
+  return 'offen';
+}
+
+/**
  * Was unter einer wartenden Aufgabe steht. Bewusst OHNE Dauer („seit zwölf
  * Tagen") — das wäre ein Schuld-Zähler für etwas, das man gar nicht in der
  * Hand hat.

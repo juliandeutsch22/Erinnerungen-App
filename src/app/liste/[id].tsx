@@ -30,7 +30,7 @@ import { Type } from '@/components/Type';
 import { useCompleteList, useCompleteTask, useLists, useReopenList, useReopenTask, useTasks } from '@/data/queries';
 import type { Task } from '@/data/types';
 import { todayStr } from '@/lib/dates';
-import { byTimeThenCreation, expiredTasks, groupPlanned, isCurrent, isDormant, isOpen, listProgress, projectDeadlineLabel, projectState, recentlyCompleted, waitingTasks } from '@/lib/taskLogic';
+import { byTimeThenCreation, groupPlanned, isOpen, listProgress, listenGruppe, projectDeadlineLabel, projectState, recentlyCompleted } from '@/lib/taskLogic';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { shareText } from '@/lib/share';
 import { listToShareText } from '@/lib/shareText';
@@ -95,28 +95,33 @@ export default function ListeDetailScreen() {
     return all.filter((t) => t.listId === id);
   }, [tasks, id]);
 
-  // Offene: fällige zuerst (chronologisch), der Rest nach Anlage (Fahrplan §4).
-  const open = useMemo(
-    () =>
-      scoped.filter((t) => isOpen(t) && isCurrent(t, today)).sort((a, b) => {
-        if (a.dueDate !== b.dueDate) {
-          if (a.dueDate === null) return 1;
-          if (b.dueDate === null) return -1;
-          return a.dueDate < b.dueDate ? -1 : 1;
-        }
-        return byTimeThenCreation(a, b);
-      }),
-    [scoped, today],
-  );
-  // Schlummernde und verfallene Aufgaben verschwinden aus der offenen Liste,
-  // aber NICHT aus der App: sie bekommen unten je eine eigene, ruhige Gruppe.
-  const spaeter = useMemo(
-    () => scoped.filter((t) => isOpen(t) && isDormant(t, today)).sort((a, b) => (a.startDate! < b.startDate! ? -1 : 1)),
-    [scoped, today],
-  );
-  const verfallen = useMemo(() => expiredTasks(scoped, today), [scoped, today]);
-  // Wartendes bleibt im Projekt — es ist nicht weg, es liegt nur bei anderen.
-  const wartend = useMemo(() => waitingTasks(scoped), [scoped]);
+  // Die vier Gruppen in EINEM Durchgang, damit keine Aufgabe in zweien landet.
+  // Die Rangfolge steht in `listenGruppe` (taskLogic) und ist dort begründet.
+  // Schlummernde, verfallene und wartende Aufgaben verschwinden aus der
+  // offenen Liste, aber NICHT aus der App: jede bekommt unten ihre eigene,
+  // ruhige Gruppe.
+  const { open, spaeter, verfallen, wartend } = useMemo(() => {
+    const gruppen = { open: [] as Task[], spaeter: [] as Task[], verfallen: [] as Task[], wartend: [] as Task[] };
+    for (const t of scoped) {
+      if (t.deletedAt || !isOpen(t)) continue;
+      const g = listenGruppe(t, today);
+      if (g === 'verfallen') gruppen.verfallen.push(t);
+      else if (g === 'warten') gruppen.wartend.push(t);
+      else if (g === 'spaeter') gruppen.spaeter.push(t);
+      else gruppen.open.push(t);
+    }
+    // Offene: fällige zuerst (chronologisch), der Rest nach Anlage (Fahrplan §4).
+    gruppen.open.sort((a, b) => {
+      if (a.dueDate !== b.dueDate) {
+        if (a.dueDate === null) return 1;
+        if (b.dueDate === null) return -1;
+        return a.dueDate < b.dueDate ? -1 : 1;
+      }
+      return byTimeThenCreation(a, b);
+    });
+    gruppen.spaeter.sort((a, b) => (a.startDate! < b.startDate! ? -1 : 1));
+    return gruppen;
+  }, [scoped, today]);
   const completed = useMemo(() => recentlyCompleted(scoped, today), [scoped, today]);
   const progress = useMemo(() => listProgress(scoped), [scoped]);
   const isProject = !!(list && (list.goal || list.deadline));

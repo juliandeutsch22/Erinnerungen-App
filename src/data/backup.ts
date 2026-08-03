@@ -147,6 +147,8 @@ export type BackupSummary = {
   tasks: number;
   notes: number;
   chats: number;
+  /** Menschen (v1.74.0) — der Bericht soll nennen, was er wirklich sichert. */
+  people: number;
   journal: number;
   photos: number;
   documents: number;
@@ -161,6 +163,7 @@ export function summarizeBundle(bundle: BackupBundle): BackupSummary {
     tasks: bundle.tasks.filter((t) => !t.deletedAt).length,
     notes: bundle.notes.filter((n) => n.deletedAt === null).length,
     chats: bundle.chats.filter((c) => c.deletedAt === null).length,
+    people: (bundle.people ?? []).length,
     journal: bundle.journal.length,
     photos: bundle.photos.length,
     documents: bundle.documents.length,
@@ -175,6 +178,7 @@ export function describeSummary(s: BackupSummary): string {
     `${s.lists} Listen`,
     `${s.notes} Notizen`,
     `${s.chats} Chats`,
+    `${s.people} Menschen`,
     `${s.journal} Betrachtungen`,
     `${s.photos} Fotos`,
     `${s.documents} Dokumente`,

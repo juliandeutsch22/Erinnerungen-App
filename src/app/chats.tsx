@@ -3,7 +3,7 @@
 // Kalender-Glyph. Swipe links = löschen. Ohne API-Schlüssel erklärt die
 // Seite die Einrichtung (Feature ist strikt opt-in).
 import { useRouter } from 'expo-router';
-import { BrainCircuit, CalendarDays, ChevronLeft, ListTodo, NotebookPen, Sparkles } from 'lucide-react-native';
+import { BrainCircuit, CalendarDays, ChevronLeft, ListTodo, NotebookPen, Sparkles, UserRound } from 'lucide-react-native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import ReanimatedSwipeable, { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
@@ -21,7 +21,8 @@ import { SwipeActionSlide } from '@/components/SwipeActionSlide';
 import { Type } from '@/components/Type';
 import { useDeviceEvents } from '@/data/calendarQueries';
 import { useChats, useCreateChat, useDeleteChat, useUpdateChat } from '@/data/chatQueries';
-import { useTasks } from '@/data/queries';
+import { usePeople } from '@/data/personQueries';
+import { useLists, useTasks } from '@/data/queries';
 import type { Chat } from '@/data/types';
 import { addDays, formatDueDate, parseDateStr, toDateStr, todayStr } from '@/lib/dates';
 import { hasCalendarPermission } from '@/lib/deviceCalendar';
@@ -65,6 +66,12 @@ export default function ChatsScreen() {
 
   // „Plane meinen Tag": Chat mit den heutigen Aufgaben + Terminen als Kontext.
   const { data: tasks } = useTasks();
+  // Nur Farbe und Namens-IDs — mehr braucht die Zeile nicht, und eine
+  // gelöschte Liste bzw. ein gelöschter Mensch verschwindet von selbst.
+  const { data: lists } = useLists();
+  const { data: menschen } = usePeople();
+  const listFarbe = useMemo(() => new Map((lists ?? []).map((l) => [l.id, l.color])), [lists]);
+  const menschenIds = useMemo(() => new Set((menschen ?? []).map((p) => p.id)), [menschen]);
   const [calGranted, setCalGranted] = useState(false);
   useEffect(() => {
     void hasCalendarPermission().then(setCalGranted);
@@ -213,7 +220,13 @@ export default function ChatsScreen() {
               {active.map((c, i) => (
                 <View key={c.id}>
                   {i > 0 && <Seam marginVertical={2} />}
-                  <ChatRow chat={c} today={today} onPress={() => router.push(`/chat/${c.id}`)} />
+                  <ChatRow
+                    chat={c}
+                    today={today}
+                    listColor={c.listId ? listFarbe.get(c.listId) : undefined}
+                    hatMensch={!!c.personId && menschenIds.has(c.personId)}
+                    onPress={() => router.push(`/chat/${c.id}`)}
+                  />
                 </View>
               ))}
               {trash.length > 0 && (
@@ -250,7 +263,23 @@ export default function ChatsScreen() {
   );
 }
 
-function ChatRow({ chat, today, onPress }: { chat: Chat; today: string; onPress: () => void }) {
+/** `listColor`/`hatMensch`: dieselben Erkennungszeichen wie im Notizen-Tab.
+ *  Ohne sie war ein Chat, den man einem Projekt oder einem Menschen zugeordnet
+ *  hat, außerhalb dieser Ansichten unsichtbar — die Zuordnung hatte an ihrem
+ *  EIGENEN Ort keine Folge. */
+function ChatRow({
+  chat,
+  today,
+  listColor,
+  hatMensch,
+  onPress,
+}: {
+  chat: Chat;
+  today: string;
+  listColor?: string;
+  hatMensch?: boolean;
+  onPress: () => void;
+}) {
   const colors = useColors();
   const updateChat = useUpdateChat();
   const swipeRef = useRef<SwipeableMethods>(null);
@@ -263,13 +292,17 @@ function ChatRow({ chat, today, onPress }: { chat: Chat; today: string; onPress:
       pressedScale={0.99}
       style={{ paddingVertical: Spacing.sm, gap: 2, backgroundColor: 'transparent' }}
     >
-      <Type variant="heading" numberOfLines={1} style={{ fontSize: T.lg, lineHeight: T.lg * 1.3 }}>
-        {chat.title}
-      </Type>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
+        {listColor && <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: listColor }} />}
+        <Type variant="heading" numberOfLines={1} style={{ flex: 1, fontSize: T.lg, lineHeight: T.lg * 1.3 }}>
+          {chat.title}
+        </Type>
+      </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
         {chat.eventId && <CalendarDays size={12} color={colors.text3} strokeWidth={2} />}
         {chat.noteId && <NotebookPen size={12} color={colors.text3} strokeWidth={2} />}
         {chat.taskId && <ListTodo size={12} color={colors.text3} strokeWidth={2} />}
+        {hatMensch && <UserRound size={12} color={colors.text3} strokeWidth={2} />}
         <View style={{ flex: 1 }} />
         <Type variant="caption" tone="text3" tabular>{dateLabel}</Type>
       </View>

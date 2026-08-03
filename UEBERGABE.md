@@ -1803,6 +1803,47 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
       ausgeführt, Backup, applyActions, Parser) und `terminmenschen.mjs`
       (5 Prüfungen) für den Assistenten-Weg samt Leitplanke.
 
+75. **Der Zusammenhangs-Durchgang** (v1.74.1). Julian: „der ‚Neue Liste'-Knopf
+    passt gar nicht zum sonstigen Design" — und danach die Bitte, einmal zu
+    prüfen, ob nach drei Releases alles noch logisch zusammenhängt. Vier Funde,
+    alle behoben.
+    · **Die Geister-Karte.** „Neue Liste" war eine flache, mittig gesetzte Well:
+      kein Marmor, kein Schatten, keine Fase — und als einzige Kachel des
+      Gitters zentriert. Sie unterschied sich in DREI Dingen gleichzeitig vom
+      Nachbarn (Material, Ausrichtung, Rhythmus) und las sich deshalb wie ein
+      Fremdkörper statt wie ein freier Platz. Jetzt dieselbe Glas-Platte,
+      dieselbe Geometrie, dasselbe Symbolquadrat oben links — nur ohne Zahl,
+      mit `Shadow.sm` statt `md` und in Text3. Ein leerer Sockel derselben
+      Reihe.
+    · **Eine Aufgabe stand doppelt.** Der Listen-Bildschirm rechnete seine vier
+      Gruppen einzeln aus, und die Bedingungen überlappten: eine Aufgabe, die
+      WARTET und deren Startdatum noch in der Zukunft liegt, stand unter
+      „Später" UND unter „Warten auf" — dieselbe Zeile zweimal, mit zwei Haken,
+      die dasselbe meinen. Dasselbe galt für verfallen + wartend.
+      Neu: `listenGruppe(t, today)` in taskLogic mit EINER begründeten
+      Rangfolge — verfallen > wartend > später > offen. Der Bildschirm
+      gruppiert in einem Durchgang; ein Test prüft alle acht Kombinationen aus
+      wartend/Startdatum/Verfall auf Eindeutigkeit.
+    · **Der Backup-Bericht verschwieg die Menschen.** Er ist ausdrücklich der
+      „ehrliche Bericht" — und zählte Aufgaben, Listen, Notizen, Chats,
+      Betrachtungen, Fotos und Dokumente auf, während die Menschen seit v1.73
+      mitgesichert wurden, ohne genannt zu werden. Jetzt stehen sie drin.
+    · **Ein Chat am Projekt war außerhalb unsichtbar.** Die Chat-Liste zeigte
+      Glyphen für Termin, Notiz und Aufgabe, aber nichts für Liste und Mensch —
+      die Zuordnung hatte an ihrem EIGENEN Ort keine Folge. Jetzt derselbe
+      Punkt in der Listenfarbe wie im Notizen-Tab, plus ein Personen-Glyph in
+      der bestehenden Glyphen-Reihe.
+    · `scratchpad/zusammenhang.mjs` (26 Prüfungen) geht die Kette einmal ganz
+      durch: Projekt → Aufgabe → Mensch → Warten auf → Notiz → Notizen-Tab →
+      Personen-Screen → Warten beenden → zurück ins Projekt. Es zählt dabei
+      ausdrücklich VORKOMMEN, nicht nur Vorhandensein — genau daran ist die
+      Doppelung aufgefallen.
+    · Harnisch-Nachtrag: der Griff hat jetzt DREI Stufen (obenauf → im Bild →
+      überhaupt vorhanden). Kopfzeilen rutschen je nach Scroll-Stand über den
+      oberen Rand; sie sind für den Nutzer per Wisch erreichbar, für einen
+      Koordinaten-Klick aber nicht. Die dritte Stufe holt sie ins Bild und
+      klickt direkt. Dreimal hintereinander stabil grün.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

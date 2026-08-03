@@ -519,7 +519,15 @@ describe('summarizeBundle / describeSummary — ehrlicher Bericht', () => {
   });
 
   it('ohne Lücken bleibt der Bericht ein einziger ruhiger Satz', () => {
-    const text = describeSummary({ lists: 2, tasks: 5, notes: 1, chats: 0, journal: 3, photos: 4, documents: 0, skippedDocuments: [] });
-    expect(text).toBe('Gesichert: 5 Aufgaben, 2 Listen, 1 Notizen, 0 Chats, 3 Betrachtungen, 4 Fotos, 0 Dokumente.');
+    const text = describeSummary({ lists: 2, tasks: 5, notes: 1, chats: 0, people: 2, journal: 3, photos: 4, documents: 0, skippedDocuments: [] });
+    expect(text).toBe('Gesichert: 5 Aufgaben, 2 Listen, 1 Notizen, 0 Chats, 2 Menschen, 3 Betrachtungen, 4 Fotos, 0 Dokumente.');
+  });
+
+  it('nennt die Menschen — ein Bericht, der sie verschweigt, ist nicht ehrlich', async () => {
+    await getPersonRepository().create({ id: 'p1', name: 'Anna', note: null, sort: 1, createdAt: '2026-07-01T08:00:00.000Z' });
+    const json = await exportToJsonString(noPhotos, new Date('2026-07-03T12:00:00.000Z'));
+    const summary = summarizeBundle(JSON.parse(json) as BackupBundle);
+    expect(summary.people).toBe(1);
+    expect(describeSummary(summary)).toContain('1 Menschen');
   });
 });
