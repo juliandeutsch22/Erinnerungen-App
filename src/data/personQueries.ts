@@ -25,20 +25,41 @@ function useInvalidatePeople() {
  * gibt. „Anna", „anna" und „Anna " sind dieselbe Person; zwei Einträge mit
  * demselben Namen wären für den Nutzer nicht unterscheidbar und würden seine
  * offenen Punkte auf zwei Ansichten verteilen.
+ *
+ * Seit v1.75.0 zählt zusätzlich die Adressbuch-Herkunft: derselbe Kontakt
+ * zweimal importiert bleibt EIN Mensch, auch wenn er im Adressbuch inzwischen
+ * anders heißt. Der vorhandene Eintrag bekommt dabei nachgereicht, was ihm
+ * fehlt (Nummer, E-Mail, Herkunft) — aber nichts wird überschrieben, was schon
+ * dasteht: was von Hand getippt wurde, gehört dem Nutzer.
  */
 export function useCreatePerson() {
   const invalidate = useInvalidatePeople();
   return useMutation({
     mutationFn: async (input: NewPerson) => {
       const name = input.name.trim();
-      const vorhanden = (await getPersonRepository().getAll()).find(
-        (p) => normalizePersonName(p.name) === normalizePersonName(name),
-      );
-      if (vorhanden) return vorhanden;
+      const alle = await getPersonRepository().getAll();
+      const vorhanden =
+        (input.contactId ? alle.find((p) => p.contactId === input.contactId) : undefined) ??
+        alle.find((p) => normalizePersonName(p.name) === normalizePersonName(name));
+      if (vorhanden) {
+        const nachtrag: Partial<Omit<Person, 'id'>> = {};
+        if (!vorhanden.phone && input.phone) nachtrag.phone = input.phone;
+        if (!vorhanden.email && input.email) nachtrag.email = input.email;
+        if (!vorhanden.contactId && input.contactId) nachtrag.contactId = input.contactId;
+        if (!vorhanden.note && input.note) nachtrag.note = input.note;
+        if (Object.keys(nachtrag).length > 0) {
+          await getPersonRepository().update(vorhanden.id, nachtrag);
+          return { ...vorhanden, ...nachtrag };
+        }
+        return vorhanden;
+      }
       const person: Person = {
         id: newId(),
         name,
         note: input.note ?? null,
+        phone: input.phone ?? null,
+        email: input.email ?? null,
+        contactId: input.contactId ?? null,
         sort: Date.now(),
         createdAt: new Date().toISOString(),
       };

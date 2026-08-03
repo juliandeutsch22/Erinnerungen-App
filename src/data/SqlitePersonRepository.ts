@@ -3,10 +3,24 @@ import { getDb } from './db';
 import { PersonRepository } from './PersonRepository';
 import type { Person } from './types';
 
-type PersonRow = { id: string; name: string; note: string | null; sort: number; created_at: string };
+type PersonRow = {
+  id: string; name: string; note: string | null;
+  phone: string | null; email: string | null; contact_id: string | null;
+  sort: number; created_at: string;
+};
 
 function toPerson(r: PersonRow): Person {
-  return { id: r.id, name: r.name, note: r.note ?? null, sort: r.sort, createdAt: r.created_at };
+  return {
+    id: r.id,
+    name: r.name,
+    note: r.note ?? null,
+    // Nachgerüstete Spalten (v1.75.0) — alte Zeilen liefern `undefined`.
+    phone: r.phone ?? null,
+    email: r.email ?? null,
+    contactId: r.contact_id ?? null,
+    sort: r.sort,
+    createdAt: r.created_at,
+  };
 }
 
 export class SqlitePersonRepository implements PersonRepository {
@@ -22,8 +36,8 @@ export class SqlitePersonRepository implements PersonRepository {
   async create(person: Person): Promise<void> {
     const db = await getDb();
     await db.runAsync(
-      'INSERT OR REPLACE INTO people (id, name, note, sort, created_at) VALUES (?, ?, ?, ?, ?)',
-      [person.id, person.name, person.note, person.sort, person.createdAt],
+      'INSERT OR REPLACE INTO people (id, name, note, phone, email, contact_id, sort, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [person.id, person.name, person.note, person.phone ?? null, person.email ?? null, person.contactId ?? null, person.sort, person.createdAt],
     );
   }
 
@@ -33,6 +47,9 @@ export class SqlitePersonRepository implements PersonRepository {
     const args: (string | number | null)[] = [];
     if (patch.name !== undefined) { sets.push('name = ?'); args.push(patch.name); }
     if (patch.note !== undefined) { sets.push('note = ?'); args.push(patch.note); }
+    if (patch.phone !== undefined) { sets.push('phone = ?'); args.push(patch.phone ?? null); }
+    if (patch.email !== undefined) { sets.push('email = ?'); args.push(patch.email ?? null); }
+    if (patch.contactId !== undefined) { sets.push('contact_id = ?'); args.push(patch.contactId ?? null); }
     if (patch.sort !== undefined) { sets.push('sort = ?'); args.push(patch.sort); }
     if (sets.length === 0) return;
     args.push(id);

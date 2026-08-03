@@ -169,6 +169,15 @@ meisten Wirkung pro Zeile Code. Alle **NEU**, sofern nicht anders vermerkt.
   pro Termin. Der Assistent kann sie beim Anlegen mitgeben. Die
   EventKit-Teilnehmer bleiben unangetastet — sie sind nur lesbar, und sie zu
   setzen hieße Einladungsmails zu verschicken.
+- ~~**Menschen als feste Kontakte**~~ — umgesetzt in v1.75.0 (UEBERGABE §8.78).
+  Der eigenständige Weg zum Menschen (bis dahin gab es ihn nur als Nebenprodukt
+  einer Aufgabe), Telefon und E-Mail als tippbare Griffe (`tel:`/`mailto:`) und
+  der Import aus dem iOS-Adressbuch über `Contact.presentPicker()` — die
+  Auswahl läuft außerhalb der App, es kommt nur der eine gewählte Eintrag
+  zurück. Der Import KOPIERT: `Person.contactId` ist reine Herkunft, nichts
+  liest je daraus nach. Damit ist die alte Risiko-Einschätzung („nativ → eigene
+  Risikoklasse", siehe v1.73.0) aufgelöst, ohne Zugriff aufs ganze Buch.
+
 - **Wiedervorlage an Notizen** `[JS · klein]` — *Notizen haben kein Datum, gar
   keins.* Ein Gedanke, der in drei Wochen relevant wird, hat in Stoa keinen Ort
   außer einer Aufgabe, die er nicht ist. Ein optionales „zeig mir das wieder

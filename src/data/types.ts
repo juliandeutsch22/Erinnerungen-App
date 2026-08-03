@@ -144,15 +144,36 @@ export type NewTask = {
  * es sie gibt. Der Moment, in dem eine Personen-Ansicht trägt, ist der, in dem
  * man jemanden zufällig trifft.
  *
- * Bewusst frei getippt und NICHT aus den Systemkontakten gelesen: das wäre ein
- * natives Modul (`expo-contacts`) mit eigener Berechtigung — im Web nicht
- * prüfbar, also eigene Risikoklasse (AGENTS.md §5). Ein Name genügt.
+ * Ein Name genügt. Wer mehr will, holt sich den Menschen seit v1.75.0 aus dem
+ * Adressbuch (siehe `contactId`) — das bleibt aber optional: der Dachdecker,
+ * den man nie eingespeichert hat, ist genauso ein Mensch.
  */
 export type Person = {
   id: string;
   name: string;
   /** Freie Notiz zur Person („Dachdecker, über Kollegin"). */
   note: string | null;
+  /**
+   * Telefon und E-Mail — beim Import aus dem Adressbuch KOPIERT, nicht
+   * verlinkt (siehe `contactId`). Antippbar auf dem Personen-Screen: das ist
+   * der eigentliche Ertrag, denn „Angebot vom Dachdecker" wartet, und von dort
+   * bis zum Anruf sollen es zwei Tipps sein.
+   */
+  phone?: string | null;
+  email?: string | null;
+  /**
+   * Woher der Mensch kam: die Kennung des Adressbuch-Eintrags. NUR Herkunft —
+   * Name, Nummer und E-Mail liegen als eigene Felder in Stoa.
+   *
+   * Die Alternative wäre ein reiner Zeiger gewesen (nur die Kennung merken,
+   * alles andere live aus den Kontakten lesen). Dagegen sprachen drei Dinge:
+   * ohne Kontakt-Zugriff hätte JEDER Mensch seinen Namen verloren; im Backup
+   * stünden Kennungen, die auf einem anderen iPhone ins Leere zeigen; und ein
+   * Mensch OHNE Adressbuch-Eintrag („der Dachdecker") könnte gar nicht
+   * existieren. Der Preis der Kopie ist, dass sie veraltet — dagegen gibt es
+   * „Aus Kontakten aktualisieren".
+   */
+  contactId?: string | null;
   sort: number;
   createdAt: string; // ISO
 };
@@ -160,6 +181,9 @@ export type Person = {
 export type NewPerson = {
   name: string;
   note?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  contactId?: string | null;
 };
 
 /** Namen vergleichbar machen — „anna" und „Anna " sind dieselbe Person. */

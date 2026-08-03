@@ -14,6 +14,7 @@ import { DisclosureChevron } from '@/components/DisclosureChevron';
 import { Glass } from '@/components/Glass';
 import { GlassPanel } from '@/components/GlassPanel';
 import { NeuLink } from '@/components/NeuKnopf';
+import { PersonEditorSheet } from '@/components/PersonEditorSheet';
 import { ListEditorSheet } from '@/components/ListEditorSheet';
 import { listIcon } from '@/components/listMeta';
 import { PressableScale } from '@/components/PressableScale';
@@ -34,7 +35,7 @@ import {
   useTrashedLists,
   useTrashedTasks,
 } from '@/data/queries';
-import type { List, Task } from '@/data/types';
+import type { List, Person, Task } from '@/data/types';
 import { applyFilter } from '@/lib/taskFilters';
 import { addDays, formatDueDate, toDateStr, todayStr } from '@/lib/dates';
 import { usePeople } from '@/data/personQueries';
@@ -53,6 +54,8 @@ export default function ListenScreen() {
 
   // undefined = Sheet zu, null = neue Liste, List = bearbeiten.
   const [editorList, setEditorList] = useState<List | null | undefined>(undefined);
+  // undefined = Sheet zu, null = neuer Mensch, Person = bearbeiten.
+  const [editorPerson, setEditorPerson] = useState<Person | null | undefined>(undefined);
   const savedFilters = useSettings((s) => s.savedFilters);
   const today = todayStr();
 
@@ -161,15 +164,22 @@ export default function ListenScreen() {
       </Reveal>
 
       {/* Menschen — der Ort, an dem „was liegt bei wem?" beantwortet wird.
-          Erscheint erst, wenn es etwas zu zeigen gibt: ein leerer Abschnitt
-          mit einer Einladung wäre eine Aufgabe, die niemand gestellt hat.
           Der Zugang zu „Warten auf" steht bewusst HIER und nicht als eigene
           Smart-Karte oben: es ist keine Sicht auf den Kalender, sondern die
-          Gegenfrage zu allem, was man selbst tut. */}
-      {((people ?? []).length > 0 || wartend.length > 0) && (
-        <Reveal delay={105}>
+          Gegenfrage zu allem, was man selbst tut.
+
+          Der Abschnitt steht IMMER da — genau wie „Filter" darüber, das seine
+          Überschrift und seinen Link auch ohne gespeicherte Filter zeigt. Bis
+          v1.74 erschien er erst, WENN es Menschen gab; angelegt werden konnten
+          sie aber nur nebenbei in einer Aufgabe. Wer nie eine Aufgabe jemandem
+          zuordnete, hatte keinen Weg zu diesem Teil der App. */}
+      <Reveal delay={105}>
           <View style={{ gap: Spacing.sm }}>
-            <Type variant="eyebrow" tone="text3">Menschen</Type>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Type variant="eyebrow" tone="text3">Menschen</Type>
+              <NeuLink label="Neuer Mensch" icon={UserRound} onPress={() => setEditorPerson(null)} />
+            </View>
+            {((people ?? []).length > 0 || wartend.length > 0) && (
             <GlassPanel>
               <PressableScale
                 accessibilityLabel="Warten auf öffnen"
@@ -191,6 +201,10 @@ export default function ListenScreen() {
                     <PressableScale
                       accessibilityLabel={`Alles zu ${p.name} ansehen`}
                       onPress={() => router.push(`/person/${p.id}`)}
+                      onLongPress={() => {
+                        hapticSelect();
+                        setEditorPerson(p);
+                      }}
                       pressedScale={0.99}
                       style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.sm }}
                     >
@@ -209,9 +223,9 @@ export default function ListenScreen() {
                 );
               })}
             </GlassPanel>
+            )}
           </View>
-        </Reveal>
-      )}
+      </Reveal>
 
       {/* Listen-Grid */}
       <Reveal delay={120}>
@@ -313,6 +327,9 @@ export default function ListenScreen() {
       <TrashSection />
 
       {editorList !== undefined && <ListEditorSheet list={editorList} onClose={() => setEditorList(undefined)} />}
+      {editorPerson !== undefined && (
+        <PersonEditorSheet person={editorPerson} onClose={() => setEditorPerson(undefined)} />
+      )}
     </Screen>
     <QuickAdd />
     </View>

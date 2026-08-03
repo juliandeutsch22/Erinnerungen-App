@@ -8,12 +8,13 @@
 // Reihenfolge nach Dringlichkeit der Frage: Worauf warte ich bei ihr/ihm?
 // Was habe ich mit ihr/ihm vor? Was weiß ich? Worüber habe ich nachgedacht?
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { CalendarDays, ChevronLeft, ChevronRight, NotebookPen, Pencil, Sparkles, Trash2, UserRound } from 'lucide-react-native';
+import { CalendarDays, ChevronLeft, ChevronRight, Mail, NotebookPen, Pencil, Phone, Sparkles, UserRound } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
-import { TextInput, View } from 'react-native';
+import { Linking, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GlassPanel } from '@/components/GlassPanel';
+import { PersonEditorSheet } from '@/components/PersonEditorSheet';
 import { PressableScale } from '@/components/PressableScale';
 import { RescheduleSheet } from '@/components/RescheduleSheet';
 import { Reveal } from '@/components/Reveal';
@@ -28,7 +29,7 @@ import { useDeviceEvents } from '@/data/calendarQueries';
 import { useChats } from '@/data/chatQueries';
 import { useEventPeople } from '@/data/eventPersonQueries';
 import { useNotes } from '@/data/noteQueries';
-import { useDeletePerson, usePeople, useUpdatePerson } from '@/data/personQueries';
+import { usePeople } from '@/data/personQueries';
 import { useCompleteTask, useLists, useReopenTask, useTasks } from '@/data/queries';
 import type { Task } from '@/data/types';
 import { addDays, formatDueDate, toDateStr, todayStr } from '@/lib/dates';
@@ -36,9 +37,8 @@ import { hasCalendarPermission } from '@/lib/deviceCalendar';
 import { hapticSelect } from '@/lib/haptics';
 import { noteTitle } from '@/lib/noteLogic';
 import { isOpen, isWaiting, recentlyCompleted } from '@/lib/taskLogic';
-import { webNoOutline } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
-import { R, Spacing, T } from '@/theme/theme.tokens';
+import { R, Spacing } from '@/theme/theme.tokens';
 
 export default function PersonScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -52,8 +52,6 @@ export default function PersonScreen() {
   const { data: lists } = useLists();
   const { data: notes } = useNotes();
   const { data: chats } = useChats();
-  const updatePerson = useUpdatePerson();
-  const deletePerson = useDeletePerson();
   const complete = useCompleteTask();
   const reopen = useReopenTask();
 
@@ -61,9 +59,6 @@ export default function PersonScreen() {
   const [rescheduleTask, setRescheduleTask] = useState<Task | null>(null);
   const [quickTask, setQuickTask] = useState<Task | null>(null);
   const [bearbeiten, setBearbeiten] = useState(false);
-  const [namensEntwurf, setNamensEntwurf] = useState('');
-  const [notizEntwurf, setNotizEntwurf] = useState('');
-  const [loeschBestaetigt, setLoeschBestaetigt] = useState(false);
 
   const person = useMemo(() => (people ?? []).find((p) => p.id === id), [people, id]);
   const listById = useMemo(() => new Map((lists ?? []).map((l) => [l.id, l])), [lists]);
@@ -122,15 +117,6 @@ export default function PersonScreen() {
     );
   }
 
-  const sichern = () => {
-    const name = namensEntwurf.trim();
-    updatePerson.mutate({
-      id: person.id,
-      patch: { ...(name ? { name } : {}), note: notizEntwurf.trim() ? notizEntwurf.trim() : null },
-    });
-    setBearbeiten(false);
-  };
-
   const renderRow = (t: Task) => (
     <TaskRow
       key={t.id}
@@ -157,76 +143,62 @@ export default function PersonScreen() {
       <Reveal>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           {zurueck}
+          {/* Bearbeiten läuft seit v1.75.0 über dasselbe Sheet wie das Anlegen
+              (`PersonEditorSheet`) statt über einen zweiten Inline-Editor, den
+              es nur hier gab — mit Telefon, E-Mail und dem Weg ins Adressbuch
+              wären das sonst zwei Formulare gewesen, die auseinanderlaufen. */}
           <PressableScale
-            accessibilityLabel={bearbeiten ? 'Änderungen sichern' : 'Menschen bearbeiten'}
+            accessibilityLabel="Menschen bearbeiten"
             onPress={() => {
               hapticSelect();
-              if (bearbeiten) {
-                sichern();
-              } else {
-                setNamensEntwurf(person.name);
-                setNotizEntwurf(person.note ?? '');
-                setLoeschBestaetigt(false);
-                setBearbeiten(true);
-              }
+              setBearbeiten(true);
             }}
             style={{ padding: Spacing.sm }}
           >
-            <Pencil size={18} color={bearbeiten ? colors.teal : colors.text3} strokeWidth={2} />
+            <Pencil size={18} color={colors.text3} strokeWidth={2} />
           </PressableScale>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.xs }}>
           <UserRound size={26} color={colors.teal} strokeWidth={2.2} />
           <Type variant="title">{person.name}</Type>
         </View>
-        {!bearbeiten && person.note && (
-          <Type variant="body" tone="text2" style={{ marginTop: Spacing.xs }}>{person.note}</Type>
+        {person.note && <Type variant="body" tone="text2" style={{ marginTop: Spacing.xs }}>{person.note}</Type>}
+
+        {/* Nummer und E-Mail sind ANTIPPBAR — das ist der eigentliche Ertrag
+            des Imports. „Angebot vom Dachdecker" wartet, man tippt den
+            Menschen an, tippt die Nummer an, und telefoniert. Ohne das wäre
+            eine gespeicherte Nummer nur Text zum Abschreiben. */}
+        {(person.phone || person.email) && (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.sm }}>
+            {person.phone && (
+              <PressableScale
+                accessibilityLabel={`${person.name} anrufen`}
+                onPress={() => {
+                  hapticSelect();
+                  void Linking.openURL(`tel:${person.phone!.replace(/\s+/g, '')}`);
+                }}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: Spacing.md, borderRadius: R.pill, backgroundColor: colors.chip, borderWidth: 1, borderColor: colors.chipBorder }}
+              >
+                <Phone size={14} color={colors.teal} strokeWidth={2} />
+                <Type variant="label" tone="teal" tabular>{person.phone}</Type>
+              </PressableScale>
+            )}
+            {person.email && (
+              <PressableScale
+                accessibilityLabel={`${person.name} eine E-Mail schreiben`}
+                onPress={() => {
+                  hapticSelect();
+                  void Linking.openURL(`mailto:${person.email}`);
+                }}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: Spacing.md, borderRadius: R.pill, backgroundColor: colors.chip, borderWidth: 1, borderColor: colors.chipBorder }}
+              >
+                <Mail size={14} color={colors.teal} strokeWidth={2} />
+                <Type variant="label" tone="teal" numberOfLines={1} style={{ maxWidth: 200 }}>{person.email}</Type>
+              </PressableScale>
+            )}
+          </View>
         )}
       </Reveal>
-
-      {bearbeiten && (
-        <Reveal delay={60}>
-          <GlassPanel>
-            <View style={{ gap: Spacing.sm }}>
-              <TextInput
-                accessibilityLabel="Name"
-                value={namensEntwurf}
-                onChangeText={setNamensEntwurf}
-                placeholder="Name"
-                placeholderTextColor={colors.text3}
-                style={[{ fontSize: T.md, color: colors.text, borderRadius: R.lg, borderWidth: 1, borderColor: colors.chipBorder, backgroundColor: colors.bg2, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm + 2 }, webNoOutline]}
-              />
-              <TextInput
-                accessibilityLabel="Notiz zum Menschen"
-                value={notizEntwurf}
-                onChangeText={setNotizEntwurf}
-                placeholder="Notiz (z. B. Dachdecker, über Kollegin)"
-                placeholderTextColor={colors.text3}
-                style={[{ fontSize: T.md, color: colors.text, borderRadius: R.lg, borderWidth: 1, borderColor: colors.chipBorder, backgroundColor: colors.bg2, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm + 2 }, webNoOutline]}
-              />
-              {/* Löschen zweistufig — und ehrlich darüber, was dabei passiert:
-                  Aufgaben und Notizen bleiben, nur die Zuordnung geht. */}
-              <PressableScale
-                accessibilityLabel={loeschBestaetigt ? 'Löschen bestätigen' : 'Menschen löschen'}
-                onPress={() => {
-                  if (!loeschBestaetigt) {
-                    setLoeschBestaetigt(true);
-                    return;
-                  }
-                  deletePerson.mutate(person.id);
-                  router.back();
-                }}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.sm }}
-              >
-                <Trash2 size={16} color={colors.indigo} strokeWidth={2} />
-                <Type variant="label" tone="indigo">
-                  {loeschBestaetigt ? 'Wirklich löschen? Tippe erneut.' : 'Löschen — Aufgaben und Notizen bleiben'}
-                </Type>
-              </PressableScale>
-            </View>
-          </GlassPanel>
-        </Reveal>
-      )}
 
       <Reveal delay={90}>
         <GlassPanel>
@@ -336,6 +308,7 @@ export default function PersonScreen() {
         </GlassPanel>
       </Reveal>
 
+      {bearbeiten && <PersonEditorSheet person={person} onClose={() => setBearbeiten(false)} />}
       {editorTask !== undefined && <TaskEditorSheet task={editorTask} onClose={() => setEditorTask(undefined)} />}
       {rescheduleTask && <RescheduleSheet task={rescheduleTask} onClose={() => setRescheduleTask(null)} />}
       {quickTask && (

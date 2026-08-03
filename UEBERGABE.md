@@ -1903,6 +1903,53 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
       Für die nächste Design-Rückmeldung: erst das Mittel in der ganzen App
       suchen, dann die Stelle ändern.
 
+78. **Menschen sind feste Kontakte** (v1.75.0). Julian: „es wäre cool wenn man
+    personen selbst anlegen könnte, nicht nur in einer aufgabe. Und diese dann
+    eventuell auch aus dem ios adressbuch importieren kann. mit Telefonnummer
+    etc. … Macht das sinn? Bitte denke das fertig."
+    · **Das Henne-Ei-Problem, das ich in v1.73 gebaut hatte:** Menschen
+      entstanden NUR als Nebenprodukt — man tippte einen Namen im Aufgaben-,
+      Notiz- oder Termin-Editor. Und der Menschen-Abschnitt im Listen-Tab
+      erschien erst, WENN es schon welche gab. Wer einen Menschen anlegen
+      wollte, musste also erst eine Aufgabe erfinden. Jetzt steht der
+      Abschnitt immer da, mit `NeuLink „Neuer Mensch"` neben der Inschrift —
+      dieselbe Bauweise wie „Neuer Filter", also kein neues Muster.
+    · **Kopie, kein Zeiger.** Der Import holt Name, erste Nummer und erste
+      E-Mail und schreibt sie in Stoas eigene Felder. `Person.contactId` ist
+      reine HERKUNFT — nichts liest je daraus nach. Das ist die Entscheidung,
+      die den Rest trägt: Stoa überlebt eine entzogene Berechtigung, einen
+      gelöschten Kontakt und ein neues iPhone. Der Preis ist ehrlich und steht
+      im Editor: Änderungen im Adressbuch kommen nicht von selbst an.
+    · **Kein Zugriff aufs Adressbuch.** `Contact.presentPicker()` (expo-contacts
+      56) läuft AUSSERHALB der App und liefert nur den einen gewählten Eintrag
+      zurück — es braucht dafür keine Kontakte-Berechtigung für das ganze Buch.
+      Der Assistent kommt an diesen Weg nicht heran; er darf Menschen weiterhin
+      nur per Namen anlegen, nach Bestätigungstipp. Der `contactsPermission`-Text
+      in `app.json` ist trotzdem gesetzt, falls iOS ihn je zeigt.
+    · **Telefon und E-Mail sind Griffe, keine Zierde.** Auf dem Personen-Screen
+      sind sie tippbare Chips (`tel:` / `mailto:`). Damit ist die wartende
+      Aufgabe genau EINEN Tipp vom Anruf entfernt — das ist der eigentliche
+      Gewinn, nicht die gespeicherte Nummer.
+    · **Nebenbefund beim Fertigdenken:** Menschen waren seit v1.74.0 zwar an
+      Termine hängbar, aber nur beim BEARBEITEN eines gesicherten Termins —
+      beim Anlegen fehlte der Block, weil es noch keine `eventId` gab, an die
+      `event_people` hätte hängen können. `EventMenschen` arbeitet jetzt
+      wahlweise gegen eine `eventId` ODER gegen `gewaehlt`/`onGewaehlt`; der
+      Editor sammelt die Auswahl und verknüpft sie im `onSuccess` des
+      Anlegens. Wer „Termin mit X" denkt, kann das jetzt in einem Zug tun.
+    · Migrationen: `people.phone`, `people.email`, `people.contact_id` per
+      ALTER; das Backup schreibt und liest sie und kommt mit älteren Backups
+      klar (fehlende Felder werden `null`, nicht `undefined`).
+    · Verifikation: 507 Tests, tsc sauber, eslint 28 Warnungen/0 Fehler,
+      21 Playwright-Touren grün (neu: `kontakt.mjs`). **Ehrlich dazu:** der
+      Adressbuch-Import selbst ist im Web nicht prüfbar — Apples Auswahl gibt
+      es dort nicht. Die Tour prüft deshalb nur, dass der Knopf ohne
+      Adressbuch GAR NICHT erscheint; testbar gemacht ist stattdessen
+      `kontaktName()` als reine Funktion (ein Kontakt ohne Namen darf keinen
+      Menschen „undefined undefined" erzeugen). Auf dem Gerät zu prüfen bleibt:
+      der Import selbst und der „Wer ist dabei"-Block beim Anlegen eines
+      Termins.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**
@@ -1926,4 +1973,11 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
   beim Export ausweisen).
 - Assistent-Feinschliff: Prompt-Chips, Streaming, automatische Chat-Titel.
 - Name der App (vorläufig „Stoa").
+- **Auf dem Gerät ungeprüft** (im Web strukturell nicht prüfbar, weil
+  `deviceCalendarAvailable === false` bzw. das native Modul fehlt): Ort-Feld,
+  Kalender-Plus und mehrtägige Termine (seit v1.70), Wer-ist-dabei am Termin
+  (v1.74.0, beim Anlegen erst seit v1.75.0), der Termine-Abschnitt auf dem
+  Personen-Screen und der Adressbuch-Import (v1.75.0). Ebenso offen: ob der
+  Absturz aus v1.71.0 wirklich weg ist — falls nicht, wird der Exception-Name
+  aus Xcode gebraucht.
 - TestFlight-Frage (99 €/Jahr) — beendet den 7-Tage-Zyklus, Entscheidung offen.

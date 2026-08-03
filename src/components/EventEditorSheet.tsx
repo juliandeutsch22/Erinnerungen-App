@@ -11,6 +11,7 @@ import { DisclosureChevron } from '@/components/DisclosureChevron';
 import { Chip } from '@/components/Chip';
 import { GlassButton } from '@/components/GlassButton';
 import { EventMenschen } from '@/components/EventMenschen';
+import { useToggleEventPerson } from '@/data/eventPersonQueries';
 import { LinkedNotes } from '@/components/LinkedNotes';
 import { MiniCalendar } from '@/components/MiniCalendar';
 import { DocumentStrip } from '@/components/DocumentStrip';
@@ -94,6 +95,10 @@ export function EventEditorSheet({
   const [startTime, setStartTime] = useState(event && !event.allDay ? hm(event.start) : '09:00');
   const [endTime, setEndTime] = useState(event && !event.allDay ? hm(event.end) : '10:00');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // Menschen für einen NEUEN Termin: es gibt noch keine Event-ID, an der die
+  // Verknüpfung hängen könnte — die Auswahl wartet hier, bis der Termin steht.
+  const [neueMenschen, setNeueMenschen] = useState<string[]>([]);
+  const linkEventPerson = useToggleEventPerson();
   const [section, setSection] = useState<'calendar' | WhenRow | null>(isEdit ? null : 'start');
 
   const canSave = title.trim().length > 0 && calendarId.length > 0;
@@ -149,8 +154,22 @@ export function EventEditorSheet({
     };
     if (isEdit) updateEvent.mutate({ event, draft });
     else {
-      createEvent.mutate({ calendarId, draft });
       hapticSuccess();
+      // Erst der Termin, dann die Menschen: die Verknüpfung braucht die ID,
+      // die `createDeviceEvent` seit v1.74.0 zurückgibt. Kommt keine (kein
+      // Kalenderzugriff), bleibt die Auswahl folgenlos — es entsteht dann
+      // ohnehin kein Termin, an dem sie hängen könnte.
+      createEvent.mutate(
+        { calendarId, draft },
+        {
+          onSuccess: (neueId) => {
+            if (!neueId) return;
+            for (const personId of neueMenschen) {
+              linkEventPerson.mutate({ eventId: neueId, personId, dran: false });
+            }
+          },
+        },
+      );
     }
     onSaved?.();
     onClose();
@@ -339,17 +358,19 @@ export function EventEditorSheet({
 
       {/* Aufgaben zum Termin — macht den Termin zum kleinen Projekt
           (Vorbereiten, Mitbringen …). Erst für gespeicherte Termine. */}
-      {/* Wer ist dabei — erst für gespeicherte Termine (die Verknüpfung
-          braucht eine Event-ID). Steht VOR den Aufgaben: wer dabei ist,
-          gehört zum Termin selbst; die Aufgaben sind schon die Vorbereitung. */}
-      {isEdit && event && (
+      {/* Wer ist dabei — seit v1.75.0 AUCH beim Anlegen. Steht VOR den
+          Aufgaben: wer dabei ist, gehört zum Termin selbst; die Aufgaben sind
+          schon die Vorbereitung darauf. */}
+      <View style={{ marginTop: Spacing.md }}>
+        <Hairline />
         <View style={{ marginTop: Spacing.md }}>
-          <Hairline />
-          <View style={{ marginTop: Spacing.md }}>
+          {isEdit && event ? (
             <EventMenschen eventId={event.id} />
-          </View>
+          ) : (
+            <EventMenschen gewaehlt={neueMenschen} onGewaehlt={setNeueMenschen} />
+          )}
         </View>
-      )}
+      </View>
 
       {isEdit && event && (
         <View style={{ marginTop: Spacing.md }}>

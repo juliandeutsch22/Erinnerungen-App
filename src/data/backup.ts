@@ -306,6 +306,12 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
       id: p.id,
       name: p.name,
       note: str(p.note) ? p.note : null,
+      phone: str(p.phone) ? p.phone : null,
+      email: str(p.email) ? p.email : null,
+      // Die Adressbuch-Kennung wandert mit, taugt auf einem ANDEREN iPhone
+      // aber nichts — genau deshalb liegen Name, Nummer und E-Mail als eigene
+      // Felder daneben (siehe `Person.contactId`).
+      contactId: str(p.contactId) ? p.contactId : null,
       sort: typeof p.sort === 'number' ? p.sort : 0,
       createdAt: str(p.createdAt) ? p.createdAt : new Date().toISOString(),
     });

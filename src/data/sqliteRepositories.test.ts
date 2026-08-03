@@ -205,6 +205,39 @@ describe('Warten auf und Menschen (v1.73.0)', () => {
     expect((await people.getAll())[0].note).toBe('0170…');
   });
 
+  // `phone`/`email`/`contact_id` kamen per ALTER TABLE dazu (v1.75.0).
+  it('trägt Telefon, E-Mail und die Adressbuch-Herkunft', async () => {
+    const { people } = await frisch();
+    await people.create({
+      id: 'p1', name: 'Herr Brandt', note: 'Dachdecker',
+      phone: '+49 170 1234567', email: 'brandt@example.org', contactId: 'ABC-123',
+      sort: 1, createdAt: 'A',
+    });
+    const [p] = await people.getAll();
+    expect(p.phone).toBe('+49 170 1234567');
+    expect(p.email).toBe('brandt@example.org');
+    expect(p.contactId).toBe('ABC-123');
+
+    // Und jedes der drei lässt sich einzeln wieder leeren.
+    await people.update('p1', { phone: null, email: null, contactId: null });
+    const [nach] = await people.getAll();
+    expect(nach.phone).toBeNull();
+    expect(nach.email).toBeNull();
+    expect(nach.contactId).toBeNull();
+    // Der Rest bleibt stehen.
+    expect(nach.name).toBe('Herr Brandt');
+    expect(nach.note).toBe('Dachdecker');
+  });
+
+  it('liest einen Menschen OHNE die neuen Felder als null, nicht als undefined', async () => {
+    const { people } = await frisch();
+    await people.create({ id: 'p1', name: 'Anna', note: null, sort: 1, createdAt: 'A' });
+    const [p] = await people.getAll();
+    expect(p.phone).toBeNull();
+    expect(p.email).toBeNull();
+    expect(p.contactId).toBeNull();
+  });
+
   it('löst beim Löschen einer Person JEDE Zuordnung — in einem Zug', async () => {
     const { people, tasks, notes, chats } = await frisch();
     await people.create({ id: 'p1', name: 'Anna', note: null, sort: 1, createdAt: 'A' });

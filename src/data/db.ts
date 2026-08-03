@@ -99,6 +99,9 @@ export function getDb(): Promise<SQLiteDatabase> {
           id TEXT PRIMARY KEY NOT NULL,
           name TEXT NOT NULL,
           note TEXT,
+          phone TEXT,
+          email TEXT,
+          contact_id TEXT,
           sort INTEGER NOT NULL,
           created_at TEXT NOT NULL
         );
@@ -143,6 +146,15 @@ export function getDb(): Promise<SQLiteDatabase> {
       for (const col of ['note_id TEXT', 'deleted_at TEXT', 'list_id TEXT', 'person_id TEXT']) {
         try {
           await db.execAsync(`ALTER TABLE chats ADD COLUMN ${col};`);
+        } catch {
+          /* Spalte existiert bereits */
+        }
+      }
+      // Telefon, E-Mail und Adressbuch-Herkunft (v1.75.0). Wer die Tabelle
+      // schon aus v1.73 hat, bekommt die Spalten hier nachgereicht.
+      for (const col of ['phone TEXT', 'email TEXT', 'contact_id TEXT']) {
+        try {
+          await db.execAsync(`ALTER TABLE people ADD COLUMN ${col};`);
         } catch {
           /* Spalte existiert bereits */
         }

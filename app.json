@@ -2,7 +2,7 @@
   "expo": {
     "name": "Stoa",
     "slug": "stille",
-    "version": "1.74.4",
+    "version": "1.75.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "stille",
@@ -10,7 +10,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "app.julian.stille",
-      "buildNumber": "117",
+      "buildNumber": "118",
       "icon": {
         "light": "./assets/images/icon.png",
         "dark": "./assets/images/icon-dark.png",
@@ -56,6 +56,12 @@
         {
           "calendarPermission": "Stoa zeigt deine Kalender-Termine neben deinen Aufgaben an — alles bleibt auf dem Gerät.",
           "remindersPermission": "Stoa liest deine Apple-Erinnerungen nur für den einmaligen Import — alles bleibt auf dem Gerät."
+        }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Stoa öffnet die Kontakte-Auswahl von iOS, wenn du einen Menschen aus deinem Adressbuch übernimmst — nur der von dir gewählte Eintrag wird kopiert, und er bleibt auf dem Gerät."
         }
       ],
       "@react-native-community/datetimepicker",

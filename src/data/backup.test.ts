@@ -408,6 +408,36 @@ describe('Backup', () => {
     expect(await getEventPersonRepository().getAll()).toEqual([]);
   });
 
+  it('sichert Telefon, E-Mail und Adressbuch-Herkunft eines Menschen', async () => {
+    await getPersonRepository().create({
+      id: 'p1', name: 'Herr Brandt', note: 'Dachdecker',
+      phone: '+49 170 1234567', email: 'brandt@example.org', contactId: 'ABC-123',
+      sort: 1, createdAt: '2026-07-01T08:00:00.000Z',
+    });
+    const json = await exportToJsonString(noPhotos, new Date('2026-07-03T12:00:00.000Z'));
+    __setPersonRepositoryForTests(new InMemoryPersonRepository());
+    await importBackup(json);
+
+    const [p] = await getPersonRepository().getAll();
+    expect(p.phone).toBe('+49 170 1234567');
+    expect(p.email).toBe('brandt@example.org');
+    // Die Kennung wandert mit — sie taugt auf einem anderen iPhone zwar
+    // nichts, aber genau dafür liegen Name und Nummer als eigene Felder da.
+    expect(p.contactId).toBe('ABC-123');
+  });
+
+  it('liest Menschen aus Backups vor v1.75.0 ohne die neuen Felder', async () => {
+    const json = JSON.stringify({
+      app: 'stille', schemaVersion: 3, exportedAt: '2026-07-03T12:00:00.000Z',
+      lists: [], tasks: [], people: [{ id: 'p1', name: 'Anna', createdAt: 'A' }],
+    });
+    await importBackup(json);
+    const [p] = await getPersonRepository().getAll();
+    expect(p.name).toBe('Anna');
+    expect(p.phone).toBeNull();
+    expect(p.contactId).toBeNull();
+  });
+
   it('lehnt fremdes/ungültiges JSON ab', async () => {
     await expect(importBackup('kein json')).rejects.toThrow('Kein gültiges JSON.');
     await expect(importBackup('{"app":"cairn","schemaVersion":1}')).rejects.toThrow('Kein Erinnerungen-Backup');

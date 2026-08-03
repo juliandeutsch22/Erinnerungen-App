@@ -21,7 +21,26 @@ import { webNoOutline } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
 import { R, Spacing, T } from '@/theme/theme.tokens';
 
-export function EventMenschen({ eventId }: { eventId: string }) {
+export function EventMenschen({
+  eventId,
+  gewaehlt,
+  onGewaehlt,
+}: {
+  /** Bestehender Termin — dann wird sofort verknüpft. */
+  eventId?: string;
+  /**
+   * NEUER Termin: die Auswahl hat noch kein Ziel und wird beim Aufrufer
+   * zwischengehalten, bis der Termin angelegt ist (EventEditorSheet).
+   *
+   * Bis v1.74 gab es diesen Weg nicht — „Wer ist dabei" erschien erst beim
+   * BEARBEITEN eines gespeicherten Termins, weil die Verknüpfung eine
+   * Event-ID braucht. „Abendessen mit Anna" hieß damit: anlegen, schließen,
+   * wieder öffnen, Anna anhaken. Seit `createDeviceEvent` die ID zurückgibt
+   * (v1.74.0), geht es in einem Zug.
+   */
+  gewaehlt?: string[];
+  onGewaehlt?: (ids: string[]) => void;
+}) {
   const colors = useColors();
   const { data: people } = usePeople();
   const { data: links } = useEventPeople();
@@ -30,9 +49,22 @@ export function EventMenschen({ eventId }: { eventId: string }) {
   const [entwurf, setEntwurf] = useState('');
 
   const dabei = useMemo(
-    () => new Set((links ?? []).filter((l) => l.eventId === eventId).map((l) => l.personId)),
-    [links, eventId],
+    () =>
+      eventId
+        ? new Set((links ?? []).filter((l) => l.eventId === eventId).map((l) => l.personId))
+        : new Set(gewaehlt ?? []),
+    [links, eventId, gewaehlt],
   );
+
+  /** Ein Mensch an/aus — am bestehenden Termin sofort, sonst im Entwurf. */
+  const umschalten = (personId: string, ist: boolean) => {
+    if (eventId) {
+      toggle.mutate({ eventId, personId, dran: ist });
+      return;
+    }
+    const naechste = ist ? (gewaehlt ?? []).filter((x) => x !== personId) : [...(gewaehlt ?? []), personId];
+    onGewaehlt?.(naechste);
+  };
 
   // Wer dabei ist, steht oben — sonst müsste man zum Lösen erst suchen.
   const sortiert = useMemo(
@@ -46,10 +78,7 @@ export function EventMenschen({ eventId }: { eventId: string }) {
     hapticSuccess();
     // Gleicher Name = derselbe Mensch (siehe `useCreatePerson`), und er ist
     // sofort dabei — man tippt ihn ja ein, weil er dazugehört.
-    createPerson.mutate(
-      { name },
-      { onSuccess: (p) => toggle.mutate({ eventId, personId: p.id, dran: false }) },
-    );
+    createPerson.mutate({ name }, { onSuccess: (p) => umschalten(p.id, false) });
     setEntwurf('');
   };
 
@@ -64,7 +93,7 @@ export function EventMenschen({ eventId }: { eventId: string }) {
             accessibilityLabel={ist ? `${p.name} ist nicht dabei` : `${p.name} ist dabei`}
             onPress={() => {
               hapticSelect();
-              toggle.mutate({ eventId, personId: p.id, dran: ist });
+              umschalten(p.id, ist);
             }}
             pressedScale={0.99}
             style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.xs + 2 }}
