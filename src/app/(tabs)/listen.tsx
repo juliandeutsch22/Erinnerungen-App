@@ -294,10 +294,14 @@ export default function ListenScreen() {
                   borderRadius: R.md,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  // Dieselbe Tönung wie die Listen-Symbole (`${farbe}1F`), nur
-                  // im Stein-Ton: der Platz ist da, die Farbe kommt erst mit
-                  // der Liste.
-                  backgroundColor: colors.chip,
+                  // Dieselbe Tönung wie bei den echten Listen (`${farbe}1F`),
+                  // hier im Akzent. Bis v1.74.2 stand hier der neutrale
+                  // Stein-Ton — gedacht als „die Farbe kommt erst mit der
+                  // Liste", gelesen als grauer Kasten um ein blaues Zeichen.
+                  // Nirgends sonst in der App hält eine getönte Fläche ein
+                  // Glyph in einer ANDEREN Farbe: Fläche und Zeichen sind
+                  // überall ein Ton. Also folgt die Fläche dem Plus.
+                  backgroundColor: `${colors.teal}1F`,
                 }}
               >
                 {/* Teal, wie JEDES „lege etwas an" in dieser App (Kopfzeilen-Plus,

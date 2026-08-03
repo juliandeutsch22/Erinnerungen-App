@@ -1864,6 +1864,16 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
     · Die Beschriftung bleibt Text3: sie sitzt im NAMENS-Feld der Karte, und
       dort steht noch kein Name. Das Plus trägt das Handlungs-Signal, wie
       überall sonst.
+    · **Nachtrag (v1.74.3), zweite Rückfrage zur selben Karte:** damit stand
+      ein blaues Zeichen in einem GRAUEN Kasten. Die 38er-Symbolfläche trägt
+      bei jeder echten Liste deren eigene Farbe (`${farbe}1F`); ich hatte sie
+      hier im neutralen Steinton gelassen — gedacht als „die Farbe kommt erst
+      mit der Liste", gelesen als toter Rahmen.
+      Die Regel dahinter ist die eigentliche Lehre: **nirgends sonst in dieser
+      App hält eine getönte Fläche ein Glyph in einer anderen Farbe.** Fläche
+      und Zeichen sind überall EIN Ton. Also folgt die Fläche dem Plus:
+      `${colors.teal}1F`. Zwei Rückfragen für eine Karte — die Kachel war der
+      Ort, an dem drei Erbstücke gleichzeitig lagen.
 
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
