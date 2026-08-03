@@ -8,14 +8,20 @@
 // reine, testbare Logik, und die Bildschirme behalten ihre eigenen Hooks (und
 // damit die Wiederholungs-Logik und die Notification-Neuplanung).
 import { resolveListId, resolveTaskHandle, subtasksFromSchritte, actionDueDate, type AssistantAction } from '@/lib/assistant';
-import type { List, NewList, NewTask, Subtask, Task } from '@/data/types';
+import type { List, NewList, NewPerson, NewTask, Person, Subtask, Task } from '@/data/types';
+import { normalizePersonName } from '@/data/types';
 
 export type ApplyDeps = {
   lists: List[];
   /** Nur zum Auflösen der Handles in „aenderungen" — darf leer sein. */
   tasks: Task[];
+  /** Bekannte Menschen — für „person" im Vorschlag. Darf leer sein. */
+  people?: Person[];
   today: string;
   createList: (input: NewList) => Promise<List>;
+  /** Legt einen Menschen an (oder gibt den gleichnamigen vorhandenen zurück).
+   *  Fehlt die Funktion, wird „person" schlicht ignoriert. */
+  createPerson?: (input: NewPerson) => Promise<Person>;
   /** Muss die angelegte Aufgabe zurückgeben — ohne id kein Rückgängig. */
   createTask: (input: NewTask) => Promise<{ id: string }>;
   /** Muss die angelegte Notiz zurückgeben — ohne id kein Rückgängig. */
@@ -148,6 +154,36 @@ export async function applyAssistantActions(a: AssistantAction, deps: ApplyDeps)
   }
   const alleListen = [...deps.lists, ...frisch];
 
+  // 1b. Menschen. Ein Name aus dem Vorschlag zeigt entweder auf einen
+  //     vorhandenen Menschen (Groß-/Kleinschreibung egal) oder legt einen an.
+  //     Angelegt wird erst HIER, also nach dem Bestätigungs-Tipp — vorher
+  //     schreibt die App nichts, auch keinen Namen.
+  //
+  //     Bewusst NICHT im Rückgängig-Block: ein Mensch ist kein Vorschlag,
+  //     sondern eine Person, die es ab jetzt gibt. Ihn beim Zurücknehmen
+  //     wieder zu löschen, würde auch die Zuordnungen mitreißen, die inzwischen
+  //     von Hand gesetzt wurden.
+  const personenCache = new Map<string, string | null>();
+  const resolvePerson = async (name: string | undefined | null): Promise<string | null> => {
+    if (!name) return null;
+    const schluessel = normalizePersonName(name);
+    if (schluessel.length === 0) return null;
+    const gemerkt = personenCache.get(schluessel);
+    if (gemerkt !== undefined) return gemerkt;
+    const vorhanden = (deps.people ?? []).find((p) => normalizePersonName(p.name) === schluessel);
+    if (vorhanden) {
+      personenCache.set(schluessel, vorhanden.id);
+      return vorhanden.id;
+    }
+    if (!deps.createPerson) {
+      personenCache.set(schluessel, null);
+      return null;
+    }
+    const neu = await deps.createPerson({ name: name.trim() });
+    personenCache.set(schluessel, neu.id);
+    return neu.id;
+  };
+
   // 2. Änderungen an Bestehendem.
   let aenderungen = 0;
   const rueckgaengig: ApplyUndo = { aufgaben: [], notizen: [], listen: neueListen, aenderungen: [], entsorgt: [], abgehakt: [] };
@@ -165,6 +201,13 @@ export async function applyAssistantActions(a: AssistantAction, deps: ApplyDeps)
     if (c.datum !== undefined) patch.dueDate = c.datum;
     if (c.zeit !== undefined) patch.dueTime = c.zeit;
     if (c.liste) patch.listId = resolveListId(c.liste, alleListen, t.listId);
+    if (c.wartet_auf !== undefined) {
+      // null beendet das Warten — dann muss auch der Text weg, sonst bliebe
+      // eine Fußnote an einer Aufgabe, die gar nicht mehr wartet.
+      patch.waiting = c.wartet_auf !== null;
+      patch.waitingFor = c.wartet_auf;
+    }
+    if (c.person !== undefined) patch.personId = await resolvePerson(c.person);
     if (Object.keys(patch).length > 0) {
       // Den Stand VORHER merken — und nur die Felder, die wirklich angefasst
       // werden. Ein vollständiger Task als „vorher" würde beim Zurücknehmen
@@ -201,6 +244,9 @@ export async function applyAssistantActions(a: AssistantAction, deps: ApplyDeps)
       rrule: t.wiederholung ?? null,
       tags: t.tags ?? [],
       eventId: deps.taskEventId ?? null,
+      waiting: t.wartet_auf !== undefined,
+      waitingFor: t.wartet_auf ?? null,
+      personId: await resolvePerson(t.person),
       subtasks,
     });
     if (neu?.id) rueckgaengig.aufgaben.push(neu.id);

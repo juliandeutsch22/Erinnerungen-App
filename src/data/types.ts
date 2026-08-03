@@ -87,6 +87,25 @@ export type Task = {
   deletedAt?: string | null; // ISO
   /** geplante lokale Notification (zum Ersetzen/Abbrechen), null = keine geplant. */
   notificationId: string | null;
+  /**
+   * Die Aufgabe liegt bei jemand anderem und ist gerade NICHT deine Handlung.
+   *
+   * Bis dahin gab es dafür nur zwei schlechte Wege: immer weiter verschieben
+   * (fühlt sich nach Versagen an) oder ins Projekt verbannen (dann sieht man
+   * sie nie wieder). Wartend heißt: raus aus „Heute" und aus dem
+   * Überfällig-Stapel, aber weiter im Projekt, in der Suche und in einer
+   * eigenen ruhigen Ansicht. **Kein Zähler, keine Mahnung** — nie „du wartest
+   * seit zwölf Tagen".
+   *
+   * Optional im Typ, damit Alt-Daten ohne das Feld gültig bleiben.
+   */
+  waiting?: boolean;
+  /** Worauf/auf wen gewartet wird, frei („Angebot vom Dachdecker"). Rein
+   *  beschreibend — den Zustand trägt `waiting`, damit es nie zwei Wahrheiten
+   *  gibt. Steht eine PERSON dahinter, gehört sie in `personId`. */
+  waitingFor?: string | null;
+  /** Der Mensch, an dem diese Aufgabe hängt (siehe `Person`). */
+  personId?: string | null;
   /** Frei vergebbare Tags (kleingeschrieben, ohne #) — kontextübergreifend filterbar. */
   tags: string[];
   /** Checkliste innerhalb der Aufgabe (eine Ebene). */
@@ -108,9 +127,45 @@ export type NewTask = {
   evening?: boolean;
   flagged?: boolean;
   eventId?: string | null;
+  waiting?: boolean;
+  waitingFor?: string | null;
+  personId?: string | null;
   tags?: string[];
   subtasks?: Subtask[];
 };
+
+/**
+ * Ein Mensch, an dem etwas hängt.
+ *
+ * Stoa kannte Listen, Termine, Notizen und Tags — aber keine Personen. Dabei
+ * hängt ein großer Teil aller offenen Punkte an jemandem: „Angebot vom
+ * Dachdecker", „mit Anna wegen Urlaub reden", „Papa Fotos schicken". Die drei
+ * lagen an drei Orten und waren nur zu finden, wenn man sich erinnerte, dass
+ * es sie gibt. Der Moment, in dem eine Personen-Ansicht trägt, ist der, in dem
+ * man jemanden zufällig trifft.
+ *
+ * Bewusst frei getippt und NICHT aus den Systemkontakten gelesen: das wäre ein
+ * natives Modul (`expo-contacts`) mit eigener Berechtigung — im Web nicht
+ * prüfbar, also eigene Risikoklasse (AGENTS.md §5). Ein Name genügt.
+ */
+export type Person = {
+  id: string;
+  name: string;
+  /** Freie Notiz zur Person („Dachdecker, über Kollegin"). */
+  note: string | null;
+  sort: number;
+  createdAt: string; // ISO
+};
+
+export type NewPerson = {
+  name: string;
+  note?: string | null;
+};
+
+/** Namen vergleichbar machen — „anna" und „Anna " sind dieselbe Person. */
+export function normalizePersonName(raw: string): string {
+  return raw.trim().replace(/\s+/g, ' ').toLowerCase();
+}
 
 /** Tag normalisieren: klein, ohne führendes #, keine Leerzeichen. */
 export function normalizeTag(raw: string): string {
@@ -148,6 +203,8 @@ export type Note = {
    * Optional im Typ, damit Alt-Daten ohne das Feld gültig bleiben.
    */
   listId?: string | null;
+  /** Der Mensch, um den es in dieser Notiz geht (siehe `Person`). */
+  personId?: string | null;
   /** Angeheftet — steht in der Liste oben vor den Datumsgruppen. */
   pinned: boolean;
   /** Papierkorb: gesetzt = „Zuletzt gelöscht" (30 Tage), null = aktiv. */
@@ -169,6 +226,8 @@ export type Chat = {
   /** Zugehörige Liste bzw. Projekt — wie bei der Notiz, siehe dort.
    *  Optional, damit Alt-Daten ohne das Feld gültig bleiben. */
   listId?: string | null;
+  /** Der Mensch, um den es in diesem Chat geht (siehe `Person`). */
+  personId?: string | null;
   context: string | null;
   /** Papierkorb (30 Tage, wie Notizen), null = aktiv. */
   deletedAt: string | null; // ISO

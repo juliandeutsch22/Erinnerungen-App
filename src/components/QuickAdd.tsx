@@ -33,6 +33,7 @@ import { PressableScale } from '@/components/PressableScale';
 import { Type } from '@/components/Type';
 import { LIST_COLORS } from '@/components/listMeta';
 import { useCreateAssistantEvents, useDeviceEvents } from '@/data/calendarQueries';
+import { useCreatePerson, usePeople } from '@/data/personQueries';
 import { useCreateNote, useDeleteNote, useNotes } from '@/data/noteQueries';
 import { useCompleteTask, useCreateList, useCreateTask, useDeleteList, useDeleteTask, useLists, useRestoreTask, useTasks, useUpdateTask } from '@/data/queries';
 import { DEFAULT_LIST_ID } from '@/data/ListRepository';
@@ -121,6 +122,8 @@ export function QuickAdd({
   const deleteList = useDeleteList();
   const { data: tasks } = useTasks();
   const { data: lists } = useLists();
+  const { data: people } = usePeople();
+  const createPerson = useCreatePerson();
   const { data: notes } = useNotes();
 
   const apiKey = useSettings((s) => s.geminiApiKey);
@@ -234,7 +237,7 @@ export function QuickAdd({
     beginRun(RUN_ZEILE, 'Zeile', eingabe, verlauf);
     try {
       const kontext = contextEnabled
-        ? buildAppContext({ events: events ?? [], tasks: tasks ?? [], lists: lists ?? [], notes: notes ?? [], today, calendarDenied: !calGranted })
+        ? buildAppContext({ events: events ?? [], tasks: tasks ?? [], lists: lists ?? [], notes: notes ?? [], people: people ?? [], today, calendarDenied: !calGranted })
         : null;
       // Werkzeuge am SELBEN Schalter wie der Überblick — wer ihn ausschaltet,
       // will nicht, dass stattdessen nachgeschlagen wird.
@@ -388,7 +391,9 @@ export function QuickAdd({
         lists: lists ?? [],
         tasks: tasks ?? [],
         today,
+        people: people ?? [],
         createList: (input) => createList.mutateAsync(input),
+        createPerson: (input) => createPerson.mutateAsync(input),
         createTask: (input) => createTask.mutateAsync(input),
         createNote: (body) => createNote.mutateAsync({ body }),
         updateTask: (id, patch) => updateTask.mutateAsync({ id, patch }),

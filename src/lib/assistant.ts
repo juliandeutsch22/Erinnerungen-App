@@ -2,7 +2,7 @@
 // Bewusst OHNE eigenen Server: das Gerät spricht die API direkt an — keine
 // laufenden Kosten, kein Mittelsmann. Reine Logik testbar (Prompt-Bau,
 // Antwort-Extraktion); der fetch selbst wird im Test nicht ausgeführt.
-import { type ChatMessage, type List, type Note, newId, normalizeTag, type Rrule, type Subtask, type Task } from '@/data/types';
+import { type ChatMessage, type List, type Note, newId, normalizeTag, type Person, type Rrule, type Subtask, type Task } from '@/data/types';
 import { anchorWeekdayRrule, isRrule, rruleLabel, toDateStr } from '@/lib/dates';
 import { noteTitle } from '@/lib/noteLogic';
 import type { DeviceEvent } from '@/lib/deviceCalendar';
@@ -82,6 +82,14 @@ const P_AKTIONEN_RUMPF =
   'oder an festen Wochentagen "wd:1,4" (0=So, 1=Mo … 6=Sa; „jeden Montag und Donnerstag"); ' +
   'für Montag bis Freitag gibt es "weekdays". ' +
   '„tags" sind kurze Schlagworte ohne #; „notiz" ist Zusatzkontext an der Aufgabe (Nummern, Adressen, Details). ' +
+  // Warten auf: der Zustand, den die App bis v1.72 gar nicht kannte.
+  'WARTEN: Liegt etwas bei JEMAND ANDEREM und ist gerade nicht meine Handlung ' +
+  '(„ich warte auf das Angebot vom Dachdecker", „Anna meldet sich wegen der Termine"), ' +
+  'setze „wartet_auf" auf das, worauf gewartet wird („Angebot", „Rückmeldung"). ' +
+  'Die Aufgabe verschwindet dann aus „Heute" und mahnt nicht mehr. ' +
+  'Setze es NUR bei einer echten Warte-Aussage — nicht bei allem, was noch offen ist. ' +
+  'Steht ein MENSCH dahinter oder hat die Aufgabe mit jemandem zu tun („mit Anna besprechen", ' +
+  '„Papa Fotos schicken"), gehört dessen Name in „person" — nur der Name, nichts weiter. ' +
   '„listen" legt ein neues Projekt an — NUR wenn der Nutzer ein größeres Vorhaben beschreibt und ' +
   'keine passende Liste existiert. Aufgaben dazu bekommen dann "liste" mit genau diesem Namen. ' +
   'WICHTIG — „schritte": Wenn viele Einzelteile zu EINEM Gang oder EINER Handlung gehören, ' +
@@ -141,6 +149,8 @@ const P_AENDERN =
   'Klammern aus dem App-Überblick — NUR dort gesehene Handles verwenden, nie erfundene, ' +
   'und nur Felder angeben, die sich wirklich ändern. „erledigt":true hakt ab, ' +
   '"papierkorb":true legt in den Papierkorb (wiederherstellbar). ' +
+  '„wartet_auf" setzt/ändert den Wartezustand, null beendet ihn („ist da", „hat sich gemeldet"); ' +
+  '„person" ordnet einem Menschen zu, null löst die Zuordnung. ' +
   'ENDGÜLTIG LÖSCHEN KANNST DU NICHT — biete es auch nicht an. ' +
   'Ohne App-Überblick (keine Handles sichtbar) gibt es keine „aenderungen". ' +
   'Nutze den Block NUR bei einer ausdrücklichen Anlege- oder Änderungs-Bitte, nie ungefragt.';
@@ -163,6 +173,8 @@ const ACTION_SCHEMA = {
           wiederholung: { type: 'STRING' },
           tags: { type: 'ARRAY', items: { type: 'STRING' } },
           schritte: { type: 'ARRAY', items: { type: 'STRING' } },
+          wartet_auf: { type: 'STRING' },
+          person: { type: 'STRING' },
         },
         required: ['titel'],
       },
@@ -268,6 +280,11 @@ export type AssistantAction = {
     tags?: string[];
     /** Zusatzkontext an der Aufgabe (Nummern, Adressen) statt im Titel. */
     notiz?: string;
+    /** Liegt bei jemand anderem — Text beschreibt WORAUF gewartet wird. */
+    wartet_auf?: string;
+    /** Mensch, an dem die Aufgabe hängt — als NAME. Wird beim Übernehmen auf
+     *  eine vorhandene Person aufgelöst oder neu angelegt. */
+    person?: string;
   }[];
   /** Feste Verabredungen → Gerätekalender. datum Pflicht; ohne start = ganztägig. */
   termine: { titel: string; datum: string; enddatum?: string; start?: string; ende?: string; ort?: string; notiz?: string }[];
@@ -283,6 +300,10 @@ export type AssistantAction = {
     zeit?: string | null;
     titel?: string;
     liste?: string;
+    /** null = Warten beenden, Text = ab jetzt warten (und worauf). */
+    wartet_auf?: string | null;
+    /** null = Zuordnung lösen, Name = diesem Menschen zuordnen. */
+    person?: string | null;
     papierkorb?: boolean;
   }[];
   checkliste: string[];
@@ -351,8 +372,15 @@ function parseTags(raw: unknown): string[] | undefined {
 
 /** Zusatz-Merkmale einer Aktions-Aufgabe für die Bestätigungskarte
  *  (Wiederholung, Tags) — sichtbar, BEVOR etwas angelegt wird. */
-export function describeExtras(a: { wiederholung?: Rrule; tags?: string[] }): string | null {
-  const parts = [a.wiederholung ? rruleLabel(a.wiederholung) : '', (a.tags ?? []).map((t) => `#${t}`).join(' ')];
+export function describeExtras(a: { wiederholung?: Rrule; tags?: string[]; wartet_auf?: string; person?: string }): string | null {
+  const parts = [
+    a.wiederholung ? rruleLabel(a.wiederholung) : '',
+    // Beides muss VOR dem Übernehmen sichtbar sein: „wartet auf" nimmt die
+    // Aufgabe aus Heute heraus, und „person" legt womöglich einen Menschen an.
+    a.wartet_auf ? `wartet auf ${a.wartet_auf}` : '',
+    a.person ? `Mensch: ${a.person}` : '',
+    (a.tags ?? []).map((t) => `#${t}`).join(' '),
+  ];
   const text = parts.filter(Boolean).join(' · ');
   return text.length > 0 ? text : null;
 }
@@ -368,6 +396,10 @@ export function describeAenderung(
   if (c.papierkorb) parts.push('in den Papierkorb');
   if (c.titel) parts.push(`umbenennen in „${c.titel}"`);
   if (c.liste) parts.push(`in die Liste „${c.liste}"`);
+  if (c.wartet_auf === null) parts.push('nicht mehr warten');
+  else if (c.wartet_auf) parts.push(`wartet auf ${c.wartet_auf}`);
+  if (c.person === null) parts.push('Menschen lösen');
+  else if (c.person) parts.push(`Mensch: ${c.person}`);
   if (c.datum === null) parts.push('Datum entfernen');
   else if (c.datum) parts.push(`auf ${formatDatum(c.datum)}${c.zeit ? ` · ${c.zeit} Uhr` : ''}`);
   else if (c.zeit === null) parts.push('Uhrzeit entfernen');
@@ -466,6 +498,15 @@ function parseActionJson(jsonText: string): AssistantAction | null {
             wiederholung: isRrule(a.wiederholung) ? a.wiederholung : undefined,
             tags: parseTags(a.tags),
             notiz: typeof a.notiz === 'string' && a.notiz.trim().length > 0 ? a.notiz.trim() : undefined,
+            // Freier Text, nur leer aussortieren. Ein leerer String hieße
+            // „wartend ohne Angabe" und ist über den Editor erreichbar — vom
+            // Modell wollen wir dafür eine Aussage, sonst gar nichts.
+            wartet_auf:
+              typeof a.wartet_auf === 'string' && (a.wartet_auf as string).trim().length > 0
+                ? (a.wartet_auf as string).trim()
+                : undefined,
+            person:
+              typeof a.person === 'string' && (a.person as string).trim().length > 0 ? (a.person as string).trim() : undefined,
           }))
       : [];
     const termine = Array.isArray(raw.termine)
@@ -519,10 +560,33 @@ function parseActionJson(jsonText: string): AssistantAction | null {
             zeit: c.zeit === null ? null : typeof c.zeit === 'string' && /^\d{2}:\d{2}$/.test(c.zeit) ? c.zeit : undefined,
             titel: typeof c.titel === 'string' && (c.titel as string).trim().length > 0 ? (c.titel as string).trim() : undefined,
             liste: typeof c.liste === 'string' && (c.liste as string).trim().length > 0 ? (c.liste as string).trim() : undefined,
+            // null ist bedeutungsvoll: „hör auf zu warten" / „lös die Person".
+            wartet_auf:
+              c.wartet_auf === null
+                ? null
+                : typeof c.wartet_auf === 'string' && (c.wartet_auf as string).trim().length > 0
+                  ? (c.wartet_auf as string).trim()
+                  : undefined,
+            person:
+              c.person === null
+                ? null
+                : typeof c.person === 'string' && (c.person as string).trim().length > 0
+                  ? (c.person as string).trim()
+                  : undefined,
             papierkorb: c.papierkorb === true ? true : undefined,
           }))
           // Eine Änderung ohne Feld ist ein Rauschen-Eintrag — weg damit.
-          .filter((c) => c.erledigt || c.papierkorb || c.titel || c.liste || c.datum !== undefined || c.zeit !== undefined)
+          .filter(
+            (c) =>
+              c.erledigt ||
+              c.papierkorb ||
+              c.titel ||
+              c.liste ||
+              c.datum !== undefined ||
+              c.zeit !== undefined ||
+              c.wartet_auf !== undefined ||
+              c.person !== undefined,
+          )
       : [];
     const checkliste = Array.isArray(raw.checkliste)
       ? raw.checkliste.filter((c): c is string => typeof c === 'string' && c.trim().length > 0).map((c) => c.trim())
@@ -682,12 +746,15 @@ export function buildAppContext(input: {
   tasks: Task[];
   lists: List[];
   notes: Note[];
+  /** Menschen — optional, damit alte Aufrufer gültig bleiben. */
+  people?: Person[];
   today: string; // 'YYYY-MM-DD'
   /** Kein Kalenderzugriff → das Modell soll „unbekannt" sagen, nicht „keine". */
   calendarDenied?: boolean;
 }): string {
-  const { events, tasks, lists, notes, today, calendarDenied } = input;
+  const { events, tasks, lists, notes, people, today, calendarDenied } = input;
   const listName = new Map(lists.map((l) => [l.id, l.name]));
+  const personName = new Map((people ?? []).map((p) => [p.id, p.name]));
 
   const tag = (d: Date) => `${WD[d.getDay()]} ${d.getDate()}.${d.getMonth() + 1}.`;
   const uhr = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -715,11 +782,32 @@ export function buildAppContext(input: {
   };
   const eventLines = events.slice(0, CTX_EVENT_LIMIT).map(evLine);
 
-  const open = tasks.filter((t) => t.completedAt === null);
+  const alleOffen = tasks.filter((t) => t.completedAt === null);
+  // Wartendes steht in einem EIGENEN Block. Stünde es zwischen den offenen
+  // Aufgaben, schlüge der Assistent vor, es heute zu erledigen — dabei liegt
+  // es bei jemand anderem. Und „überfällig" darf dort niemals stehen.
+  const open = alleOffen.filter((t) => t.waiting !== true);
+  const wartend = alleOffen.filter((t) => t.waiting === true);
   const sortKey = (t: Task) => `${t.dueDate ?? '9999-12-31'} ${t.dueTime ?? '99:99'}`;
   const taskLine = (t: Task) => {
     const parts = [`[${taskHandle(t.id)}] ${t.title}`];
     if (t.dueDate) parts.push(`fällig ${t.dueDate}${t.dueTime ? ` ${t.dueTime}` : ''}${t.dueDate < today ? ' (überfällig)' : ''}`);
+    const ln = listName.get(t.listId);
+    if (ln && t.listId !== 'default') parts.push(`Liste „${ln}"`);
+    const pn = t.personId ? personName.get(t.personId) : undefined;
+    if (pn) parts.push(`Mensch: ${pn}`);
+    return `- ${parts.join(' · ')}`;
+  };
+  const wartendLine = (t: Task) => {
+    const parts = [`[${taskHandle(t.id)}] ${t.title}`];
+    const pn = t.personId ? personName.get(t.personId) : undefined;
+    const worauf = (t.waitingFor ?? '').trim();
+    if (pn && worauf) parts.push(`wartet auf ${pn} (${worauf})`);
+    else if (pn) parts.push(`wartet auf ${pn}`);
+    else if (worauf) parts.push(`wartet auf ${worauf}`);
+    else parts.push('wartet');
+    // Bewusst OHNE „(überfällig)": was bei anderen liegt, ist kein Versäumnis.
+    if (t.dueDate) parts.push(`Datum ${t.dueDate}`);
     const ln = listName.get(t.listId);
     if (ln && t.listId !== 'default') parts.push(`Liste „${ln}"`);
     return `- ${parts.join(' · ')}`;
@@ -728,6 +816,7 @@ export function buildAppContext(input: {
     .sort((a, b) => (sortKey(a) < sortKey(b) ? -1 : 1))
     .slice(0, CTX_TASK_LIMIT)
     .map(taskLine);
+  const wartendLines = [...wartend].sort((a, b) => (sortKey(a) < sortKey(b) ? -1 : 1)).slice(0, CTX_TASK_LIMIT).map(wartendLine);
 
   // Abgeschlossene Projekte gehören nicht in den Überblick — sonst schlägt der
   // Verwalter Verschiebungen für etwas vor, das der Nutzer beendet hat.
@@ -756,10 +845,15 @@ export function buildAppContext(input: {
     'Offene Aufgaben:',
     taskLines.length ? taskLines.join('\n') : '- keine',
     '',
+    'Warten auf (liegt bei anderen — NICHT überfällig, nicht zum Erledigen vorschlagen):',
+    wartendLines.length ? wartendLines.join('\n') : '- nichts',
+    '',
     'Listen/Projekte:',
     projectLines.length ? projectLines.join('\n') : '- keine',
     '',
     `Notizen (nur Titel): ${noteTitles.length ? noteTitles.join(', ') : 'keine'}`,
+    '',
+    `Menschen: ${(people ?? []).length ? (people ?? []).map((p) => p.name).join(', ') : 'keine'}`,
     '',
     'Beantworte Fragen zu Terminen, Aufgaben und Planung direkt aus diesem Überblick. ' +
       'Erfinde keine Einträge dazu; was hier nicht steht, existiert in der App nicht. ' +

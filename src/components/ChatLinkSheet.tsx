@@ -10,6 +10,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 
 import { BottomSheet } from '@/components/BottomSheet';
+import { PersonWahl } from '@/components/PersonWahl';
 import { PressableScale } from '@/components/PressableScale';
 import { Group, RowDivider } from '@/components/SheetParts';
 import { Type } from '@/components/Type';
@@ -70,7 +71,7 @@ export function ChatLinkSheet({ chatId, onClose }: { chatId: string; onClose: ()
 
   if (!chat) return null;
 
-  const toggle = (patch: { taskId?: string | null; noteId?: string | null; eventId?: string | null; listId?: string | null; context?: string | null }) => {
+  const toggle = (patch: { taskId?: string | null; noteId?: string | null; eventId?: string | null; listId?: string | null; personId?: string | null; context?: string | null }) => {
     hapticSelect();
     updateChat.mutate({ id: chat.id, patch });
   };
@@ -98,6 +99,9 @@ export function ChatLinkSheet({ chatId, onClose }: { chatId: string; onClose: ()
           ))}
         </Group>
       )}
+
+      <Type variant="eyebrow" tone="text3" style={{ marginTop: Spacing.lg, marginBottom: Spacing.xs }}>Mensch</Type>
+      <PersonWahl selected={chat.personId ?? null} onSelect={(personId) => toggle({ personId })} />
 
       <Type variant="eyebrow" tone="text3" style={{ marginTop: Spacing.lg, marginBottom: Spacing.xs }}>Notizen</Type>
       {activeNotes.length === 0 && <Type variant="caption" tone="text3">Keine Notizen.</Type>}

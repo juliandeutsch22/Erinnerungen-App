@@ -2,7 +2,7 @@
 // Aktionen, die sonst nur tief im Editor liegen (Flagge, Löschen) plus Erledigen,
 // als gruppierte Liste (gleiche Sprache wie die Editoren). Selbstständig: nutzt
 // die Mutationen intern, braucht nur die Aufgabe.
-import { CalendarClock, Check, Flag, RotateCcw, Trash2, type LucideIcon } from 'lucide-react-native';
+import { CalendarClock, Check, Flag, PauseCircle, RotateCcw, Trash2, type LucideIcon } from 'lucide-react-native';
 import React, { useState } from 'react';
 
 import { BottomSheet } from '@/components/BottomSheet';
@@ -89,6 +89,32 @@ export function TaskQuickSheet({
                 // Tor (`lib/sheetPresence.ts`) und nicht mehr hier: sie galt
                 // sonst an genau DIESER Stelle und an keiner künftigen.
                 onReschedule();
+              }}
+            />
+            <RowDivider />
+          </>
+        )}
+        {/* Warten auf — der schnelle Weg. Der ausführliche liegt im Editor
+            (mit „worauf?" und dem Menschen); hier genügt der Zustand, weil man
+            ihn meistens genau in dem Moment setzt, in dem einem auffällt, dass
+            man selbst gerade nichts tun kann. */}
+        {!done && (
+          <>
+            <Row
+              colors={colors}
+              icon={PauseCircle}
+              label={task.waiting ? 'Nicht mehr warten' : 'Ich warte darauf'}
+              tone={task.waiting ? 'indigo' : 'teal'}
+              onPress={() => {
+                hapticSelect();
+                // Beim Beenden auch den Text lösen: „wartet auf Angebot" an
+                // einer Aufgabe, die nicht mehr wartet, wäre eine Fußnote, die
+                // niemand mehr aufräumt.
+                update.mutate({
+                  id: task.id,
+                  patch: task.waiting ? { waiting: false, waitingFor: null } : { waiting: true },
+                });
+                onClose();
               }}
             />
             <RowDivider />

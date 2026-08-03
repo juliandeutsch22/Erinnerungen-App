@@ -30,7 +30,7 @@ import { Type } from '@/components/Type';
 import { useCompleteList, useCompleteTask, useLists, useReopenList, useReopenTask, useTasks } from '@/data/queries';
 import type { Task } from '@/data/types';
 import { todayStr } from '@/lib/dates';
-import { byTimeThenCreation, expiredTasks, groupPlanned, isCurrent, isDormant, isOpen, listProgress, projectDeadlineLabel, projectState, recentlyCompleted } from '@/lib/taskLogic';
+import { byTimeThenCreation, expiredTasks, groupPlanned, isCurrent, isDormant, isOpen, listProgress, projectDeadlineLabel, projectState, recentlyCompleted, waitingTasks } from '@/lib/taskLogic';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { shareText } from '@/lib/share';
 import { listToShareText } from '@/lib/shareText';
@@ -79,6 +79,7 @@ export default function ListeDetailScreen() {
   const [editList, setEditList] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
   const [showLater, setShowLater] = useState(false);
+  const [showWaiting, setShowWaiting] = useState(false);
   const [showExpired, setShowExpired] = useState(false);
   const [reordering, setReordering] = useState(false);
 
@@ -114,6 +115,8 @@ export default function ListeDetailScreen() {
     [scoped, today],
   );
   const verfallen = useMemo(() => expiredTasks(scoped, today), [scoped, today]);
+  // Wartendes bleibt im Projekt — es ist nicht weg, es liegt nur bei anderen.
+  const wartend = useMemo(() => waitingTasks(scoped), [scoped]);
   const completed = useMemo(() => recentlyCompleted(scoped, today), [scoped, today]);
   const progress = useMemo(() => listProgress(scoped), [scoped]);
   const isProject = !!(list && (list.goal || list.deadline));
@@ -262,6 +265,26 @@ export default function ListeDetailScreen() {
                 <DisclosureChevron open={showLater} color={colors.text3} />
               </PressableScale>
               {showLater && <View style={{ marginTop: Spacing.xs }}>{spaeter.map((t) => renderRow(t, isSmartView))}</View>}
+            </>
+          )}
+
+          {/* Warten auf: liegt bei anderen. Bleibt sichtbar, aber eingeklappt
+              und ohne Farbe — es ist kein Versaeumnis. */}
+          {wartend.length > 0 && (
+            <>
+              <Seam marginVertical={Spacing.md} />
+              <PressableScale
+                accessibilityLabel={showWaiting ? 'Warten auf ausblenden' : 'Warten auf anzeigen'}
+                onPress={() => {
+                  hapticSelect();
+                  setShowWaiting((v) => !v);
+                }}
+                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+              >
+                <Type variant="eyebrow" tone="text3">Warten auf · {wartend.length}</Type>
+                <DisclosureChevron open={showWaiting} color={colors.text3} />
+              </PressableScale>
+              {showWaiting && <View style={{ marginTop: Spacing.xs }}>{wartend.map((t) => renderRow(t, isSmartView))}</View>}
             </>
           )}
 

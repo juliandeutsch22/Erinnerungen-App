@@ -1,6 +1,6 @@
 // taskLogic.test.ts — Überfällig-Ableitung, Abhak-Semantik, Gruppierungen.
 import type { List, Task } from '@/data/types';
-import { adoptOverdueToToday, groupPlanned, listProgress, groupToday, groupUpcomingDays, isDueToday, isOverdue, recentlyCompleted, resolveCompletion, projectState, projectDeadlineLabel, projectShowsDeadline, isCurrent, isDormant, isExpired, expiredTasks, lifespanLabel } from './taskLogic';
+import { adoptOverdueToToday, groupPlanned, listProgress, groupToday, groupUpcomingDays, isDueToday, isOverdue, recentlyCompleted, resolveCompletion, projectState, projectDeadlineLabel, projectShowsDeadline, isCurrent, isDormant, isExpired, isWaiting, expiredTasks, lifespanLabel, waitingLabel, waitingTasks } from './taskLogic';
 
 const TODAY = '2026-07-03';
 
@@ -276,6 +276,56 @@ describe('Lebensspanne — ab wann, bis wann', () => {
     expect(lifespanLabel({ startDate: null, expiresOn: '2026-08-10', completedAt: null }, heute)).toBe('bis 2026-08-10');
     expect(lifespanLabel({ startDate: null, expiresOn: '2026-07-01', completedAt: null }, heute)).toBe('Anlass vorbei');
     expect(lifespanLabel({ startDate: null, expiresOn: null, completedAt: null }, heute)).toBeNull();
+  });
+});
+
+describe('Warten auf — die Aufgabe liegt bei jemand anderem', () => {
+  it('wartend, solange sie offen ist; erledigt beendet das Warten', () => {
+    expect(isWaiting({ waiting: true, completedAt: null })).toBe(true);
+    expect(isWaiting({ waiting: false, completedAt: null })).toBe(false);
+    expect(isWaiting({ waiting: undefined, completedAt: null })).toBe(false);
+    // Abgehakt ist fertig — sonst fiele sie aus der Erledigt-Sektion heraus.
+    expect(isWaiting({ waiting: true, completedAt: '2026-07-02T10:00:00.000Z' })).toBe(false);
+  });
+
+  it('fällt aus isCurrent — das eine Tor vor Heute, Geplant und den Filtern', () => {
+    expect(isCurrent({ startDate: null, expiresOn: null, completedAt: null, waiting: true }, TODAY)).toBe(false);
+    expect(isCurrent({ startDate: null, expiresOn: null, completedAt: null, waiting: false }, TODAY)).toBe(true);
+  });
+
+  it('taucht deshalb weder heute noch als überfällig auf', () => {
+    const wartend = task({ dueDate: '2026-07-01', waiting: true });
+    const offen = task({ id: 't2', dueDate: '2026-07-01' });
+    expect(isOverdue(wartend, TODAY)).toBe(false);
+    expect(isDueToday(task({ dueDate: TODAY, waiting: true }), TODAY)).toBe(false);
+    const g = groupToday([wartend, offen], TODAY);
+    expect(g.overdue.map((t) => t.id)).toEqual(['t2']);
+  });
+
+  it('wird auch nicht „auf heute geholt" — man kann nicht nachholen, was bei anderen liegt', () => {
+    const wartend = task({ dueDate: '2026-07-01', waiting: true });
+    expect(adoptOverdueToToday([wartend], TODAY)).toEqual([]);
+  });
+
+  it('sammelt die Wartenden für die eigene Ansicht, ohne den Papierkorb', () => {
+    const alle = [
+      task({ id: 'a', waiting: true }),
+      task({ id: 'b' }),
+      task({ id: 'c', waiting: true, deletedAt: '2026-07-02T00:00:00.000Z' }),
+      task({ id: 'd', waiting: true, completedAt: '2026-07-02T10:00:00.000Z' }),
+    ];
+    expect(waitingTasks(alle).map((t) => t.id)).toEqual(['a']);
+  });
+
+  it('beschriftet ruhig — mit Person, mit Text, mit beidem, mit nichts', () => {
+    const w = { waiting: true, completedAt: null };
+    expect(waitingLabel({ ...w, waitingFor: null }, 'Anna')).toBe('Wartet auf Anna');
+    expect(waitingLabel({ ...w, waitingFor: 'Angebot' }, null)).toBe('Wartet auf Angebot');
+    expect(waitingLabel({ ...w, waitingFor: 'Angebot' }, 'Anna')).toBe('Wartet auf Anna · Angebot');
+    expect(waitingLabel({ ...w, waitingFor: null }, null)).toBe('Wartet');
+    expect(waitingLabel({ ...w, waitingFor: '   ' }, null)).toBe('Wartet');
+    // Nicht wartend → gar keine Zeile.
+    expect(waitingLabel({ waiting: false, waitingFor: 'x', completedAt: null }, 'Anna')).toBeNull();
   });
 });
 

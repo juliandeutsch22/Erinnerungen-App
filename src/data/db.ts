@@ -87,6 +87,13 @@ export function getDb(): Promise<SQLiteDatabase> {
           created_at TEXT NOT NULL,
           updated_at TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS people (
+          id TEXT PRIMARY KEY NOT NULL,
+          name TEXT NOT NULL,
+          note TEXT,
+          sort INTEGER NOT NULL,
+          created_at TEXT NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS event_photos (
           id TEXT PRIMARY KEY NOT NULL,
           event_id TEXT NOT NULL,
@@ -97,7 +104,11 @@ export function getDb(): Promise<SQLiteDatabase> {
       `);
       // Migration: neue Spalten nachrüsten (bestehende Installs).
       // ALTER wirft, wenn die Spalte schon existiert → still schlucken.
-      for (const col of ['tags TEXT', 'subtasks TEXT', 'event_id TEXT', 'deleted_at TEXT', 'rrule_until TEXT', 'start_date TEXT', 'expires_on TEXT', 'evening INTEGER NOT NULL DEFAULT 0']) {
+      // `waiting`/`waiting_for`/`person_id` (v1.73.0) — wartende Aufgaben und
+      // der Mensch, an dem etwas hängt. `person_id` bewusst OHNE REFERENCES:
+      // wird die Person gelöscht, bleibt die Aufgabe (das Lösen der Zuordnung
+      // macht SqlitePersonRepository.remove selbst, in einer Transaktion).
+      for (const col of ['tags TEXT', 'subtasks TEXT', 'event_id TEXT', 'deleted_at TEXT', 'rrule_until TEXT', 'start_date TEXT', 'expires_on TEXT', 'evening INTEGER NOT NULL DEFAULT 0', 'waiting INTEGER NOT NULL DEFAULT 0', 'waiting_for TEXT', 'person_id TEXT']) {
         try {
           await db.execAsync(`ALTER TABLE tasks ADD COLUMN ${col};`);
         } catch {
@@ -114,14 +125,14 @@ export function getDb(): Promise<SQLiteDatabase> {
       // `list_id` (v1.72.0) bewusst OHNE `REFERENCES lists(id)`: die Zuordnung
       // ist eine lose Notiz-am-Projekt, keine Besitzverhältnis. Wird die Liste
       // gelöscht, soll die Notiz bleiben — sie ist Inhalt, nicht Zubehör.
-      for (const col of ['pinned INTEGER NOT NULL DEFAULT 0', 'deleted_at TEXT', 'list_id TEXT']) {
+      for (const col of ['pinned INTEGER NOT NULL DEFAULT 0', 'deleted_at TEXT', 'list_id TEXT', 'person_id TEXT']) {
         try {
           await db.execAsync(`ALTER TABLE notes ADD COLUMN ${col};`);
         } catch {
           /* Spalte existiert bereits */
         }
       }
-      for (const col of ['note_id TEXT', 'deleted_at TEXT', 'list_id TEXT']) {
+      for (const col of ['note_id TEXT', 'deleted_at TEXT', 'list_id TEXT', 'person_id TEXT']) {
         try {
           await db.execAsync(`ALTER TABLE chats ADD COLUMN ${col};`);
         } catch {

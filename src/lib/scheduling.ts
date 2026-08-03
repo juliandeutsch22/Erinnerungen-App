@@ -1,7 +1,7 @@
 // scheduling.ts — reine Auswahl-Logik der Erinnerungs-Engine (testbar ohne
 // expo-notifications): welche Aufgaben kommen ins 64er-Planungsfenster?
 import type { Task } from '@/data/types';
-import { isExpired } from '@/lib/taskLogic';
+import { isExpired, isWaiting } from '@/lib/taskLogic';
 import { parseDateStr } from '@/lib/dates';
 
 /** Planungsfenster: bewusst unter dem 64er-Limit von iOS (Fahrplan §8.1). */
@@ -27,9 +27,11 @@ export function selectNotificationWindow(
   limit: number = NOTIFICATION_WINDOW,
 ): { task: Task; fire: Date }[] {
   // Verfallenes klingelt nicht: der Anlass ist vorbei, nicht verpasst.
+  // Wartendes klingelt auch nicht: es liegt bei jemand anderem, und eine
+  // Mitteilung über etwas, das man gar nicht tun kann, ist reine Unruhe.
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   return tasks
-    .filter((t) => t.completedAt === null && !isExpired(t, today))
+    .filter((t) => t.completedAt === null && !isExpired(t, today) && !isWaiting(t))
     .map((task) => ({ task, fire: taskFireDate(task) }))
     .filter((x): x is { task: Task; fire: Date } => x.fire !== null && x.fire.getTime() > now.getTime())
     .sort((a, b) => a.fire.getTime() - b.fire.getTime())
@@ -39,6 +41,11 @@ export function selectNotificationWindow(
 /** Anzahl der am Zieltag ohne Uhrzeit fälligen offenen Aufgaben (überfällige zählen mit). */
 export function countUntimedDue(tasks: Task[], targetDay: string): number {
   return tasks.filter(
-    (t) => t.completedAt === null && t.dueTime === null && t.dueDate !== null && t.dueDate <= targetDay,
+    (t) =>
+      t.completedAt === null &&
+      !isWaiting(t) &&
+      t.dueTime === null &&
+      t.dueDate !== null &&
+      t.dueDate <= targetDay,
   ).length;
 }

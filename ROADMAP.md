@@ -153,17 +153,19 @@ meisten Wirkung pro Zeile Code. Alle **NEU**, sofern nicht anders vermerkt.
 ## 4. Neue Funktionen
 
 **Erfassen**
-- **„Warten auf"** `[JS · klein]` — *eine Aufgabe, die bei jemand anderem liegt
-  („Angebot vom Dachdecker"), hat heute keinen Zustand.* Es gibt nur zwei
-  schlechte Wege: immer weiter verschieben (fühlt sich nach Versagen an) oder
-  ins Projekt verbannen (dann sieht man sie nie wieder). Ein Feld `waitingFor`
-  (auf wen/was, frei, optional) nimmt sie aus Heute und aus dem
-  Überfällig-Stapel, lässt sie aber im Projekt und in der Suche. Ein eigener
-  ruhiger Abschnitt auf „Listen" statt eines fünften Tabs. Optional ein Datum
-  („ab dann wieder zeigen"); ohne Datum liegt sie einfach da, bis man sie holt.
-  **Kein Zähler, keine Mahnung** — nie „du wartest seit 12 Tagen". Erreichbar
-  per Wischen UND aus dem Editor (eine Geste ist nie der einzige Weg).
-  **Vom Nutzer angenommen — als Nächstes dran.** **NEU**
+- ~~**„Warten auf"**~~ — umgesetzt in v1.73.0 (UEBERGABE §8.73). `Task.waiting`
+  + `Task.waitingFor`; `isWaiting` steckt in `isCurrent` und damit im EINEN Tor
+  vor Heute, Überfällig, Geplant und den Filtern. Eigener Bildschirm
+  `/liste/warten`, nach Mensch gruppiert. Kein Zähler, keine Dauer, keine
+  Mitteilung. Wege: Schnellmenü, Editor, Assistent.
+- ~~**Menschen als eigene Dimension**~~ — umgesetzt in v1.73.0 (UEBERGABE
+  §8.73). Eigene Entität `Person`; `personId` an Aufgabe, Notiz und Chat;
+  `person/[id].tsx` führt alles zu einem Menschen zusammen. Frei getippt, nicht
+  aus den Systemkontakten (`expo-contacts` wäre nativ → eigene Risikoklasse).
+  Der Assistent kann eine Person nach Namen zuordnen oder anlegen — erst nach
+  dem Bestätigungs-Tipp. **Offen geblieben:** Menschen an Terminen (der
+  Gerätekalender hat dafür kein Feld, das wir schreiben dürfen, ohne die
+  Teilnehmer-Verwaltung von EventKit anzufassen).
 - **Wiedervorlage an Notizen** `[JS · klein]` — *Notizen haben kein Datum, gar
   keins.* Ein Gedanke, der in drei Wochen relevant wird, hat in Stoa keinen Ort
   außer einer Aufgabe, die er nicht ist. Ein optionales „zeig mir das wieder
@@ -324,7 +326,8 @@ Damit die Linie klar bleibt — diese Dinge wurden erwogen und verworfen:
 1. ~~**§1 Offene Kanten**~~ — erledigt in v1.28.0 (Säule + gefühlte Wartezeit).
 2. **§2 Der Bogen** — das Flaggschiff, macht die App zu einer Praxis.
    Vorher Mocks zeigen: es ist UX-lastig, da lohnt sich ein Blick vor dem Bau.
-3. **§3 Vernetzungen** — die beiden kleinen sind in v1.31.0 erledigt
+3. **§3 Vernetzungen** — Notizen/Chats am Projekt (v1.72.0) und Menschen als
+   Dimension (v1.73.0) stehen. Die beiden kleinen sind in v1.31.0 erledigt
    (Checklisten-Zeile → Aufgabe, Projekt-Deadline im Kalender). Als Nächstes das
    Rückgrat: **Tags über alles** — eigener Schritt, weil es das Datenmodell der
    Notizen erweitert.

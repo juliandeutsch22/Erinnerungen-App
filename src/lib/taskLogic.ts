@@ -207,13 +207,53 @@ export function isExpired(t: Pick<Task, 'expiresOn' | 'completedAt'>, today: str
 }
 
 /**
- * Zählt die Aufgabe in den normalen Ansichten mit? Schlummernde und verfallene
- * werden ausgeblendet — sie sind nicht gelöscht, nur nicht jetzt.
+ * Liegt die Aufgabe bei jemand anderem? Dann ist sie gerade nicht deine
+ * Handlung — und hat auf „Heute" und im Überfällig-Stapel nichts verloren.
+ *
+ * Erledigtes zählt bewusst NICHT als wartend: eine abgehakte Aufgabe ist
+ * fertig, egal wer sie am Ende getan hat. Sonst verschwände sie aus der
+ * Erledigt-Sektion.
+ */
+export function isWaiting(t: Pick<Task, 'waiting' | 'completedAt'>): boolean {
+  return t.completedAt === null && t.waiting === true;
+}
+
+/**
+ * Zählt die Aufgabe in den normalen Ansichten mit? Schlummernde, verfallene
+ * und wartende werden ausgeblendet — sie sind nicht gelöscht, nur nicht jetzt
+ * bzw. nicht deine Handlung.
  * WICHTIG: erledigte Aufgaben filtert weiterhin `isOpen`; das hier ist eine
  * ZUSÄTZLICHE Bedingung, keine Ersetzung.
+ *
+ * Dass „wartend" HIER steht und nicht bei jedem Aufrufer einzeln, ist der
+ * ganze Punkt: `isCurrent` ist das eine Tor, durch das Heute, Überfällig, die
+ * Wochenvorschau, „Geplant" und die Smart-Filter gehen. Eine wartende Aufgabe
+ * kann so nirgends als Versäumnis auftauchen.
  */
-export function isCurrent(t: Pick<Task, 'startDate' | 'expiresOn' | 'completedAt'>, today: string): boolean {
-  return !isDormant(t, today) && !isExpired(t, today);
+export function isCurrent(
+  t: Pick<Task, 'startDate' | 'expiresOn' | 'completedAt' | 'waiting'>,
+  today: string,
+): boolean {
+  return !isDormant(t, today) && !isExpired(t, today) && !isWaiting(t);
+}
+
+/** Wartende, noch offene Aufgaben — für die eigene ruhige Ansicht. */
+export function waitingTasks(tasks: Task[]): Task[] {
+  return tasks.filter((t) => !t.deletedAt && isWaiting(t));
+}
+
+/**
+ * Was unter einer wartenden Aufgabe steht. Bewusst OHNE Dauer („seit zwölf
+ * Tagen") — das wäre ein Schuld-Zähler für etwas, das man gar nicht in der
+ * Hand hat.
+ */
+export function waitingLabel(t: Pick<Task, 'waiting' | 'waitingFor' | 'completedAt'>, personName?: string | null): string | null {
+  if (!isWaiting(t)) return null;
+  const worauf = (t.waitingFor ?? '').trim();
+  if (personName && worauf) return `Wartet auf ${personName} · ${worauf}`;
+  if (personName) return `Wartet auf ${personName}`;
+  if (worauf) return `Wartet auf ${worauf}`;
+  return 'Wartet';
 }
 
 /** Verfallene, noch offene Aufgaben — für den ruhigen Aufräum-Hinweis. */

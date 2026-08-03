@@ -10,6 +10,7 @@ type TaskRow = {
   created_at: string; sort: number; tags: string | null; subtasks: string | null;
   event_id: string | null; deleted_at: string | null; rrule_until: string | null;
   start_date: string | null; expires_on: string | null; evening: number | null;
+  waiting: number | null; waiting_for: string | null; person_id: string | null;
 };
 
 function parseArray<T>(json: string | null): T[] {
@@ -35,6 +36,10 @@ function toTask(r: TaskRow): Task {
     startDate: r.start_date ?? null,
     expiresOn: r.expires_on ?? null,
     evening: r.evening === 1,
+    waiting: r.waiting === 1,
+    // Nachgerüstete Spalten: alte Zeilen liefern `undefined`, nicht `null`.
+    waitingFor: r.waiting_for ?? null,
+    personId: r.person_id ?? null,
     flagged: r.flagged === 1,
     eventId: r.event_id,
     completedAt: r.completed_at,
@@ -58,11 +63,13 @@ export class SqliteTaskRepository implements TaskRepository {
     const db = await getDb();
     await db.runAsync(
       `INSERT OR REPLACE INTO tasks
-         (id, list_id, title, note, due_date, due_time, rrule, rrule_until, start_date, expires_on, evening, flagged, completed_at, notification_id, created_at, sort, tags, subtasks, event_id, deleted_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, list_id, title, note, due_date, due_time, rrule, rrule_until, start_date, expires_on, evening, waiting, waiting_for, person_id, flagged, completed_at, notification_id, created_at, sort, tags, subtasks, event_id, deleted_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         task.id, task.listId, task.title, task.note, task.dueDate, task.dueTime,
-        task.rrule, task.rruleUntil ?? null, task.startDate ?? null, task.expiresOn ?? null, task.evening ? 1 : 0, task.flagged ? 1 : 0, task.completedAt, task.notificationId,
+        task.rrule, task.rruleUntil ?? null, task.startDate ?? null, task.expiresOn ?? null, task.evening ? 1 : 0,
+        task.waiting ? 1 : 0, task.waitingFor ?? null, task.personId ?? null,
+        task.flagged ? 1 : 0, task.completedAt, task.notificationId,
         task.createdAt, task.sort, JSON.stringify(task.tags ?? []), JSON.stringify(task.subtasks ?? []),
         task.eventId, task.deletedAt ?? null,
       ],
@@ -76,6 +83,7 @@ export class SqliteTaskRepository implements TaskRepository {
     const map: Record<string, string> = {
       listId: 'list_id', title: 'title', note: 'note', dueDate: 'due_date', dueTime: 'due_time',
       rrule: 'rrule', rruleUntil: 'rrule_until', startDate: 'start_date', expiresOn: 'expires_on', evening: 'evening',
+      waiting: 'waiting', waitingFor: 'waiting_for', personId: 'person_id',
       flagged: 'flagged', completedAt: 'completed_at',
       notificationId: 'notification_id', sort: 'sort', tags: 'tags', subtasks: 'subtasks',
       eventId: 'event_id', deletedAt: 'deleted_at',
@@ -84,9 +92,11 @@ export class SqliteTaskRepository implements TaskRepository {
       if (key in patch) {
         const value = (patch as Record<string, unknown>)[key];
         sets.push(`${col} = ?`);
-        if (key === 'flagged') args.push(value ? 1 : 0);
+        if (key === 'flagged' || key === 'evening' || key === 'waiting') args.push(value ? 1 : 0);
         else if (key === 'tags' || key === 'subtasks') args.push(JSON.stringify(value ?? []));
-        else args.push(value as string | number | null);
+        // `undefined` ist für SQLite kein Wert — bei den optionalen Feldern
+        // (waitingFor, personId) kann es im Patch stehen und meint null.
+        else args.push((value ?? null) as string | number | null);
       }
     }
     if (sets.length === 0) return;

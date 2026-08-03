@@ -14,12 +14,12 @@ import { isRrule } from '@/lib/dates';
 import type { FilterRange, SavedFilter } from '@/lib/taskFilters';
 import { remapListColor } from './colorRebrand';
 import type { EventDocument } from './DocumentRepository';
-import { getChatRepository, getDocumentRepository, getJournalRepository, getListRepository, getNoteRepository, getPhotoRepository, getTaskRepository } from './index';
+import { getChatRepository, getDocumentRepository, getJournalRepository, getListRepository, getNoteRepository, getPersonRepository, getPhotoRepository, getTaskRepository } from './index';
 import type { JournalEntry } from './JournalRepository';
 import { DEFAULT_LIST_ID } from './ListRepository';
 import type { EventPhoto } from './PhotoRepository';
-import type { Chat, ChatMessage, List, Note, Task } from './types';
-import { newId } from './types';
+import type { Chat, ChatMessage, List, Note, Person, Task } from './types';
+import { newId, normalizePersonName } from './types';
 
 /** Ein Foto im Backup: Verknüpfung + eingebettete Bilddaten (Base64). */
 export type BackupPhoto = {
@@ -52,6 +52,8 @@ export type BackupBundle = {
   lists: List[];
   tasks: Task[];
   notes: Note[];
+  /** Menschen (v1.73.0) — ältere Backups haben das Feld nicht. */
+  people: Person[];
   savedFilters: SavedFilter[];
   photos: BackupPhoto[];
   chats: Chat[];
@@ -86,10 +88,11 @@ export type BackupSources = BackupStoreSlice & {
 };
 
 export async function buildBackup(sources: BackupSources, now: Date = new Date()): Promise<BackupBundle> {
-  const [lists, tasks, notes, photoLinks, chats, chatMessages, docLinks, journal] = await Promise.all([
+  const [lists, tasks, notes, people, photoLinks, chats, chatMessages, docLinks, journal] = await Promise.all([
     getListRepository().getAll(),
     getTaskRepository().getAll(),
     getNoteRepository().getAll(),
+    getPersonRepository().getAll(),
     getPhotoRepository().getAll(),
     getChatRepository().getAll(),
     getChatRepository().getAllMessages(),
@@ -117,6 +120,7 @@ export async function buildBackup(sources: BackupSources, now: Date = new Date()
     lists,
     tasks,
     notes,
+    people,
     savedFilters: sources.savedFilters,
     photos,
     chats,
@@ -277,6 +281,27 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
   const rawChatMessages = Array.isArray(parsed.chatMessages) ? parsed.chatMessages : [];
   const rawDocuments = Array.isArray(parsed.documents) ? parsed.documents : [];
   const rawJournal = Array.isArray(parsed.journal) ? parsed.journal : [];
+  const rawPeople = Array.isArray(parsed.people) ? parsed.people : [];
+
+  // Menschen zuerst: Aufgaben, Notizen und Chats prüfen ihre Zuordnung gegen
+  // diese Liste. Namen sind eindeutig — zwei „Anna" wären für den Nutzer nicht
+  // unterscheidbar und verteilten seine offenen Punkte auf zwei Ansichten.
+  const people: Person[] = [];
+  const gesehen = new Set<string>();
+  for (const p of rawPeople) {
+    if (!isRecord(p) || !str(p.id) || !str(p.name)) continue;
+    const schluessel = normalizePersonName(p.name);
+    if (gesehen.has(schluessel)) continue;
+    gesehen.add(schluessel);
+    people.push({
+      id: p.id,
+      name: p.name,
+      note: str(p.note) ? p.note : null,
+      sort: typeof p.sort === 'number' ? p.sort : 0,
+      createdAt: str(p.createdAt) ? p.createdAt : new Date().toISOString(),
+    });
+  }
+  const personIds = new Set(people.map((p) => p.id));
 
   const lists: List[] = [];
   for (const l of rawLists) {
@@ -313,6 +338,11 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
       startDate: str(t.startDate) ? t.startDate : null,
       expiresOn: str(t.expiresOn) ? t.expiresOn : null,
       evening: t.evening === true,
+      waiting: t.waiting === true,
+      waitingFor: str(t.waitingFor) ? t.waitingFor : null,
+      // Wie bei listId: eine Zuordnung auf einen Menschen, den es im Backup
+      // nicht gibt, ist keine Zuordnung.
+      personId: str(t.personId) && personIds.has(t.personId) ? t.personId : null,
       flagged: t.flagged === true,
       eventId: str(t.eventId) ? t.eventId : null,
       completedAt: str(t.completedAt) ? t.completedAt : null,
@@ -345,6 +375,7 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
       // gibt, ist keine Zuordnung — sonst hinge die Notiz an einem Projekt,
       // das nie aufgeht.
       listId: str(n.listId) && listIds.has(n.listId) ? n.listId : null,
+      personId: str(n.personId) && personIds.has(n.personId) ? n.personId : null,
       // Ältere Backups (ohne Anheften/Papierkorb) → Standardwerte.
       pinned: n.pinned === true,
       deletedAt: str(n.deletedAt) ? n.deletedAt : null,
@@ -364,6 +395,7 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
       taskId: str(c.taskId) ? c.taskId : null,
       noteId: str(c.noteId) ? c.noteId : null,
       listId: str(c.listId) && listIds.has(c.listId) ? c.listId : null,
+      personId: str(c.personId) && personIds.has(c.personId) ? c.personId : null,
       context: str(c.context) ? c.context : null,
       deletedAt: str(c.deletedAt) ? c.deletedAt : null,
       createdAt: str(c.createdAt) ? c.createdAt : new Date().toISOString(),
@@ -442,6 +474,7 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
   const chatRepo = getChatRepository();
   const docRepo = getDocumentRepository();
   const journalRepo = getJournalRepository();
+  const personRepo = getPersonRepository();
   await taskRepo.clearAll();
   await listRepo.clearAll();
   await photoRepo.clearAll();
@@ -449,6 +482,9 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
   await chatRepo.clearAll();
   await docRepo.clearAll();
   await journalRepo.clearAll();
+  await personRepo.clearAll();
+  // Menschen vor allem anderen: danach zeigen die Zuordnungen ins Leere nicht.
+  for (const p of people) await personRepo.create(p);
   for (const l of lists) await listRepo.create(l);
   for (const t of tasks) await taskRepo.create(t);
   for (const n of notes) await noteRepo.create(n);

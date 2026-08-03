@@ -3,7 +3,7 @@
 // mussten, weil die Schleife dreimal kopiert war.
 import { applyAssistantActions, type ApplyDeps, type UndoDeps, undoAppliedActions } from './applyActions';
 import type { AssistantAction } from './assistant';
-import type { List, Task } from '@/data/types';
+import type { List, Person, Task } from '@/data/types';
 
 const leer: AssistantAction = { aufgaben: [], termine: [], listen: [], aenderungen: [], checkliste: [], notizen: [] };
 
@@ -50,10 +50,18 @@ function deps(over: Partial<ApplyDeps> = {}) {
       log.push(`termine:${t.length}`);
       return t.length;
     },
+    createPerson: async (input) => {
+      log.push(`mensch:${input.name}`);
+      return { id: `p-${input.name}`, name: input.name, note: null, sort: 0, createdAt: '2026-07-27T09:00:00.000Z' };
+    },
     colorAt: () => '#2B5FA6',
     ...over,
   };
   return { deps: base, log, createdTasks, patches };
+}
+
+function person(id: string, name: string): Person {
+  return { id, name, note: null, sort: 0, createdAt: '2026-07-01T08:00:00.000Z' };
 }
 
 describe('applyAssistantActions', () => {
@@ -261,5 +269,93 @@ describe('Rückgängig eines Abhakens bei WIEDERHOLUNG', () => {
     expect(res.rueckgaengig.abgehakt).toEqual([{ id: 'w1', completedAt: null, dueDate: '2026-08-03' }]);
     // Und die Änderung selbst kennt weiterhin das alte Datum.
     expect(res.rueckgaengig.aenderungen).toEqual([{ id: 'w1', vorher: { dueDate: '2026-07-27' } }]);
+  });
+});
+
+describe('Warten auf und Menschen', () => {
+  it('legt eine wartende Aufgabe mit Text an', async () => {
+    const d = deps();
+    await applyAssistantActions(
+      { ...leer, aufgaben: [{ titel: 'Dach reparieren', wartet_auf: 'Angebot' }] },
+      d.deps,
+    );
+    expect(d.createdTasks[0].waiting).toBe(true);
+    expect(d.createdTasks[0].waitingFor).toBe('Angebot');
+  });
+
+  it('lässt eine gewöhnliche Aufgabe NICHT warten', async () => {
+    const d = deps();
+    await applyAssistantActions({ ...leer, aufgaben: [{ titel: 'Milch kaufen' }] }, d.deps);
+    expect(d.createdTasks[0].waiting).toBe(false);
+    expect(d.createdTasks[0].waitingFor).toBeNull();
+    expect(d.createdTasks[0].personId).toBeNull();
+  });
+
+  it('findet einen vorhandenen Menschen, statt ihn zu verdoppeln — Groß/Klein egal', async () => {
+    const d = deps({ people: [person('p1', 'Anna')] });
+    await applyAssistantActions({ ...leer, aufgaben: [{ titel: 'Urlaub klären', person: 'anna' }] }, d.deps);
+    expect(d.log).toEqual(['aufgabe:Urlaub klären']); // KEIN createPerson
+    expect(d.createdTasks[0].personId).toBe('p1');
+  });
+
+  it('legt einen unbekannten Menschen an — aber nur EINMAL pro Durchgang', async () => {
+    const d = deps();
+    await applyAssistantActions(
+      {
+        ...leer,
+        aufgaben: [
+          { titel: 'Fotos schicken', person: 'Papa' },
+          { titel: 'Anrufen', person: ' papa ' },
+        ],
+      },
+      d.deps,
+    );
+    expect(d.log.filter((x) => x.startsWith('mensch:'))).toEqual(['mensch:Papa']);
+    expect(d.createdTasks[0].personId).toBe('p-Papa');
+    expect(d.createdTasks[1].personId).toBe('p-Papa');
+  });
+
+  it('ignoriert „person" still, wenn der Aufrufer gar keine Menschen führt', async () => {
+    const d = deps({ createPerson: undefined });
+    await applyAssistantActions({ ...leer, aufgaben: [{ titel: 'X', person: 'Anna' }] }, d.deps);
+    expect(d.createdTasks[0].personId).toBeNull();
+  });
+
+  it('setzt und beendet das Warten über eine Änderung', async () => {
+    const bestehend = task('abc123', 'Angebot einholen', { waiting: true, waitingFor: 'Dachdecker' });
+    const d = deps({ tasks: [bestehend] });
+    await applyAssistantActions(
+      { ...leer, aenderungen: [{ handle: 'abc123'.slice(-6), wartet_auf: null }] },
+      d.deps,
+    );
+    expect(d.patches[0].patch.waiting).toBe(false);
+    // Der Text muss MIT weg — sonst bliebe eine Fußnote ohne Zustand.
+    expect(d.patches[0].patch.waitingFor).toBeNull();
+  });
+
+  it('nimmt eine Änderung, die NUR das Warten betrifft, überhaupt an', async () => {
+    const bestehend = task('abc123', 'Rückruf');
+    const d = deps({ tasks: [bestehend] });
+    const res = await applyAssistantActions(
+      { ...leer, aenderungen: [{ handle: 'abc123'.slice(-6), wartet_auf: 'Rückruf vom Amt' }] },
+      d.deps,
+    );
+    expect(res.aenderungen).toBe(1);
+    expect(d.patches[0].patch).toEqual({ waiting: true, waitingFor: 'Rückruf vom Amt' });
+  });
+
+  it('löst den Menschen über eine Änderung wieder', async () => {
+    const bestehend = task('abc123', 'Urlaub', { personId: 'p1' });
+    const d = deps({ tasks: [bestehend], people: [person('p1', 'Anna')] });
+    await applyAssistantActions({ ...leer, aenderungen: [{ handle: 'abc123'.slice(-6), person: null }] }, d.deps);
+    expect(d.patches[0].patch.personId).toBeNull();
+  });
+
+  it('macht das Anlegen eines Menschen NICHT rückgängig — er ist kein Vorschlag', async () => {
+    const d = deps();
+    const res = await applyAssistantActions({ ...leer, aufgaben: [{ titel: 'X', person: 'Neu' }] }, d.deps);
+    // Nur die Aufgabe steht im Rückgängig-Block, der Mensch bleibt.
+    expect(res.rueckgaengig.aufgaben).toEqual(['t-X']);
+    expect(JSON.stringify(res.rueckgaengig)).not.toContain('p-Neu');
   });
 });

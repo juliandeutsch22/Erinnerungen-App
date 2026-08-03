@@ -1708,6 +1708,64 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
       Anführungszeichen — ein `[aria-label="…"]`-Selektor bricht darin ab; die
       Tour vergleicht deshalb das Attribut selbst statt einen Selektor zu bauen.
 
+73. **„Warten auf" und Menschen als eigene Dimension** (v1.73.0). Zwei Features
+    in einem Zug, weil sie dieselbe Frage von zwei Seiten beantworten: „worauf
+    warte ich?" und „bei wem liegt es?".
+    · **Warten auf.** `Task.waiting` (Zustand) + `Task.waitingFor` (Text,
+      rein beschreibend). Zwei Felder statt einem, damit es nie zwei Wahrheiten
+      gibt: ein leerer String als „wartet ohne Angabe" wäre durch jede Schicht
+      (SQLite, Backup, Parser) anders gerutscht.
+      Der ganze Trick steckt in EINER Zeile: `isWaiting` geht in `isCurrent`.
+      Das ist das eine Tor, durch das Heute, Überfällig, die Wochenvorschau,
+      „Geplant" und die Smart-Filter gehen — eine wartende Aufgabe kann damit
+      nirgends als Versäumnis auftauchen, ohne dass ein einziger Bildschirm es
+      einzeln buchführen müsste. Dazu: keine Mitteilung mehr
+      (`selectNotificationWindow`, `countUntimedDue`) — eine Erinnerung an
+      etwas, das man gar nicht tun kann, ist reine Unruhe.
+      **Kein Zähler, keine Dauer.** „Du wartest seit zwölf Tagen" wäre ein
+      Schuld-Zähler für etwas, das man nicht in der Hand hat.
+    · **Menschen.** Neue Entität `Person` (Name, freie Notiz) in eigener
+      Tabelle, plus `personId` an Aufgabe, Notiz und Chat. Bewusst FREI getippt
+      und nicht aus den Systemkontakten: `expo-contacts` wäre ein natives Modul
+      mit eigener Berechtigung — im Web nicht prüfbar, also eigene Risikoklasse
+      (AGENTS.md §5). Ein Name genügt.
+      `person/[id].tsx` ist der Ort, an dem alles zusammenläuft: Wartendes,
+      Offenes, Notizen, Chats, Erledigtes. Der Moment, in dem er trägt, ist
+      der, in dem man jemanden zufällig trifft.
+    · **Löschen einer Person** löst JEDE Zuordnung und löscht dann erst — in
+      einer Transaktion (SQLite) bzw. in derselben Reihenfolge im Hook
+      (`personQueries`), damit Gerät und Prüfstand sich gleich verhalten. Was
+      bleibt, ist die Aufgabe; verloren geht nur die Zuordnung. Deshalb auch
+      kein Papierkorb für Menschen: eine Person trägt keinen Inhalt.
+    · **Wege hinein, immer mehr als einer:** Schnellmenü (Long-Press) für den
+      schnellen Zustand, Editor für Zustand + Grund + Mensch, Assistent für
+      beides. Die Zuordnung eines Menschen zusätzlich in `NoteLinkSheet` und
+      `ChatLinkSheet`. `PersonWahl` ist dabei ein INLINE-Block, kein Sheet —
+      ein Modal aus einem Modal ist genau der Weg, der die App reproduzierbar
+      zerlegt hat (§8.54/§8.71).
+    · **Assistent, vollständig:** `wartet_auf` und `person` im Antwort-Schema,
+      im Prompt, im Parser (null in „aenderungen" beendet das Warten bzw. löst
+      den Menschen) und in `applyActions`. Ein Personen-NAME wird dort auf eine
+      vorhandene Person aufgelöst (Groß/Klein egal) oder angelegt — erst nach
+      dem Bestätigungs-Tipp, und nur EINMAL pro Durchgang. Bewusst NICHT im
+      Rückgängig-Block: ein Mensch ist kein Vorschlag, sondern jemand, den es
+      ab jetzt gibt; ihn zurückzunehmen risse Zuordnungen mit, die inzwischen
+      von Hand gesetzt wurden. Beides steht VOR dem Übernehmen auf der Karte
+      (`describeExtras`, `describeAenderung`) — nichts geschieht unsichtbar.
+    · Im App-Überblick steht Wartendes in einem EIGENEN Block und trägt dort
+      nie „(überfällig)" — sonst schlüge der Assistent vor, etwas zu erledigen,
+      das bei jemand anderem liegt.
+    · Geprüft: 33 neue Jest-Tests (Logik, SQLite ausgeführt, Backup, Parser,
+      applyActions) und zwei Playwright-Touren — `warten.mjs` (17 Prüfungen:
+      markieren, verschwinden, wiederfinden, Mensch anlegen, Personen-Screen,
+      Suche, Warten beenden) und `wartetauf.mjs` (8: der Assistenten-Weg,
+      inklusive der Leitplanke „ohne Tipp wird nichts geschrieben, auch kein
+      Mensch").
+    · Harnisch: die Touren brauchten einen zweiten Griff. Kommt man über einen
+      SPÄTEREN Tab zurück, liegt dessen Fläche über dem sichtbaren Bildschirm —
+      `elementFromPoint` trifft sie statt des Knopfes, obwohl er zu sehen ist.
+      Fällt der Treffertest aus, wird das Element direkt geklickt.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

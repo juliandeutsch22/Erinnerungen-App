@@ -3,7 +3,7 @@
 // Detail-Zeilen (Liste / Fällig / Wiederholung / Flagge) mit aktuellem Wert,
 // die erst beim Antippen ihre Chips aufklappen — keine Chip-Wand. Der
 // Primär-Button sitzt fest im Sheet-Footer. Löschen zweistufig.
-import { CalendarDays, CalendarX2, Clock, Flag, ListChecks, type LucideIcon, Minus, Plus, Repeat, Tag as TagIcon, Trash2, X, Hourglass, Moon } from 'lucide-react-native';
+import { CalendarDays, CalendarX2, Clock, Flag, ListChecks, type LucideIcon, Minus, PauseCircle, Plus, Repeat, Tag as TagIcon, Trash2, UserRound, X, Hourglass, Moon } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { TextInput, View } from 'react-native';
 
@@ -17,11 +17,13 @@ import { LinkedNotes } from '@/components/LinkedNotes';
 import { listIcon } from '@/components/listMeta';
 import { Seam } from '@/components/Seam';
 import { MiniCalendar } from '@/components/MiniCalendar';
+import { PersonWahl } from '@/components/PersonWahl';
 import { PressableScale } from '@/components/PressableScale';
 import { Expanded, Group, RowDivider } from '@/components/SheetParts';
 import { TaskCheck } from '@/components/TaskCheck';
 import { TimeField } from '@/components/TimeField';
 import { Type } from '@/components/Type';
+import { usePeople } from '@/data/personQueries';
 import { useCreateTask, useDeleteTask, useLists, useTasks, useUpdateTask } from '@/data/queries';
 import type { Rrule, RruleUnit, Subtask, Task } from '@/data/types';
 import { newId, normalizeTag } from '@/data/types';
@@ -47,7 +49,7 @@ const ENDS: { label: string; months: number | null }[] = [
   { label: 'Nach 1 Jahr', months: 12 },
 ];
 
-type Section = 'list' | 'due' | 'repeat' | 'span';
+type Section = 'list' | 'due' | 'repeat' | 'span' | 'waiting' | 'person';
 
 export function TaskEditorSheet({
   task,
@@ -90,6 +92,9 @@ export function TaskEditorSheet({
   const [rruleUntil, setRruleUntil] = useState<string | null>(task?.rruleUntil ?? null);
   const [evening, setEvening] = useState<boolean>(task?.evening ?? false);
   const [startDate, setStartDate] = useState<string | null>(task?.startDate ?? null);
+  const [waiting, setWaiting] = useState<boolean>(task?.waiting ?? false);
+  const [waitingFor, setWaitingFor] = useState(task?.waitingFor ?? '');
+  const [personId, setPersonId] = useState<string | null>(task?.personId ?? null);
   const [expiresOn, setExpiresOn] = useState<string | null>(task?.expiresOn ?? null);
   // Bausteine des Satzes „Alle [n] [Einheit], gezählt ab [Fälligkeit|Erledigen]".
   // Startwerte aus einer bestehenden Regel; 'weekdays' hat keine → Vorgabe.
@@ -134,6 +139,12 @@ export function TaskEditorSheet({
   };
 
   const currentList = useMemo(() => (lists ?? []).find((l) => l.id === listId), [lists, listId]);
+  const { data: people } = usePeople();
+  const currentPerson = useMemo(() => (people ?? []).find((p) => p.id === personId), [people, personId]);
+  const personLabel = currentPerson ? currentPerson.name : 'Niemand';
+  // Kurzform für die zugeklappte Zeile — die ausführliche Beschriftung steht
+  // an der Aufgabe selbst (taskLogic.waitingLabel).
+  const waitingLabelKurz = !waiting ? 'Nein' : waitingFor.trim() ? waitingFor.trim() : 'Ja';
 
   const dueLabel = dueDate ? formatDueDate(dueDate, today) + (dueTime ? `, ${dueTime}` : '') : 'Kein Datum';
   // Beschriftung der Lebensspanne: „ab …", „bis …" oder beides.
@@ -185,6 +196,11 @@ export function TaskEditorSheet({
       expiresOn,
       // Mit Uhrzeit hat die Aufgabe ihren Platz — dann ist „Abends" gegenstandslos.
       evening: dueTime === null ? evening : false,
+      waiting,
+      // Der Text ist rein beschreibend — ohne Wartezustand hat er keinen Sinn
+      // und würde beim nächsten Öffnen einen Zustand vortäuschen.
+      waitingFor: waiting && waitingFor.trim() ? waitingFor.trim() : null,
+      personId,
       rrule: finalDate ? rrule : null,
       rruleUntil: finalDate && rrule ? rruleUntil : null,
       flagged,
@@ -466,6 +482,83 @@ export function TaskEditorSheet({
                   </PressableScale>
                 )}
               </View>
+            </View>
+          </Expanded>
+        )}
+
+        <RowDivider />
+
+        {/* An wem hängt das? Steht VOR „Warten auf", weil das Warten meistens
+            auf genau diesen Menschen zeigt — und weil die Person auch ohne
+            Warten trägt („mit Anna wegen Urlaub reden"). */}
+        <DetailRow
+          icon={UserRound}
+          iconColor={personId ? colors.teal : colors.text3}
+          label="Mensch"
+          value={personLabel}
+          valueTone={personId ? 'teal' : 'text3'}
+          expanded={section === 'person'}
+          onPress={() => toggleSection('person')}
+        />
+        {section === 'person' && (
+          <Expanded>
+            <View style={{ gap: Spacing.xs }}>
+              <Type variant="caption" tone="text3">
+                Wer hat damit zu tun? Alles zu einem Menschen steht danach an einem Ort.
+              </Type>
+              <PersonWahl selected={personId} onSelect={setPersonId} />
+            </View>
+          </Expanded>
+        )}
+
+        <RowDivider />
+
+        {/* Warten auf — die Aufgabe liegt bei jemand anderem. */}
+        <DetailRow
+          icon={PauseCircle}
+          iconColor={waiting ? colors.teal : colors.text3}
+          label="Warten auf"
+          value={waitingLabelKurz}
+          valueTone={waiting ? 'teal' : 'text3'}
+          expanded={section === 'waiting'}
+          onPress={() => toggleSection('waiting')}
+        />
+        {section === 'waiting' && (
+          <Expanded>
+            <View style={{ gap: Spacing.sm }}>
+              <Type variant="caption" tone="text3">
+                Liegt bei jemand anderem: verschwindet aus „Heute" und aus dem
+                Überfällig-Stapel, bleibt aber im Projekt, in der Suche und in
+                der eigenen Ansicht. Es mahnt nichts.
+              </Type>
+              <PressableScale
+                accessibilityRole="switch"
+                accessibilityState={{ checked: waiting }}
+                accessibilityLabel={waiting ? 'Nicht mehr warten' : 'Auf jemanden warten'}
+                onPress={() => {
+                  hapticSelect();
+                  setWaiting((v) => !v);
+                }}
+                pressedScale={0.99}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.xs }}
+              >
+                <PauseCircle size={18} color={waiting ? colors.teal : colors.text3} strokeWidth={2} />
+                <Type variant="body" style={{ flex: 1 }}>Ich warte darauf</Type>
+                <Type variant="label" tone={waiting ? 'teal' : 'text3'}>{waiting ? 'An' : 'Aus'}</Type>
+              </PressableScale>
+              {waiting && (
+                <TextInput
+                  accessibilityLabel="Worauf gewartet wird"
+                  value={waitingFor}
+                  onChangeText={setWaitingFor}
+                  placeholder="Worauf? (z. B. Angebot, Rückruf)"
+                  placeholderTextColor={colors.text3}
+                  style={[
+                    { fontSize: T.md, color: colors.text, borderRadius: R.lg, borderWidth: 1, borderColor: colors.chipBorder, backgroundColor: colors.bg2, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm + 2 },
+                    webNoOutline,
+                  ]}
+                />
+              )}
             </View>
           </Expanded>
         )}

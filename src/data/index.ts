@@ -7,6 +7,7 @@ import { DocumentRepository, InMemoryDocumentRepository } from './DocumentReposi
 import { InMemoryJournalRepository, JournalRepository } from './JournalRepository';
 import { InMemoryListRepository, ListRepository } from './ListRepository';
 import { InMemoryNoteRepository, NoteRepository } from './NoteRepository';
+import { InMemoryPersonRepository, PersonRepository } from './PersonRepository';
 import { InMemoryPhotoRepository, PhotoRepository } from './PhotoRepository';
 import { InMemoryTaskRepository, TaskRepository } from './TaskRepository';
 
@@ -17,6 +18,7 @@ let noteSingleton: NoteRepository | null = null;
 let chatSingleton: ChatRepository | null = null;
 let documentSingleton: DocumentRepository | null = null;
 let journalSingleton: JournalRepository | null = null;
+let personSingleton: PersonRepository | null = null;
 
 export function getListRepository(): ListRepository {
   if (listSingleton) return listSingleton;
@@ -96,6 +98,17 @@ export function getJournalRepository(): JournalRepository {
   return journalSingleton;
 }
 
+export function getPersonRepository(): PersonRepository {
+  if (personSingleton) return personSingleton;
+  if (Platform.OS === 'web') {
+    personSingleton = new InMemoryPersonRepository();
+  } else {
+    const { SqlitePersonRepository } = require('./SqlitePersonRepository') as typeof import('./SqlitePersonRepository');
+    personSingleton = new SqlitePersonRepository();
+  }
+  return personSingleton;
+}
+
 /** Nur für Tests: erlaubt das Einsetzen eigener Repository-Instanzen. */
 export function __setListRepositoryForTests(repo: ListRepository | null) {
   listSingleton = repo;
@@ -118,6 +131,9 @@ export function __setDocumentRepositoryForTests(repo: DocumentRepository | null)
 export function __setJournalRepositoryForTests(repo: JournalRepository | null) {
   journalSingleton = repo;
 }
+export function __setPersonRepositoryForTests(repo: PersonRepository | null) {
+  personSingleton = repo;
+}
 
 export type { ListRepository } from './ListRepository';
 export type { TaskRepository } from './TaskRepository';
@@ -126,3 +142,4 @@ export type { NoteRepository } from './NoteRepository';
 export type { ChatRepository } from './ChatRepository';
 export type { DocumentRepository } from './DocumentRepository';
 export type { JournalRepository } from './JournalRepository';
+export type { PersonRepository } from './PersonRepository';

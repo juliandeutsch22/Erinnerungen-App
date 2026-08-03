@@ -22,6 +22,7 @@ import { LoadingState } from '@/components/StateView';
 import { LIST_COLORS } from '@/components/listMeta';
 import { Type } from '@/components/Type';
 import { useCreateAssistantEvents } from '@/data/calendarQueries';
+import { useCreatePerson, usePeople } from '@/data/personQueries';
 import { useCreateNote } from '@/data/noteQueries';
 import { useCompleteTask, useCreateList, useCreateTask, useDeleteTask, useLists, useUpdateTask } from '@/data/queries';
 import type { ChatMessage } from '@/data/types';
@@ -51,6 +52,8 @@ export default function BraindumpScreen() {
   const createNote = useCreateNote();
   const createEvents = useCreateAssistantEvents();
   const { data: lists } = useLists();
+  const { data: people } = usePeople();
+  const createPerson = useCreatePerson();
   const today = todayStr();
 
   // Geteilter Text (iOS-Kurzbefehl → stille://braindump?text=…) füllt das Feld
@@ -212,7 +215,9 @@ export default function BraindumpScreen() {
         lists: lists ?? [],
         tasks: [],
         today,
+        people: people ?? [],
         createList: (input) => createList.mutateAsync(input),
+        createPerson: (input) => createPerson.mutateAsync(input),
         createTask: (input) => createTask.mutateAsync(input),
         createNote: (body) => createNote.mutateAsync({ body }),
         updateTask: (id, patch) => updateTask.mutateAsync({ id, patch }),

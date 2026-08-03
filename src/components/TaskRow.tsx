@@ -2,7 +2,7 @@
 // Swipe rechts = erledigt, Swipe links = „Neu planen" (Fahrplan §3.6).
 // Überfällig trägt Indigo (ruhig), nie Alarm-Rot.
 import { useRouter } from 'expo-router';
-import { Check, Flag, Link2, ListChecks, NotebookPen, Repeat } from 'lucide-react-native';
+import { Check, Flag, Link2, ListChecks, NotebookPen, PauseCircle, Repeat, UserRound } from 'lucide-react-native';
 import React, { useMemo, useRef } from 'react';
 import { View } from 'react-native';
 import ReanimatedSwipeable, { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
@@ -13,11 +13,12 @@ import { SwipeActionSlide } from '@/components/SwipeActionSlide';
 import { TaskCheck } from '@/components/TaskCheck';
 import { Type } from '@/components/Type';
 import { useNotes } from '@/data/noteQueries';
+import { usePeople } from '@/data/personQueries';
 import type { List, Task } from '@/data/types';
 import { formatDueDate } from '@/lib/dates';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { subtaskProgress } from '@/lib/taskFilters';
-import { isOverdue } from '@/lib/taskLogic';
+import { isOverdue, isWaiting, waitingLabel } from '@/lib/taskLogic';
 import { useColors } from '@/theme/ThemeProvider';
 import { R, Spacing, T } from '@/theme/theme.tokens';
 
@@ -58,6 +59,16 @@ export function TaskRow({
   const hasNote = useMemo(() => (notes ?? []).some((n) => n.taskId === task.id && n.deletedAt === null), [notes, task.id]);
   const overdue = isOverdue(task, today);
   const progress = subtaskProgress(task.subtasks);
+  // Der Mensch, an dem die Aufgabe hängt — und, falls gewartet wird, die
+  // ruhige Zeile darunter. Beides ist ausdrücklich OHNE Dauer: „seit zwölf
+  // Tagen" wäre ein Schuld-Zähler für etwas, das man nicht in der Hand hat.
+  const { data: people } = usePeople();
+  const person = useMemo(
+    () => (task.personId ? (people ?? []).find((p) => p.id === task.personId) : undefined),
+    [people, task.personId],
+  );
+  const wartet = isWaiting(task);
+  const wartetText = waitingLabel(task, person?.name ?? null);
   const swipeRef = useRef<SwipeableMethods>(null);
 
   const metaParts: { text: string; tone: 'indigo' | 'teal' | 'text3' }[] = [];
@@ -70,6 +81,11 @@ export function TaskRow({
     });
   }
   if (list) metaParts.push({ text: list.name, tone: 'text3' });
+  // Wartend: „Wartet auf …" steht VORN. Das Datum bleibt stehen, verliert aber
+  // von selbst seine Farbe — `isOverdue` gibt für Wartendes false zurück, also
+  // wird aus der Mahnung eine schlichte Angabe.
+  if (wartet && wartetText) metaParts.unshift({ text: wartetText, tone: 'text3' });
+  else if (person) metaParts.push({ text: person.name, tone: 'text3' });
 
   const row = (
     <View
@@ -99,6 +115,8 @@ export function TaskRow({
             >
               <Highlighted text={task.title} query={highlight} />
             </Type>
+            {wartet && <PauseCircle size={13} color={colors.text3} strokeWidth={2} />}
+            {!wartet && person && <UserRound size={13} color={colors.text3} strokeWidth={2} />}
             {task.flagged && <Flag size={13} color={colors.indigo} fill={colors.indigo} strokeWidth={2} />}
             {task.rrule && <Repeat size={13} color={colors.text3} strokeWidth={2} />}
             {showEventLink && task.eventId && <Link2 size={13} color={colors.text3} strokeWidth={2} />}

@@ -29,6 +29,7 @@ import { GlassButton } from '@/components/GlassButton';
 import { PressableScale } from '@/components/PressableScale';
 import { Type } from '@/components/Type';
 import { useCreateAssistantEvents } from '@/data/calendarQueries';
+import { useCreatePerson, usePeople } from '@/data/personQueries';
 import { useCreateNote } from '@/data/noteQueries';
 import { useCompleteTask, useCreateList, useCreateTask, useDeleteTask, useLists, useUpdateTask } from '@/data/queries';
 import type { ChatMessage } from '@/data/types';
@@ -344,6 +345,8 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
   const createNote = useCreateNote();
   const createEvents = useCreateAssistantEvents();
   const { data: lists } = useLists();
+  const { data: people } = usePeople();
+  const createPerson = useCreatePerson();
   const today = todayStr();
 
   const [phase, setPhase] = useState<QuickVoicePhase>('listening');
@@ -554,7 +557,9 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
         lists: lists ?? [],
         tasks: [],
         today,
+        people: people ?? [],
         createList: (input) => createList.mutateAsync(input),
+        createPerson: (input) => createPerson.mutateAsync(input),
         createTask: (input) => createTask.mutateAsync(input),
         createNote: (body) => createNote.mutateAsync({ body }),
         updateTask: (id, patch) => updateTask.mutateAsync({ id, patch }),

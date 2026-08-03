@@ -15,6 +15,7 @@ import { Type } from '@/components/Type';
 import { useDeviceEvents } from '@/data/calendarQueries';
 import { useNotes, useUpdateNote } from '@/data/noteQueries';
 import type { Note } from '@/data/types';
+import { PersonWahl } from '@/components/PersonWahl';
 import { useLists, useTasks } from '@/data/queries';
 import { addDays, formatDueDate, toDateStr, todayStr } from '@/lib/dates';
 import { hasCalendarPermission } from '@/lib/deviceCalendar';
@@ -65,6 +66,9 @@ export function NoteLinkSheet({ noteId, onClose }: { noteId: string; onClose: ()
 
   if (!note) return null;
 
+  const setPerson = (personId: string | null) => {
+    updateNote.mutate({ id: note.id, patch: { personId } });
+  };
   const toggleList = (listId: string) => {
     hapticSelect();
     updateNote.mutate({ id: note.id, patch: { listId: note.listId === listId ? null : listId } });
@@ -104,6 +108,9 @@ export function NoteLinkSheet({ noteId, onClose }: { noteId: string; onClose: ()
           ))}
         </Group>
       )}
+
+      <Type variant="eyebrow" tone="text3" style={{ marginTop: Spacing.lg, marginBottom: Spacing.xs }}>Mensch</Type>
+      <PersonWahl selected={note.personId ?? null} onSelect={setPerson} />
 
       <Type variant="eyebrow" tone="text3" style={{ marginTop: Spacing.lg, marginBottom: Spacing.xs }}>Erinnerungen</Type>
       {openTasks.length === 0 ? (

@@ -28,6 +28,7 @@ import { LIST_COLORS } from '@/components/listMeta';
 import * as Clipboard from 'expo-clipboard';
 
 import { useCreateAssistantEvents, useDeviceEvents } from '@/data/calendarQueries';
+import { useCreatePerson, usePeople } from '@/data/personQueries';
 import { useAppendMessage, useChatMessages, useChats, useUpdateChat } from '@/data/chatQueries';
 import { useCreateNote, useNotes, useUpdateNote } from '@/data/noteQueries';
 import { useCompleteTask, useCreateList, useCreateTask, useDeleteTask, useLists, useTasks, useUpdateTask } from '@/data/queries';
@@ -333,6 +334,8 @@ export default function ChatScreen() {
   const { data: notes } = useNotes();
   const { data: tasks } = useTasks();
   const { data: lists } = useLists();
+  const { data: people } = usePeople();
+  const createPerson = useCreatePerson();
 
   // App-Schnappschuss (abschaltbar in den Einstellungen): Termine der
   // nächsten ~5 Wochen + offene Aufgaben + Listen + Notiz-Titel. Das Journal
@@ -436,7 +439,9 @@ export default function ChatScreen() {
       // App-Überblick und damit Handles für „aenderungen".
       tasks: tasks ?? [],
       today,
+      people: people ?? [],
       createList: (input) => createList.mutateAsync(input),
+      createPerson: (input) => createPerson.mutateAsync(input),
       createTask: (input) => createTask.mutateAsync(input),
       createNote: (body) => createNote.mutateAsync({ body, taskId: chat?.taskId ?? null, eventId: chat?.eventId ?? null }),
       updateTask: (id, patch) => updateTask.mutateAsync({ id, patch }),
@@ -476,6 +481,7 @@ export default function ChatScreen() {
             tasks: tasks ?? [],
             lists: lists ?? [],
             notes: notes ?? [],
+            people: people ?? [],
             today,
             calendarDenied: !calGranted,
           })

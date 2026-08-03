@@ -6,7 +6,7 @@
 // „- [ ]"-Zeilen am Ende — Suche/Backup/Import bleiben Plain Text.
 // Tastatur: Wisch nach unten (interactive) oder „Fertig"-Leiste.
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { CalendarDays, ChevronLeft, Link2, ListChecks, ListTodo, Pin, Plus, Share2, Sparkles, Trash2, X } from 'lucide-react-native';
+import { CalendarDays, ChevronLeft, Link2, ListChecks, ListTodo, Pin, Plus, Share2, Sparkles, Trash2, UserRound, X } from 'lucide-react-native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Keyboard, KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,6 +21,7 @@ import { useDeviceEvents } from '@/data/calendarQueries';
 import { useCreateChat } from '@/data/chatQueries';
 import { useNotes, useUpdateNote } from '@/data/noteQueries';
 import { useSettings } from '@/theme/settings.store';
+import { usePeople } from '@/data/personQueries';
 import { useCreateTask, useLists, useTasks } from '@/data/queries';
 import { addDays, todayStr } from '@/lib/dates';
 import { hasCalendarPermission } from '@/lib/deviceCalendar';
@@ -220,6 +221,11 @@ export default function NotizScreen() {
   // Die Liste, in der diese Notiz liegt (Stoas Ordner-Ersatz). Zeigt sie auf
   // eine gelöschte Liste, findet sich nichts — dann steht auch kein Chip da.
   const { data: lists } = useLists();
+  // Der Mensch, um den es in dieser Notiz geht. Ohne `useMemo`: ein Suchlauf
+  // über eine Handvoll Namen kostet nichts, und die Nachbarn hier oben zahlen
+  // für ihre Memoisierung bereits mit einer Compiler-Warnung.
+  const { data: people } = usePeople();
+  const linkedPerson = note?.personId ? (people ?? []).find((p) => p.id === note.personId) : undefined;
   const linkedList = useMemo(
     () => (note?.listId ? (lists ?? []).find((l) => l.id === note.listId) : undefined),
     [lists, note?.listId],
@@ -357,7 +363,7 @@ export default function NotizScreen() {
         </View>
 
         {/* Verknüpfungs-Chips nur, wenn tatsächlich etwas verknüpft ist. */}
-        {(linkedTask || linkedEventTitle || linkedList) && note && (
+        {(linkedTask || linkedEventTitle || linkedList || linkedPerson) && note && (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: Spacing.sm, paddingHorizontal: Spacing.lg, paddingTop: Spacing.xs }}>
           {/* Die Liste zuerst: sie sagt, WO die Notiz liegt — die anderen
               beiden Chips sagen, worauf sie sich bezieht. */}
@@ -372,6 +378,20 @@ export default function NotizScreen() {
             >
               <View style={{ width: 9, height: 9, borderRadius: 4.5, backgroundColor: linkedList.color }} />
               <Type variant="caption" tone="text2" numberOfLines={1} style={{ maxWidth: 140 }}>{linkedList.name}</Type>
+              <X size={11} color={colors.text3} strokeWidth={2.2} />
+            </PressableScale>
+          )}
+          {linkedPerson && note && (
+            <PressableScale
+              accessibilityLabel={`Notiz von „${linkedPerson.name}" lösen`}
+              onPress={() => {
+                hapticSelect();
+                updateNote.mutate({ id: note.id, patch: { personId: null } });
+              }}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 5, paddingHorizontal: Spacing.sm, borderRadius: R.pill, backgroundColor: colors.chip, borderWidth: 1, borderColor: colors.chipBorder }}
+            >
+              <UserRound size={13} color={colors.text2} strokeWidth={2} />
+              <Type variant="caption" tone="text2" numberOfLines={1} style={{ maxWidth: 140 }}>{linkedPerson.name}</Type>
               <X size={11} color={colors.text3} strokeWidth={2.2} />
             </PressableScale>
           )}

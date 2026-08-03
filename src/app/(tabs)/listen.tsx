@@ -2,7 +2,7 @@
 // Long-Press = bearbeiten; „+ Neue Liste" als gestrichelte Geister-Karte.
 // Darüber die Smart-Ansichten Geplant / Alle (Fahrplan §3.3).
 import { useRouter } from 'expo-router';
-import { CalendarClock, CalendarDays, Filter as FilterIcon, Layers, Plus, SlidersHorizontal } from 'lucide-react-native';
+import { CalendarClock, CalendarDays, ChevronRight, Filter as FilterIcon, Layers, PauseCircle, Plus, SlidersHorizontal, UserRound } from 'lucide-react-native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import ReanimatedSwipeable, { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
@@ -18,6 +18,7 @@ import { ProgressLine } from '@/components/ProgressLine';
 import { Reveal } from '@/components/Reveal';
 import { QuickAdd } from '@/components/QuickAdd';
 import { Screen } from '@/components/Screen';
+import { Seam } from '@/components/Seam';
 import { SwipeActionSlide } from '@/components/SwipeActionSlide';
 import { Type } from '@/components/Type';
 import {
@@ -33,7 +34,8 @@ import {
 import type { List, Task } from '@/data/types';
 import { applyFilter } from '@/lib/taskFilters';
 import { addDays, formatDueDate, toDateStr, todayStr } from '@/lib/dates';
-import { isCurrent, isOpen, listProgress, projectDeadlineLabel, projectState } from '@/lib/taskLogic';
+import { usePeople } from '@/data/personQueries';
+import { isCurrent, isOpen, isWaiting, listProgress, projectDeadlineLabel, projectState, waitingTasks } from '@/lib/taskLogic';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { useSettings } from '@/theme/settings.store';
 import { QUICK_ADD_CLEARANCE, TAB_BAR_SAFE_BOTTOM } from '@/theme/layout';
@@ -70,6 +72,23 @@ export default function ListenScreen() {
     }
     const map = new Map<string, { done: number; total: number; ratio: number }>();
     for (const [id, arr] of byList) map.set(id, listProgress(arr));
+    return map;
+  }, [tasks]);
+  // Menschen und Wartendes — beides zaehlt bewusst NICHT in die offenen
+  // Aufgaben oben hinein: was bei anderen liegt, ist keine Zahl, die man
+  // abarbeitet.
+  const { data: people } = usePeople();
+  const wartend = useMemo(() => waitingTasks(tasks ?? []), [tasks]);
+  const wartendProPerson = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const t of wartend) if (t.personId) map.set(t.personId, (map.get(t.personId) ?? 0) + 1);
+    return map;
+  }, [wartend]);
+  const offenProPerson = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const t of tasks ?? []) {
+      if (t.personId && isOpen(t) && !isWaiting(t)) map.set(t.personId, (map.get(t.personId) ?? 0) + 1);
+    }
     return map;
   }, [tasks]);
   const openTotal = useMemo(() => (tasks ?? []).filter((t) => isOpen(t) && isCurrent(t, today)).length, [tasks, today]);
@@ -137,6 +156,59 @@ export default function ListenScreen() {
           )}
         </View>
       </Reveal>
+
+      {/* Menschen — der Ort, an dem „was liegt bei wem?" beantwortet wird.
+          Erscheint erst, wenn es etwas zu zeigen gibt: ein leerer Abschnitt
+          mit einer Einladung wäre eine Aufgabe, die niemand gestellt hat.
+          Der Zugang zu „Warten auf" steht bewusst HIER und nicht als eigene
+          Smart-Karte oben: es ist keine Sicht auf den Kalender, sondern die
+          Gegenfrage zu allem, was man selbst tut. */}
+      {((people ?? []).length > 0 || wartend.length > 0) && (
+        <Reveal delay={105}>
+          <View style={{ gap: Spacing.sm }}>
+            <Type variant="eyebrow" tone="text3">Menschen</Type>
+            <GlassPanel>
+              <PressableScale
+                accessibilityLabel="Warten auf öffnen"
+                onPress={() => router.push('/liste/warten')}
+                pressedScale={0.99}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.sm }}
+              >
+                <PauseCircle size={18} color={colors.teal} strokeWidth={2} />
+                <Type variant="body" style={{ flex: 1 }}>Warten auf</Type>
+                <Type variant="caption" tone="text3" tabular>{wartend.length}</Type>
+                <ChevronRight size={15} color={colors.text3} strokeWidth={2} />
+              </PressableScale>
+              {(people ?? []).map((p) => {
+                const w = wartendProPerson.get(p.id) ?? 0;
+                const o = offenProPerson.get(p.id) ?? 0;
+                return (
+                  <View key={p.id}>
+                    <Seam marginVertical={2} />
+                    <PressableScale
+                      accessibilityLabel={`Alles zu ${p.name} ansehen`}
+                      onPress={() => router.push(`/person/${p.id}`)}
+                      pressedScale={0.99}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.sm }}
+                    >
+                      <UserRound size={18} color={colors.text3} strokeWidth={2} />
+                      <View style={{ flex: 1 }}>
+                        <Type variant="body" numberOfLines={1}>{p.name}</Type>
+                        {p.note && <Type variant="caption" tone="text3" numberOfLines={1}>{p.note}</Type>}
+                      </View>
+                      {/* Zwei Zahlen, zwei Bedeutungen: was bei ihm liegt und
+                          was bei mir. Nur die, die es gibt. */}
+                      {w > 0 && <Type variant="caption" tone="teal" tabular>{w} wartet</Type>}
+                      {o > 0 && <Type variant="caption" tone="text3" tabular>{o} offen</Type>}
+                      <ChevronRight size={15} color={colors.text3} strokeWidth={2} />
+                    </PressableScale>
+                  </View>
+                );
+              })}
+            </GlassPanel>
+          </View>
+        </Reveal>
+      )}
 
       {/* Listen-Grid */}
       <Reveal delay={120}>

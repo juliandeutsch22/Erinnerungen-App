@@ -3,7 +3,7 @@
 // Live-Filter, Treffer öffnen den Editor. Bereichs-Chips grenzen die Suche ein;
 // ohne Eingabe zeigt die Seite die zuletzt gesuchten Begriffe.
 import { useRouter } from 'expo-router';
-import { FileText, History, MoonStar, NotebookPen, Search, Sparkles } from 'lucide-react-native';
+import { FileText, History, MoonStar, NotebookPen, Search, Sparkles, UserRound } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { ScrollView, TextInput, View } from 'react-native';
 
@@ -23,6 +23,7 @@ import { TaskQuickSheet } from '@/components/TaskQuickSheet';
 import { TaskRow } from '@/components/TaskRow';
 import { Type } from '@/components/Type';
 import { useAllChatMessages, useChats } from '@/data/chatQueries';
+import { usePeople } from '@/data/personQueries';
 import { useDocuments } from '@/data/documentQueries';
 import { useJournal } from '@/data/journalQueries';
 import { useNotes } from '@/data/noteQueries';
@@ -39,11 +40,12 @@ import { useSettings } from '@/theme/settings.store';
 import { Shadow, Spacing, T } from '@/theme/theme.tokens';
 
 /** Bereichs-Filter: „Alle" oder genau ein Bereich. */
-type Scope = 'alle' | 'aufgaben' | 'listen' | 'notizen' | 'dokumente' | 'chats' | 'abend';
+type Scope = 'alle' | 'aufgaben' | 'listen' | 'menschen' | 'notizen' | 'dokumente' | 'chats' | 'abend';
 const SCOPES: { value: Scope; label: string }[] = [
   { value: 'alle', label: 'Alle' },
   { value: 'aufgaben', label: 'Aufgaben' },
   { value: 'listen', label: 'Listen' },
+  { value: 'menschen', label: 'Menschen' },
   { value: 'notizen', label: 'Notizen' },
   { value: 'dokumente', label: 'Dokumente' },
   { value: 'chats', label: 'Chats' },
@@ -56,6 +58,7 @@ export default function SucheScreen() {
   const { data: tasks } = useTasks();
   const { data: lists } = useLists();
   const { data: notes } = useNotes();
+  const { data: people } = usePeople();
   const complete = useCompleteTask();
   const reopen = useReopenTask();
 
@@ -91,6 +94,14 @@ export default function SucheScreen() {
     return (lists ?? []).filter((l) => l.name.toLowerCase().includes(q));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lists, q, scope]);
+
+  // Menschen: Name UND Notiz - „Dachdecker“ findet ihn auch, wenn er
+  // „Herr Brandt“ heißt und das Gewerbe nur in der Notiz steht.
+  const personHits = useMemo(() => {
+    if (!q || !inScope('menschen')) return [];
+    return (people ?? []).filter((p) => p.name.toLowerCase().includes(q) || (p.note ?? '').toLowerCase().includes(q));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [people, q, scope]);
 
   const noteHits = useMemo(() => {
     if (!q || !inScope('notizen')) return [];
@@ -235,7 +246,7 @@ export default function SucheScreen() {
               <EmptyState
                 icon={<Search size={20} color={colors.teal} strokeWidth={2} />}
                 title="Alles auffindbar"
-                body="Ein Begriff genügt — durchsucht werden Aufgaben, Listen, Notizen, Dokumente, Chats und die Abendbetrachtung."
+                body="Ein Begriff genügt — durchsucht werden Aufgaben, Listen, Menschen, Notizen, Dokumente, Chats und die Abendbetrachtung."
               />
             )}
           </GlassPanel>
@@ -245,7 +256,7 @@ export default function SucheScreen() {
       {q.length > 0 && (
         <Reveal delay={90}>
           <GlassPanel>
-            {taskHits.length === 0 && listHits.length === 0 && noteHits.length === 0 && chatHits.length === 0 && journalHits.length === 0 && docHits.length === 0 ? (
+            {taskHits.length === 0 && listHits.length === 0 && personHits.length === 0 && noteHits.length === 0 && chatHits.length === 0 && journalHits.length === 0 && docHits.length === 0 ? (
               <EmptyState
                 icon={<Search size={20} color={colors.teal} strokeWidth={2} />}
                 title="Keine Treffer"
@@ -282,6 +293,38 @@ export default function SucheScreen() {
                     {taskHits.length > 0 && <Seam variant="ornament" marginVertical={Spacing.md} />}
                   </>
                 )}
+                {personHits.length > 0 && (
+                  <>
+                    <Type variant="eyebrow" tone="text3">Menschen</Type>
+                    <View style={{ marginTop: Spacing.xs }}>
+                      {personHits.map((p) => (
+                        <PressableScale
+                          key={p.id}
+                          accessibilityLabel={`Alles zu ${p.name} ansehen`}
+                          onPress={() => {
+                            remember();
+                            router.push(`/person/${p.id}`);
+                          }}
+                          pressedScale={0.99}
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.sm + 2 }}
+                        >
+                          <UserRound size={16} color={colors.text3} strokeWidth={2} />
+                          <View style={{ flex: 1 }}>
+                            <Type variant="body" numberOfLines={1}>
+                              <Highlighted text={p.name} query={q} />
+                            </Type>
+                            {p.note && (
+                              <Type variant="caption" tone="text3" numberOfLines={1}>
+                                <Highlighted text={p.note} query={q} />
+                              </Type>
+                            )}
+                          </View>
+                        </PressableScale>
+                      ))}
+                    </View>
+                    <Seam variant="ornament" marginVertical={Spacing.md} />
+                  </>
+                )}
                 {taskHits.length > 0 && (
                   <>
                     <Type variant="eyebrow" tone="text3">Aufgaben</Type>
@@ -307,7 +350,7 @@ export default function SucheScreen() {
                 )}
                 {noteHits.length > 0 && (
                   <>
-                    {(taskHits.length > 0 || listHits.length > 0) && <Seam marginVertical={Spacing.md} />}
+                    {(taskHits.length > 0 || listHits.length > 0 || personHits.length > 0) && <Seam marginVertical={Spacing.md} />}
                     <Type variant="eyebrow" tone="text3">Notizen</Type>
                     <View style={{ marginTop: Spacing.xs }}>
                       {noteHits.map((n) => {

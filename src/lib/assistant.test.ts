@@ -214,6 +214,92 @@ describe('buildAppContext', () => {
   });
 });
 
+describe('extractActions — Warten auf und Menschen', () => {
+  it('liest „wartet_auf" und „person" an einer neuen Aufgabe', () => {
+    const { actions } = extractActions(
+      '```stoa-aktionen\n{"aufgaben":[{"titel":"Dach","wartet_auf":"Angebot","person":"Herr Brandt"}]}\n```',
+    );
+    expect(actions?.aufgaben[0].wartet_auf).toBe('Angebot');
+    expect(actions?.aufgaben[0].person).toBe('Herr Brandt');
+  });
+
+  it('wirft leere Angaben weg — „wartend ohne Aussage" kommt nicht vom Modell', () => {
+    const { actions } = extractActions('```stoa-aktionen\n{"aufgaben":[{"titel":"X","wartet_auf":"   ","person":""}]}\n```');
+    expect(actions?.aufgaben[0].wartet_auf).toBeUndefined();
+    expect(actions?.aufgaben[0].person).toBeUndefined();
+  });
+
+  it('nimmt null in einer Änderung an — es beendet das Warten bzw. löst den Menschen', () => {
+    const { actions } = extractActions(
+      '```stoa-aktionen\n{"aenderungen":[{"handle":"abc123","wartet_auf":null,"person":null}]}\n```',
+    );
+    expect(actions?.aenderungen[0].wartet_auf).toBeNull();
+    expect(actions?.aenderungen[0].person).toBeNull();
+  });
+
+  it('behält eine Änderung, die NUR das Warten betrifft — sie ist kein Rauschen', () => {
+    const { actions } = extractActions('```stoa-aktionen\n{"aenderungen":[{"handle":"abc123","wartet_auf":"Rückruf"}]}\n```');
+    expect(actions?.aenderungen).toHaveLength(1);
+    expect(actions?.aenderungen[0].wartet_auf).toBe('Rückruf');
+  });
+
+  it('schreibt beides auf die Bestätigungskarte — nichts geschieht unsichtbar', () => {
+    expect(describeExtras({ wartet_auf: 'Angebot', person: 'Anna' })).toBe('wartet auf Angebot · Mensch: Anna');
+    expect(describeAenderung({ handle: 'x', wartet_auf: null }, (d) => d)).toContain('nicht mehr warten');
+    expect(describeAenderung({ handle: 'x', person: 'Anna' }, (d) => d)).toContain('Mensch: Anna');
+  });
+});
+
+describe('buildAppContext — Warten auf und Menschen', () => {
+  // Eigene Attrappen: die Helfer des Nachbar-Blocks sind dort lokal.
+  const task = (title: string, over: Partial<import('@/data/types').Task> = {}): import('@/data/types').Task => ({
+    id: `id-${title}`, listId: 'default', title, note: null, dueDate: null, dueTime: null, rrule: null,
+    flagged: false, eventId: null, completedAt: null, notificationId: null, tags: [], subtasks: [],
+    createdAt: '2026-07-01T08:00:00.000Z', sort: 0, ...over,
+  });
+
+  it('trennt Wartendes von den offenen Aufgaben und nennt den Menschen', () => {
+    const ctx = buildAppContext({
+      events: [],
+      tasks: [
+        task('Steuer', { dueDate: '2026-07-22' }),
+        task('Angebot', { id: 'w1', dueDate: '2026-07-10', waiting: true, waitingFor: 'Kostenvoranschlag', personId: 'p1' }),
+      ],
+      lists: [],
+      notes: [],
+      people: [{ id: 'p1', name: 'Dachdecker', note: null, sort: 0, createdAt: 'A' }],
+      today: '2026-07-20',
+    });
+    expect(ctx).toContain('Warten auf (liegt bei anderen');
+    expect(ctx).toContain('wartet auf Dachdecker (Kostenvoranschlag)');
+    expect(ctx).toContain('Menschen: Dachdecker');
+    // Der entscheidende Punkt: Wartendes steht NICHT unter den offenen
+    // Aufgaben und gilt NIE als überfällig.
+    const offenerBlock = ctx.split('Offene Aufgaben:')[1].split('Warten auf')[0];
+    expect(offenerBlock).toContain('Steuer');
+    expect(offenerBlock).not.toContain('Angebot');
+    expect(ctx).not.toContain('Angebot · fällig 2026-07-10 (überfällig)');
+  });
+
+  it('sagt „nichts" und „keine", wenn es weder Wartendes noch Menschen gibt', () => {
+    const ctx = buildAppContext({ events: [], tasks: [], lists: [], notes: [], today: '2026-07-20' });
+    expect(ctx).toContain('- nichts');
+    expect(ctx).toContain('Menschen: keine');
+  });
+
+  it('hängt den Menschen auch an eine ganz normale offene Aufgabe', () => {
+    const ctx = buildAppContext({
+      events: [],
+      tasks: [task('Urlaub abstimmen', { personId: 'p1' })],
+      lists: [],
+      notes: [],
+      people: [{ id: 'p1', name: 'Anna', note: null, sort: 0, createdAt: 'A' }],
+      today: '2026-07-20',
+    });
+    expect(ctx).toContain('Urlaub abstimmen · Mensch: Anna');
+  });
+});
+
 describe('buildAppContext — Kalenderzugriff', () => {
   it('sagt „unbekannt" statt „keine", wenn der Kalenderzugriff fehlt', () => {
     const ctx = buildAppContext({ events: [], tasks: [], lists: [], notes: [], today: '2026-07-20', calendarDenied: true });

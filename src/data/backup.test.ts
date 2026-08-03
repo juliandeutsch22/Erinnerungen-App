@@ -6,14 +6,16 @@ import {
   __setJournalRepositoryForTests,
   __setListRepositoryForTests,
   __setNoteRepositoryForTests,
+  __setPersonRepositoryForTests,
   __setPhotoRepositoryForTests,
   __setTaskRepositoryForTests,
- getChatRepository, getDocumentRepository, getJournalRepository, getListRepository, getNoteRepository, getPhotoRepository, getTaskRepository } from './index';
+ getChatRepository, getDocumentRepository, getJournalRepository, getListRepository, getNoteRepository, getPersonRepository, getPhotoRepository, getTaskRepository } from './index';
 import { InMemoryChatRepository } from './ChatRepository';
 import { InMemoryDocumentRepository } from './DocumentRepository';
 import { InMemoryJournalRepository } from './JournalRepository';
 import { InMemoryListRepository } from './ListRepository';
 import { InMemoryNoteRepository } from './NoteRepository';
+import { InMemoryPersonRepository } from './PersonRepository';
 import { InMemoryPhotoRepository } from './PhotoRepository';
 import { InMemoryTaskRepository } from './TaskRepository';
 import type { SavedFilter } from '@/lib/taskFilters';
@@ -51,6 +53,7 @@ describe('Backup', () => {
     __setChatRepositoryForTests(new InMemoryChatRepository());
     __setDocumentRepositoryForTests(new InMemoryDocumentRepository());
     __setJournalRepositoryForTests(new InMemoryJournalRepository());
+    __setPersonRepositoryForTests(new InMemoryPersonRepository());
   });
 
   afterEach(() => {
@@ -61,6 +64,7 @@ describe('Backup', () => {
     __setChatRepositoryForTests(null);
     __setDocumentRepositoryForTests(null);
     __setJournalRepositoryForTests(null);
+    __setPersonRepositoryForTests(null);
   });
 
   it('Roundtrip: Export → Import stellt Listen + Aufgaben wieder her', async () => {
@@ -206,6 +210,7 @@ describe('Backup', () => {
     // Neues Gerät.
     __setDocumentRepositoryForTests(new InMemoryDocumentRepository());
     __setJournalRepositoryForTests(new InMemoryJournalRepository());
+    __setPersonRepositoryForTests(new InMemoryPersonRepository());
 
     const result = await importBackup(json, {
       writeDocumentFromBase64: async (ext, data) => `file:///new/doc.${ext}#${data.length}`,
@@ -296,6 +301,75 @@ describe('Backup', () => {
     expect((await getChatRepository().getAll())[0].listId).toBeNull();
   });
 
+  it('sichert Menschen und alles, was an ihnen hängt', async () => {
+    await getPersonRepository().create({ id: 'p1', name: 'Anna', note: '0170…', sort: 1, createdAt: '2026-07-01T08:00:00.000Z' });
+    await getTaskRepository().create(task({ id: 't1', title: 'Urlaub abstimmen', personId: 'p1', waiting: true, waitingFor: 'Rückmeldung' }));
+    await getNoteRepository().create({
+      id: 'n1', body: 'Urlaubswünsche', taskId: null, eventId: null, personId: 'p1',
+      pinned: false, deletedAt: null, createdAt: '2026-07-02T09:00:00.000Z', updatedAt: '2026-07-02T09:00:00.000Z',
+    });
+
+    const json = await exportToJsonString(noPhotos, new Date('2026-07-03T12:00:00.000Z'));
+    __setPersonRepositoryForTests(new InMemoryPersonRepository());
+    __setTaskRepositoryForTests(new InMemoryTaskRepository());
+    __setNoteRepositoryForTests(new InMemoryNoteRepository());
+    await importBackup(json);
+
+    const leute = await getPersonRepository().getAll();
+    expect(leute.map((p) => p.name)).toEqual(['Anna']);
+    expect(leute[0].note).toBe('0170…');
+
+    const t = (await getTaskRepository().getAll())[0];
+    expect(t.personId).toBe('p1');
+    expect(t.waiting).toBe(true);
+    expect(t.waitingFor).toBe('Rückmeldung');
+    expect((await getNoteRepository().getAll())[0].personId).toBe('p1');
+  });
+
+  it('wirft eine Person-Zuordnung weg, die im Backup niemanden trifft', async () => {
+    const json = JSON.stringify({
+      app: 'stille',
+      schemaVersion: 3,
+      exportedAt: '2026-07-03T12:00:00.000Z',
+      lists: [],
+      people: [],
+      tasks: [{ id: 'x', listId: 'default', title: 'Verwaist', personId: 'weg', waiting: true }],
+      notes: [{ id: 'n1', body: 'Auch verwaist', personId: 'weg' }],
+    });
+    await importBackup(json);
+    const t = (await getTaskRepository().getAll())[0];
+    expect(t.personId).toBeNull();
+    // Der WARTEZUSTAND bleibt — er hängt nicht an der Person.
+    expect(t.waiting).toBe(true);
+    expect((await getNoteRepository().getAll())[0].personId).toBeNull();
+  });
+
+  it('schluckt doppelte Namen — zwei „Anna" wären zwei Ansichten für einen Menschen', async () => {
+    const json = JSON.stringify({
+      app: 'stille',
+      schemaVersion: 3,
+      exportedAt: '2026-07-03T12:00:00.000Z',
+      lists: [],
+      people: [
+        { id: 'p1', name: 'Anna', createdAt: 'A' },
+        { id: 'p2', name: ' anna ', createdAt: 'B' },
+      ],
+      tasks: [],
+    });
+    await importBackup(json);
+    expect((await getPersonRepository().getAll()).map((p) => p.id)).toEqual(['p1']);
+  });
+
+  it('liest Backups ohne Menschen (vor v1.73.0) ohne Fehler', async () => {
+    const json = JSON.stringify({
+      app: 'stille', schemaVersion: 2, exportedAt: '2026-07-03T12:00:00.000Z',
+      lists: [], tasks: [{ id: 'x', listId: 'default', title: 'Alt' }],
+    });
+    await expect(importBackup(json)).resolves.toBeTruthy();
+    expect((await getPersonRepository().getAll())).toEqual([]);
+    expect((await getTaskRepository().getAll())[0].waiting).toBe(false);
+  });
+
   it('lehnt fremdes/ungültiges JSON ab', async () => {
     await expect(importBackup('kein json')).rejects.toThrow('Kein gültiges JSON.');
     await expect(importBackup('{"app":"cairn","schemaVersion":1}')).rejects.toThrow('Kein Erinnerungen-Backup');
@@ -311,6 +385,7 @@ describe('Papierkorb im Backup', () => {
     __setChatRepositoryForTests(new InMemoryChatRepository());
     __setDocumentRepositoryForTests(new InMemoryDocumentRepository());
     __setJournalRepositoryForTests(new InMemoryJournalRepository());
+    __setPersonRepositoryForTests(new InMemoryPersonRepository());
   });
 
   it('deletedAt überlebt den Export/Import-Roundtrip', async () => {
@@ -379,6 +454,7 @@ describe('summarizeBundle / describeSummary — ehrlicher Bericht', () => {
     __setChatRepositoryForTests(new InMemoryChatRepository());
     __setDocumentRepositoryForTests(new InMemoryDocumentRepository());
     __setJournalRepositoryForTests(new InMemoryJournalRepository());
+    __setPersonRepositoryForTests(new InMemoryPersonRepository());
   });
 
   it('zählt aktive Einträge und weist Dokumente ohne Inhalt aus', async () => {

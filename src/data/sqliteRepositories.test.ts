@@ -34,6 +34,7 @@ async function frisch() {
   const { SqliteChatRepository } = require('./SqliteChatRepository');
   const { SqlitePhotoRepository } = require('./SqlitePhotoRepository');
   const { SqliteDocumentRepository } = require('./SqliteDocumentRepository');
+  const { SqlitePersonRepository } = require('./SqlitePersonRepository');
   const { getDb } = require('./db');
   // Erzwingt Schema + Migrationen + Seed, bevor der Test etwas erwartet.
   const db = await getDb();
@@ -46,6 +47,7 @@ async function frisch() {
     chats: new SqliteChatRepository(),
     photos: new SqlitePhotoRepository(),
     documents: new SqliteDocumentRepository(),
+    people: new SqlitePersonRepository(),
   };
 }
 
@@ -62,6 +64,9 @@ function aufgabe(over: Partial<Task> = {}): Task {
     startDate: null,
     expiresOn: null,
     evening: false,
+    waiting: false,
+    waitingFor: null,
+    personId: null,
     flagged: false,
     eventId: null,
     completedAt: null,
@@ -168,6 +173,57 @@ describe('SqliteTaskRepository', () => {
     const alle = await tasks.getAll();
     expect(alle).toHaveLength(1);
     expect(alle[0].title).toBe('Doch etwas anderes');
+  });
+});
+
+describe('Warten auf und Menschen (v1.73.0)', () => {
+  it('trägt Wartezustand, Wartetext und Person an der Aufgabe', async () => {
+    const { tasks } = await frisch();
+    await tasks.create(aufgabe({ waiting: true, waitingFor: 'Angebot vom Dachdecker', personId: 'p1' }));
+    const [t] = await tasks.getAll();
+    expect(t.waiting).toBe(true);
+    expect(t.waitingFor).toBe('Angebot vom Dachdecker');
+    expect(t.personId).toBe('p1');
+
+    // Zurück in den Normalzustand — alle drei Felder lassen sich lösen.
+    await tasks.update('t1', { waiting: false, waitingFor: null, personId: null });
+    const [nach] = await tasks.getAll();
+    expect(nach.waiting).toBe(false);
+    expect(nach.waitingFor).toBeNull();
+    expect(nach.personId).toBeNull();
+  });
+
+  it('legt Menschen an, ändert und sortiert sie', async () => {
+    const { people } = await frisch();
+    await people.create({ id: 'p1', name: 'Anna', note: null, sort: 1, createdAt: 'A' });
+    await people.create({ id: 'p2', name: 'Dachdecker', note: 'über Kollegin', sort: 2, createdAt: 'B' });
+    expect((await people.getAll()).map((p: { name: string }) => p.name)).toEqual(['Anna', 'Dachdecker']);
+
+    await people.update('p1', { note: '0170…' });
+    expect((await people.getAll())[0].note).toBe('0170…');
+  });
+
+  it('löst beim Löschen einer Person JEDE Zuordnung — in einem Zug', async () => {
+    const { people, tasks, notes, chats } = await frisch();
+    await people.create({ id: 'p1', name: 'Anna', note: null, sort: 1, createdAt: 'A' });
+    await tasks.create(aufgabe({ id: 't1', personId: 'p1', waiting: true }));
+    await notes.create({
+      id: 'n1', body: 'Urlaub', taskId: null, eventId: null, listId: null, personId: 'p1',
+      pinned: false, deletedAt: null, createdAt: 'A', updatedAt: 'A',
+    });
+    await chats.create({
+      id: 'c1', title: 'Urlaub', eventId: null, taskId: null, noteId: null, listId: null, personId: 'p1',
+      context: null, deletedAt: null, createdAt: 'A', updatedAt: 'A',
+    });
+
+    await people.remove('p1');
+
+    expect(await people.getAll()).toEqual([]);
+    // Die Inhalte BLEIBEN — verloren geht nur die Zuordnung.
+    expect((await tasks.getAll())[0].personId).toBeNull();
+    expect((await tasks.getAll())[0].waiting).toBe(true);
+    expect((await notes.getAll())[0].personId).toBeNull();
+    expect((await chats.getAll())[0].personId).toBeNull();
   });
 });
 
