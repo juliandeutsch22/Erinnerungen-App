@@ -300,7 +300,15 @@ export default function ListenScreen() {
                   backgroundColor: colors.chip,
                 }}
               >
-                <Plus size={19} color={colors.text3} strokeWidth={2.2} />
+                {/* Teal, wie JEDES „lege etwas an" in dieser App (Kopfzeilen-Plus,
+                    Neue Notiz, Assistent fragen, Neuer Mensch). Bis v1.74.1 war
+                    es hier grau — ein Erbstück der alten Geister-Karte, das den
+                    Umbau überlebt hat. Grau heißt in Stoa „Zustand, kein Knopf"
+                    (der Glyph in der EINEN Zeile, der Zähler-Stepper); hier ist
+                    es aber der einzige Weg, eine Liste anzulegen. Die Beschriftung
+                    bleibt Text3: sie sitzt im NAMENS-Feld der Karte, und dort
+                    steht noch kein Name. */}
+                <Plus size={19} color={colors.teal} strokeWidth={2.2} />
               </View>
               <Type variant="label" tone="text3" numberOfLines={1}>Neue Liste</Type>
             </Glass>

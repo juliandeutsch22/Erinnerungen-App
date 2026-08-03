@@ -1844,6 +1844,27 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
       Koordinaten-Klick aber nicht. Die dritte Stufe holt sie ins Bild und
       klickt direkt. Dreimal hintereinander stabil grün.
 
+76. **Das graue Plus** (v1.74.2). Julian: „warum ist das Plus bei den Listen
+    grau und sonst überall blau — hat das einen Grund?" Nein, hatte es nicht.
+    Es war ein Erbstück der alten Geister-Karte, das ich beim Umbau in v1.74.1
+    mitgenommen habe, ohne es zu hinterfragen.
+    · Die Zählung über alle 15 Plus-Glyphen der App macht die Regel sichtbar:
+      **elf tragen Teal — und zwar genau die, die etwas ANLEGEN** (Kopfzeilen-
+      Plus, Neue Notiz, Assistent fragen, Neuer Mensch, Termin-Menschen,
+      Unteraufgabe, Willkommens-Karte, Neue Aufgabe im Projekt).
+      Drei sind grau, und alle drei aus demselben Grund: sie sind KEINE Knöpfe.
+      Der Glyph vor dem Platzhalter der EINEN Zeile zeigt an, was die Zeile tut
+      (der echte Knopf daneben ist teal/weiß); der Glyph im Weg-Chip zeigt den
+      Zustand „wird lokal angelegt" an; das Plus am Zähler-Stepper der
+      Wiederholung ist ein „+1", kein Anlegen.
+      Grau heißt in Stoa also **Zustand, nicht Knopf** — und „Neue Liste" war
+      der einzige Ausreißer. Erschwerend: es ist der EINZIGE Weg, eine Liste
+      anzulegen (die EINE Zeile legt Aufgaben an, keine Listen), also nicht
+      einmal ein Nebenweg, den man leiser stellen dürfte.
+    · Die Beschriftung bleibt Text3: sie sitzt im NAMENS-Feld der Karte, und
+      dort steht noch kein Name. Das Plus trägt das Handlungs-Signal, wie
+      überall sonst.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**
