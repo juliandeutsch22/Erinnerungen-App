@@ -341,6 +341,10 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
       body: n.body,
       taskId: str(n.taskId) && taskIds.has(n.taskId) ? n.taskId : null,
       eventId: str(n.eventId) ? n.eventId : null,
+      // Wie bei taskId: eine Zuordnung auf eine Liste, die es im Backup nicht
+      // gibt, ist keine Zuordnung — sonst hinge die Notiz an einem Projekt,
+      // das nie aufgeht.
+      listId: str(n.listId) && listIds.has(n.listId) ? n.listId : null,
       // Ältere Backups (ohne Anheften/Papierkorb) → Standardwerte.
       pinned: n.pinned === true,
       deletedAt: str(n.deletedAt) ? n.deletedAt : null,
@@ -359,6 +363,7 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
       eventId: str(c.eventId) ? c.eventId : null,
       taskId: str(c.taskId) ? c.taskId : null,
       noteId: str(c.noteId) ? c.noteId : null,
+      listId: str(c.listId) && listIds.has(c.listId) ? c.listId : null,
       context: str(c.context) ? c.context : null,
       deletedAt: str(c.deletedAt) ? c.deletedAt : null,
       createdAt: str(c.createdAt) ? c.createdAt : new Date().toISOString(),

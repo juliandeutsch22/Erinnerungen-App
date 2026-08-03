@@ -21,7 +21,7 @@ import { useDeviceEvents } from '@/data/calendarQueries';
 import { useCreateChat } from '@/data/chatQueries';
 import { useNotes, useUpdateNote } from '@/data/noteQueries';
 import { useSettings } from '@/theme/settings.store';
-import { useCreateTask, useTasks } from '@/data/queries';
+import { useCreateTask, useLists, useTasks } from '@/data/queries';
 import { addDays, todayStr } from '@/lib/dates';
 import { hasCalendarPermission } from '@/lib/deviceCalendar';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
@@ -217,6 +217,13 @@ export default function NotizScreen() {
     if (!note?.eventId) return null;
     return (events ?? []).find((e) => e.id === note.eventId)?.title ?? 'Termin';
   }, [events, note?.eventId]);
+  // Die Liste, in der diese Notiz liegt (Stoas Ordner-Ersatz). Zeigt sie auf
+  // eine gelöschte Liste, findet sich nichts — dann steht auch kein Chip da.
+  const { data: lists } = useLists();
+  const linkedList = useMemo(
+    () => (note?.listId ? (lists ?? []).find((l) => l.id === note.listId) : undefined),
+    [lists, note?.listId],
+  );
 
   // Löschen = Papierkorb (30 Tage, im Tab wiederherstellbar) — kein Bestätigen nötig.
   const remove = () => {
@@ -350,8 +357,24 @@ export default function NotizScreen() {
         </View>
 
         {/* Verknüpfungs-Chips nur, wenn tatsächlich etwas verknüpft ist. */}
-        {(linkedTask || linkedEventTitle) && note && (
+        {(linkedTask || linkedEventTitle || linkedList) && note && (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: Spacing.sm, paddingHorizontal: Spacing.lg, paddingTop: Spacing.xs }}>
+          {/* Die Liste zuerst: sie sagt, WO die Notiz liegt — die anderen
+              beiden Chips sagen, worauf sie sich bezieht. */}
+          {linkedList && note && (
+            <PressableScale
+              accessibilityLabel={`Notiz aus „${linkedList.name}" lösen`}
+              onPress={() => {
+                hapticSelect();
+                updateNote.mutate({ id: note.id, patch: { listId: null } });
+              }}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 5, paddingHorizontal: Spacing.sm, borderRadius: R.pill, backgroundColor: colors.chip, borderWidth: 1, borderColor: colors.chipBorder }}
+            >
+              <View style={{ width: 9, height: 9, borderRadius: 4.5, backgroundColor: linkedList.color }} />
+              <Type variant="caption" tone="text2" numberOfLines={1} style={{ maxWidth: 140 }}>{linkedList.name}</Type>
+              <X size={11} color={colors.text3} strokeWidth={2.2} />
+            </PressableScale>
+          )}
           {linkedTask && note && (
             <PressableScale
               accessibilityLabel={`Verknüpfung mit „${linkedTask.title}" lösen`}

@@ -1,4 +1,4 @@
-// LinkedNotes.tsx — „Notizen"-Sektion in Aufgaben- und Termin-Editor:
+// LinkedNotes.tsx — „Notizen"-Sektion in Aufgaben-, Termin- und Projekt-Ansicht:
 // verknüpfte Notizen auflisten (Tippen öffnet den Vollbild-Editor) und
 // direkt eine neue Notiz mit Verknüpfung anlegen.
 import { useRouter } from 'expo-router';
@@ -17,10 +17,13 @@ import { Spacing } from '@/theme/theme.tokens';
 export function LinkedNotes({
   taskId,
   eventId,
+  listId,
   onNavigate,
 }: {
   taskId?: string;
   eventId?: string;
+  /** Zugehörige Liste/Projekt — Stoas Ordner-Ersatz (siehe `Note.listId`). */
+  listId?: string;
   /** Wird vor dem Navigieren gerufen (Sheet schließen). */
   onNavigate: () => void;
 }) {
@@ -32,9 +35,13 @@ export function LinkedNotes({
   const linked = useMemo(
     () =>
       (notes ?? []).filter(
-        (n) => n.deletedAt === null && ((taskId ? n.taskId === taskId : false) || (eventId ? n.eventId === eventId : false)),
+        (n) =>
+          n.deletedAt === null &&
+          ((taskId ? n.taskId === taskId : false) ||
+            (eventId ? n.eventId === eventId : false) ||
+            (listId ? n.listId === listId : false)),
       ),
-    [notes, taskId, eventId],
+    [notes, taskId, eventId, listId],
   );
 
   const openNote = (id: string) => {
@@ -45,7 +52,7 @@ export function LinkedNotes({
   const addNote = () => {
     hapticSuccess();
     createNote.mutate(
-      { taskId: taskId ?? null, eventId: eventId ?? null },
+      { taskId: taskId ?? null, eventId: eventId ?? null, listId: listId ?? null },
       { onSuccess: (note) => openNote(note.id) },
     );
   };

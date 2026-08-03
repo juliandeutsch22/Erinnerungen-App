@@ -18,6 +18,7 @@ export function LinkedChats({
   noteId,
   taskId,
   eventId,
+  listId,
   title,
   context,
   onNavigate,
@@ -25,6 +26,8 @@ export function LinkedChats({
   noteId?: string;
   taskId?: string;
   eventId?: string;
+  /** Zugehörige Liste/Projekt — Stoas Ordner-Ersatz (siehe `Note.listId`). */
+  listId?: string;
   /** Titel für einen NEUEN Chat (z. B. Aufgaben-/Termin-Titel). */
   title?: string;
   /** Kontext-Snapshot für neue Chats (nur Termine; Notizen/Aufgaben lesen live). */
@@ -45,9 +48,10 @@ export function LinkedChats({
           c.deletedAt === null &&
           ((noteId ? c.noteId === noteId : false) ||
             (taskId ? c.taskId === taskId : false) ||
-            (eventId ? c.eventId === eventId : false)),
+            (eventId ? c.eventId === eventId : false) ||
+            (listId ? c.listId === listId : false)),
       ),
-    [chats, noteId, taskId, eventId],
+    [chats, noteId, taskId, eventId, listId],
   );
 
   if (!hasKey) return null;
@@ -60,7 +64,7 @@ export function LinkedChats({
   const startChat = () => {
     hapticSuccess();
     createChat.mutate(
-      { title, noteId: noteId ?? null, taskId: taskId ?? null, eventId: eventId ?? null, context: context ?? null },
+      { title, noteId: noteId ?? null, taskId: taskId ?? null, eventId: eventId ?? null, listId: listId ?? null, context: context ?? null },
       { onSuccess: (c) => openChat(c.id) },
     );
   };

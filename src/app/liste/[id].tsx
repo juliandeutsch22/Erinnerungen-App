@@ -14,6 +14,7 @@ import { ListEditorSheet } from '@/components/ListEditorSheet';
 import { listIcon } from '@/components/listMeta';
 import { PressableScale } from '@/components/PressableScale';
 import { ProgressLine } from '@/components/ProgressLine';
+import { ProjektAnhang } from '@/components/ProjektAnhang';
 import { ReorderSheet } from '@/components/ReorderSheet';
 import { RescheduleSheet } from '@/components/RescheduleSheet';
 import { Reveal } from '@/components/Reveal';
@@ -316,6 +317,15 @@ export default function ListeDetailScreen() {
           <Type variant="label" tone="teal">Neue Aufgabe</Type>
         </GlassButton>
       </Reveal>
+
+      {/* Was sonst noch dazugehört: Notizen und Chats an DIESER Liste. Nur in
+          echten Listen — die Smart-Views („Geplant", „Alle") sind Sichten auf
+          Aufgaben, kein Ort, an dem etwas hängen könnte. */}
+      {list && (
+        <Reveal delay={210}>
+          <ProjektAnhang listId={list.id} listName={list.name} />
+        </Reveal>
+      )}
 
       {editorTask !== undefined && (
         <TaskEditorSheet

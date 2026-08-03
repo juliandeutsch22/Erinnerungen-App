@@ -1,6 +1,9 @@
-// NoteLinkSheet.tsx — „Zuweisen"-Sheet einer Notiz: an EINE Erinnerung
-// und/oder EINEN Termin hängen (Tippen wählt/löst, Sheet bleibt offen —
-// man sieht sofort, was verknüpft ist).
+// NoteLinkSheet.tsx — „Zuweisen"-Sheet einer Notiz: an EINE Liste (Projekt),
+// EINE Erinnerung und/oder EINEN Termin hängen (Tippen wählt/löst, Sheet bleibt
+// offen — man sieht sofort, was verknüpft ist).
+//
+// Die Liste steht zuoberst: sie ist der ORT der Notiz (Stoas Ordner-Ersatz,
+// siehe `Note.listId`), die anderen beiden sind Bezüge auf einzelne Dinge.
 import { Check } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
@@ -12,7 +15,7 @@ import { Type } from '@/components/Type';
 import { useDeviceEvents } from '@/data/calendarQueries';
 import { useNotes, useUpdateNote } from '@/data/noteQueries';
 import type { Note } from '@/data/types';
-import { useTasks } from '@/data/queries';
+import { useLists, useTasks } from '@/data/queries';
 import { addDays, formatDueDate, toDateStr, todayStr } from '@/lib/dates';
 import { hasCalendarPermission } from '@/lib/deviceCalendar';
 import { hapticSelect } from '@/lib/haptics';
@@ -25,6 +28,7 @@ export function NoteLinkSheet({ noteId, onClose }: { noteId: string; onClose: ()
   const today = todayStr();
   const { data: notes } = useNotes();
   const { data: tasks } = useTasks();
+  const { data: lists } = useLists();
   const updateNote = useUpdateNote();
 
   const note: Note | undefined = (notes ?? []).find((n) => n.id === noteId);
@@ -61,6 +65,10 @@ export function NoteLinkSheet({ noteId, onClose }: { noteId: string; onClose: ()
 
   if (!note) return null;
 
+  const toggleList = (listId: string) => {
+    hapticSelect();
+    updateNote.mutate({ id: note.id, patch: { listId: note.listId === listId ? null : listId } });
+  };
   const toggleTask = (taskId: string) => {
     hapticSelect();
     updateNote.mutate({ id: note.id, patch: { taskId: note.taskId === taskId ? null : taskId } });
@@ -72,7 +80,32 @@ export function NoteLinkSheet({ noteId, onClose }: { noteId: string; onClose: ()
 
   return (
     <BottomSheet visible title="Notiz zuweisen" onClose={onClose}>
-      <Type variant="eyebrow" tone="text3" style={{ marginBottom: Spacing.xs }}>Erinnerungen</Type>
+      <Type variant="eyebrow" tone="text3" style={{ marginBottom: Spacing.xs }}>Liste</Type>
+      {(lists ?? []).length === 0 ? (
+        <Type variant="caption" tone="text3">Keine Listen.</Type>
+      ) : (
+        <Group>
+          {(lists ?? []).map((l, i) => (
+            <React.Fragment key={l.id}>
+              {i > 0 && <RowDivider />}
+              <PressableScale
+                accessibilityLabel={note.listId === l.id ? `„${l.name}" lösen` : `In „${l.name}" ablegen`}
+                onPress={() => toggleList(l.id)}
+                pressedScale={0.99}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.sm + 2, paddingHorizontal: Spacing.md }}
+              >
+                {/* Punkt in der Listenfarbe: dasselbe Erkennungszeichen wie im
+                    Listen-Tab, ohne ein zweites Symbol einzuführen. */}
+                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: l.color }} />
+                <Type variant="body" numberOfLines={1} style={{ flex: 1 }}>{l.name}</Type>
+                {note.listId === l.id && <Check size={18} color={colors.teal} strokeWidth={2.4} />}
+              </PressableScale>
+            </React.Fragment>
+          ))}
+        </Group>
+      )}
+
+      <Type variant="eyebrow" tone="text3" style={{ marginTop: Spacing.lg, marginBottom: Spacing.xs }}>Erinnerungen</Type>
       {openTasks.length === 0 ? (
         <Type variant="caption" tone="text3">Keine offenen Erinnerungen.</Type>
       ) : (

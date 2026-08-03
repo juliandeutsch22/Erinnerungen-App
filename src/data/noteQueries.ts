@@ -22,13 +22,14 @@ function useInvalidateNotes() {
 export function useCreateNote() {
   const invalidate = useInvalidateNotes();
   return useMutation({
-    mutationFn: async (input: { body?: string; taskId?: string | null; eventId?: string | null }) => {
+    mutationFn: async (input: { body?: string; taskId?: string | null; eventId?: string | null; listId?: string | null }) => {
       const now = new Date().toISOString();
       const note: Note = {
         id: newId(),
         body: input.body ?? '',
         taskId: input.taskId ?? null,
         eventId: input.eventId ?? null,
+        listId: input.listId ?? null,
         pinned: false,
         deletedAt: null,
         createdAt: now,

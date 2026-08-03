@@ -111,14 +111,17 @@ export function getDb(): Promise<SQLiteDatabase> {
           /* Spalte existiert bereits */
         }
       }
-      for (const col of ['pinned INTEGER NOT NULL DEFAULT 0', 'deleted_at TEXT']) {
+      // `list_id` (v1.72.0) bewusst OHNE `REFERENCES lists(id)`: die Zuordnung
+      // ist eine lose Notiz-am-Projekt, keine Besitzverhältnis. Wird die Liste
+      // gelöscht, soll die Notiz bleiben — sie ist Inhalt, nicht Zubehör.
+      for (const col of ['pinned INTEGER NOT NULL DEFAULT 0', 'deleted_at TEXT', 'list_id TEXT']) {
         try {
           await db.execAsync(`ALTER TABLE notes ADD COLUMN ${col};`);
         } catch {
           /* Spalte existiert bereits */
         }
       }
-      for (const col of ['note_id TEXT', 'deleted_at TEXT']) {
+      for (const col of ['note_id TEXT', 'deleted_at TEXT', 'list_id TEXT']) {
         try {
           await db.execAsync(`ALTER TABLE chats ADD COLUMN ${col};`);
         } catch {

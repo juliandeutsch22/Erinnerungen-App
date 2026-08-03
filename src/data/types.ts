@@ -135,6 +135,19 @@ export type Note = {
   taskId: string | null;
   /** EventKit-Event-ID (wie bei Fotos). */
   eventId: string | null;
+  /**
+   * Zugehörige Liste bzw. Projekt — Stoas Antwort auf „Ordner für Notizen".
+   *
+   * Bewusst KEIN eigenes Ordner-System: die Liste ist der Ort, den es schon
+   * gibt (Symbol, Farbe, Detail-Screen, Papierkorb, Backup). Ein Ordner
+   * verlangte die Entscheidung VOR dem Schreiben und erzeugte ein
+   * „Unsortiert", das nach vier Wochen die eigentliche Notizliste wäre.
+   * Deshalb optional: ohne Zuordnung bleibt die Notiz genau wie bisher im
+   * Datumsstapel, und das Plus fragt weiterhin nichts.
+   *
+   * Optional im Typ, damit Alt-Daten ohne das Feld gültig bleiben.
+   */
+  listId?: string | null;
   /** Angeheftet — steht in der Liste oben vor den Datumsgruppen. */
   pinned: boolean;
   /** Papierkorb: gesetzt = „Zuletzt gelöscht" (30 Tage), null = aktiv. */
@@ -153,6 +166,9 @@ export type Chat = {
   taskId: string | null;
   /** An eine Notiz gehängt: der Chat liest ihren Inhalt LIVE (kein Snapshot). */
   noteId: string | null;
+  /** Zugehörige Liste bzw. Projekt — wie bei der Notiz, siehe dort.
+   *  Optional, damit Alt-Daten ohne das Feld gültig bleiben. */
+  listId?: string | null;
   context: string | null;
   /** Papierkorb (30 Tage, wie Notizen), null = aktiv. */
   deletedAt: string | null; // ISO

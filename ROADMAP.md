@@ -129,6 +129,10 @@ meisten Wirkung pro Zeile Code. Alle **NEU**, sofern nicht anders vermerkt.
 - **QuickAdd + Assistent als Hybrid** `[JS · mittel]` — *lokaler Parser =
   sofort, aber begrenzt; Assistent = klug, aber langsam.* Erst lokal parsen
   (Millisekunden), und nur bei Unklarheit „genauer sortieren" anbieten.
+- ~~**Notizen und Chats gehören zu einem Projekt**~~ — umgesetzt in v1.72.0
+  (UEBERGABE §8.72). `Note.listId`/`Chat.listId`, zwei Wege hinein (neu anlegen
+  und Vorhandenes anheften), Punkt in der Listenfarbe im Notizen-Tab. Das ist
+  Stoas Antwort auf „Ordner für Notizen" — Begründung siehe §7.
 - **Fotos & Dokumente auch an Notizen/Aufgaben** `[JS · mittel]` — *hängen nur
   an Terminen.* Beleg an die Aufgabe, Whiteboard-Foto an die Notiz. Die
   Infrastruktur (Speicher, Viewer, Backup) steht komplett. (War als „Fotos in
@@ -149,6 +153,29 @@ meisten Wirkung pro Zeile Code. Alle **NEU**, sofern nicht anders vermerkt.
 ## 4. Neue Funktionen
 
 **Erfassen**
+- **„Warten auf"** `[JS · klein]` — *eine Aufgabe, die bei jemand anderem liegt
+  („Angebot vom Dachdecker"), hat heute keinen Zustand.* Es gibt nur zwei
+  schlechte Wege: immer weiter verschieben (fühlt sich nach Versagen an) oder
+  ins Projekt verbannen (dann sieht man sie nie wieder). Ein Feld `waitingFor`
+  (auf wen/was, frei, optional) nimmt sie aus Heute und aus dem
+  Überfällig-Stapel, lässt sie aber im Projekt und in der Suche. Ein eigener
+  ruhiger Abschnitt auf „Listen" statt eines fünften Tabs. Optional ein Datum
+  („ab dann wieder zeigen"); ohne Datum liegt sie einfach da, bis man sie holt.
+  **Kein Zähler, keine Mahnung** — nie „du wartest seit 12 Tagen". Erreichbar
+  per Wischen UND aus dem Editor (eine Geste ist nie der einzige Weg).
+  **Vom Nutzer angenommen — als Nächstes dran.** **NEU**
+- **Wiedervorlage an Notizen** `[JS · klein]` — *Notizen haben kein Datum, gar
+  keins.* Ein Gedanke, der in drei Wochen relevant wird, hat in Stoa keinen Ort
+  außer einer Aufgabe, die er nicht ist. Ein optionales „zeig mir das wieder
+  am …" macht aus dem Notiz-Stapel ein Gedächtnis statt eines Archivs. Klein,
+  weil der Datumswähler und die Benachrichtigungen längst stehen. **NEU**
+- **Das stille Protokoll** `[JS · klein–mittel]` — ein winziges lokales
+  Ereignis-Log (angelegt / verschoben / erledigt, je ein Zeitstempel). Keine
+  Oberfläche, kein Feature — reine Aufzeichnung. Voraussetzung für „Der
+  Spiegel" (siehe unten), nützt auch „Das Maß des Tages". **Der einzige Punkt
+  der Liste, bei dem Warten echte Kosten hat:** heute überschreibt Verschieben
+  einfach `dueDate`, die Tatsache des Verschiebens ist danach weg, und ein
+  Protokoll hat erst nach Monaten etwas zu erzählen. **NEU**
 - **Web-Suche im Assistenten (Grounding)** `[JS · mittel]` — Gemini kann live
   suchen (`google_search`-Werkzeug); heute verbietet es unser Prompt bewusst.
   Als **eigener Modus** („Im Web suchen"), nie still im Hintergrund: findet
@@ -281,6 +308,15 @@ Damit die Linie klar bleibt — diese Dinge wurden erwogen und verworfen:
 - **Cloud-Sync, Konten, Teilen mit anderen** — widerspricht „alles lokal".
 - **Streaks, Punkte, Schuld-Zähler, Engagement-Tricks** — widerspricht
   „kein Druck". Auch bei Routinen (§4).
+- **Ordner für Notizen** — erwogen (v1.72.0), verworfen und ERSETZT. Ein Ordner
+  verlangt die Entscheidung VOR dem Gedanken, erzeugt zwangsläufig ein
+  „Unsortiert" mit schlechtem Gewissen (verletzt „kein Druck") und kennt genau
+  EINE Zugehörigkeit. Stattdessen: die Notiz gehört optional zu einer LISTE —
+  dem Ort, den es schon gibt (v1.72.0). Ein Zuhause (Projekt), viele Kontexte
+  (Tags, §3). Ordner UND Tags nebeneinander wären zwei halbe Netze; genau
+  deshalb warten auch die verknüpften Notizen (`[[Notiz]]`, §2) auf „Tags über
+  alles". Frei verschachtelbare Ordner mit eigenem Bildschirm bleiben draußen —
+  das wäre ein zweiter Listen-Tab, nur für Notizen.
 - **Ein drittes Akzent-Hex, Alarm-Rot** — Design-Leitplanke (AGENTS.md).
 
 ## 8. Empfohlene Reihenfolge

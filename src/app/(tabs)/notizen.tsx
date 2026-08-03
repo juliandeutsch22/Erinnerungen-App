@@ -24,6 +24,7 @@ import { EmptyState, LoadingState } from '@/components/StateView';
 import { SwipeActionSlide } from '@/components/SwipeActionSlide';
 import { Type } from '@/components/Type';
 import { useCreateNote, useDeleteNote, useNotes, useUpdateNote } from '@/data/noteQueries';
+import { useLists } from '@/data/queries';
 import type { Note } from '@/data/types';
 import { formatDueDate, toDateStr, todayStr } from '@/lib/dates';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
@@ -39,6 +40,11 @@ export default function NotizenScreen() {
   const createNote = useCreateNote();
   const deleteNote = useDeleteNote();
   const today = todayStr();
+
+  // Nur die FARBE je Liste — mehr braucht die Zeile nicht, und eine gelöschte
+  // Liste steht nicht in `lists`, also verschwindet ihr Punkt von selbst.
+  const { data: lists } = useLists();
+  const listFarbe = useMemo(() => new Map((lists ?? []).map((l) => [l.id, l.color])), [lists]);
 
   const active = useMemo(() => activeNotes(notes ?? []), [notes]);
   const groups = useMemo(() => groupNotes(active, today), [active, today]);
@@ -110,7 +116,12 @@ export default function NotizenScreen() {
                     {g.notes.map((n, i) => (
                       <View key={n.id}>
                         {i > 0 && <Seam marginVertical={2} />}
-                        <NoteRow note={n} today={today} onPress={() => router.push(`/notiz/${n.id}`)} />
+                        <NoteRow
+                          note={n}
+                          today={today}
+                          listColor={n.listId ? listFarbe.get(n.listId) : undefined}
+                          onPress={() => router.push(`/notiz/${n.id}`)}
+                        />
                       </View>
                     ))}
                   </View>
@@ -155,8 +166,12 @@ export default function NotizenScreen() {
 }
 
 /** Eine Notiz-Zeile: Titel (Antiqua) + Datum · Vorschau.
- *  Swipe rechts = anheften/lösen, Swipe links = Papierkorb. */
-function NoteRow({ note, today, onPress }: { note: Note; today: string; onPress: () => void }) {
+ *  Swipe rechts = anheften/lösen, Swipe links = Papierkorb.
+ *
+ *  `listColor` ist der Punkt vor dem Titel: gehört die Notiz zu einer Liste,
+ *  sieht man es hier — sonst hätte das Zuordnen an ihrem eigenen Ort gar keine
+ *  sichtbare Folge. Kein Name, nur die Farbe; der Stapel bleibt ruhig. */
+function NoteRow({ note, today, listColor, onPress }: { note: Note; today: string; listColor?: string; onPress: () => void }) {
   const colors = useColors();
   const updateNote = useUpdateNote();
   const swipeRef = useRef<SwipeableMethods>(null);
@@ -171,9 +186,12 @@ function NoteRow({ note, today, onPress }: { note: Note; today: string; onPress:
       pressedScale={0.99}
       style={{ paddingVertical: Spacing.sm, gap: 2, backgroundColor: 'transparent' }}
     >
-      <Type variant="heading" numberOfLines={1} style={{ fontSize: T.lg, lineHeight: T.lg * 1.3 }}>
-        {noteTitle(note.body)}
-      </Type>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
+        {listColor && <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: listColor }} />}
+        <Type variant="heading" numberOfLines={1} style={{ flex: 1, fontSize: T.lg, lineHeight: T.lg * 1.3 }}>
+          {noteTitle(note.body)}
+        </Type>
+      </View>
       {/* Vorschau links in voller Breite, Checklisten-Stand + Datum rechts. */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md }}>
         <Type variant="caption" tone="text2" numberOfLines={1} style={{ flex: 1 }}>

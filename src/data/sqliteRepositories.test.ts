@@ -220,6 +220,46 @@ describe('SqliteNoteRepository', () => {
     expect(nach.pinned).toBe(false);
     expect(nach.body).toBe('Kaution 1300 EUR');
   });
+
+  // `list_id` kam per ALTER TABLE dazu (v1.72.0). Genau diese Klasse von
+  // Änderung ist in v1.42.0 unbemerkt kaputtgegangen — deshalb wird sie
+  // ausgeführt, nicht nur gelesen.
+  it('legt eine Notiz in einer Liste ab und löst sie wieder', async () => {
+    const { notes } = await frisch();
+    await notes.create({
+      id: 'n1',
+      body: 'Maße der Küche',
+      taskId: null,
+      eventId: null,
+      listId: 'umzug',
+      pinned: false,
+      deletedAt: null,
+      createdAt: '2026-07-30T09:00:00.000Z',
+      updatedAt: '2026-07-30T09:00:00.000Z',
+    });
+    const [n]: Note[] = await notes.getAll();
+    expect(n.listId).toBe('umzug');
+
+    await notes.update('n1', { listId: null });
+    const [gelöst]: Note[] = await notes.getAll();
+    expect(gelöst.listId).toBeNull();
+  });
+
+  it('liest eine Notiz OHNE Zuordnung als null, nicht als undefined', async () => {
+    const { notes } = await frisch();
+    await notes.create({
+      id: 'n2',
+      body: 'Loser Gedanke',
+      taskId: null,
+      eventId: null,
+      pinned: false,
+      deletedAt: null,
+      createdAt: '2026-07-30T09:00:00.000Z',
+      updatedAt: '2026-07-30T09:00:00.000Z',
+    });
+    const [n]: Note[] = await notes.getAll();
+    expect(n.listId).toBeNull();
+  });
 });
 
 describe('SqliteJournalRepository', () => {
@@ -293,6 +333,26 @@ describe('SqliteChatRepository', () => {
     expect((await chats.getAll())[0].title).toBe('Umzug');
     // getAllMessages ignoriert den Chat — das braucht das Backup.
     expect((await chats.getAllMessages())).toHaveLength(2);
+  });
+
+  it('hängt einen Chat an eine Liste und wieder ab', async () => {
+    const { chats } = await frisch();
+    await chats.create({
+      id: 'c1',
+      title: 'Kellerregal',
+      eventId: null,
+      taskId: null,
+      noteId: null,
+      listId: 'umzug',
+      context: null,
+      deletedAt: null,
+      createdAt: '2026-07-30T09:00:00.000Z',
+      updatedAt: '2026-07-30T09:00:00.000Z',
+    });
+    expect((await chats.getAll())[0].listId).toBe('umzug');
+
+    await chats.update('c1', { listId: null });
+    expect((await chats.getAll())[0].listId).toBeNull();
   });
 });
 

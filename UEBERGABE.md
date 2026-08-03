@@ -1664,6 +1664,50 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
       das Sheet bleibt offen; nach unten folgt es dem Finger und federt zurück;
       weit genug nach unten schließt weiterhin.
 
+72. **Notizen und Chats gehören zu einem Projekt** (v1.72.0). Julians Frage:
+    „was ist deine Meinung zu Ordnern in den Notizen?" — und nach der Antwort:
+    „sonst machen wir es statt Ordnern über Projekte/Listen. Aber dann wäre es
+    gut, wenn man in einem erstellten Projekt direkt über einen Knopf Notizen/
+    Chats daran heften kann."
+    · **Warum keine Ordner.** Ein Ordner verlangt die Entscheidung VOR dem
+      Gedanken — genau die Reibung, die „Eine Zeile für alles" abgeräumt hat.
+      Heute legt das Plus sofort eine leere Notiz an und springt hinein; mit
+      Ordnern müsste es fragen (dann ist der schnellste Weg zum Aufschreiben
+      kaputt) oder still in einen Standard fallen (dann ist „Unsortiert" nach
+      vier Wochen die eigentliche Notizliste, mit schlechtem Gewissen obendrauf
+      — ein Verstoß gegen „kein Druck" auf die leiseste denkbare Art). Und ein
+      Ordner ist genau EINE Zugehörigkeit; die Notiz zum Umzug, in der die
+      Kosten stehen, gehört zu beidem.
+    · **Was stattdessen.** Stoa hat den Ordner schon — er heißt Liste bzw.
+      Projekt. `Note.listId` und `Chat.listId`, beide optional, beide ohne
+      `REFERENCES lists(id)`: die Zuordnung ist lose, wird die Liste gelöscht,
+      bleibt die Notiz (sie ist Inhalt, nicht Zubehör). Symbol, Farbe,
+      Detail-Screen, Papierkorb und Backup gab es bereits.
+    · **Zwei Wege hinein**, weil einer nicht reicht: `LinkedNotes`/`LinkedChats`
+      (die es für Aufgaben und Termine längst gab) bekommen `listId` — dort
+      entsteht etwas NEUES, das schon zugeordnet ist. Daneben
+      `ProjektAnheftenSheet`: Vorhandenes anheften, Tippen heftet an/löst,
+      das Sheet bleibt offen. Ohne den zweiten Weg müsste man eine alte Notiz
+      abschreiben, nur damit sie am richtigen Ort liegt.
+    · **Beide Zuweisen-Sheets** (`NoteLinkSheet`, `ChatLinkSheet`) führen die
+      Liste ZUOBERST: sie ist der ORT, die anderen Einträge sind Bezüge auf
+      einzelne Dinge.
+    · **Sichtbar bleibt es auch am eigenen Ort:** im Notizen-Tab trägt eine
+      zugeordnete Notiz einen kleinen Punkt in der Listenfarbe (kein Name, kein
+      zweites Symbol), im Notiz-Detail einen Chip zum Lösen. Der Datumsstapel
+      bleibt die Startansicht — eine Notiz OHNE Projekt ist völlig normal.
+    · **Migration:** `list_id` per ALTER TABLE in `notes` und `chats`; alte
+      Zeilen liefern `undefined`, die Repositories lesen sie als `null`. Der
+      Backup-Import wirft eine Zuordnung weg, deren Liste im Backup fehlt —
+      sonst hinge sie an einem Projekt, das nie aufgeht.
+    · Geprüft: 5 neue Jest-Tests (SQLite wird dabei wirklich ausgeführt, §8.39)
+      und `scratchpad/projekt.mjs` (14 Prüfungen) über die ganze Kette —
+      anlegen, anheften, im Tab sehen, wieder lösen.
+    · Harnisch-Fallstrick, erneut bestätigt: im Web sind alle Repositories
+      InMemory, ein `goto` wischt ALLES. Und Stoas Labels enthalten deutsche
+      Anführungszeichen — ein `[aria-label="…"]`-Selektor bricht darin ab; die
+      Tour vergleicht deshalb das Attribut selbst statt einen Selektor zu bauen.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

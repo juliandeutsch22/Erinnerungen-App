@@ -260,6 +260,42 @@ describe('Backup', () => {
     expect(tasks[0].listId).toBe('default');
   });
 
+  it('nimmt die Listen-Zuordnung von Notizen und Chats mit', async () => {
+    await getListRepository().create({ id: 'l1', name: 'Umzug', icon: 'inbox', color: '#5B6CFF', goal: null, deadline: null, sort: 1, createdAt: '2026-07-01T08:00:00.000Z' });
+    await getNoteRepository().create({
+      id: 'n1', body: 'Maße der Küche', taskId: null, eventId: null, listId: 'l1',
+      pinned: false, deletedAt: null, createdAt: '2026-07-02T09:00:00.000Z', updatedAt: '2026-07-02T09:00:00.000Z',
+    });
+    await getChatRepository().create({
+      id: 'c1', title: 'Kellerregal', eventId: null, taskId: null, noteId: null, listId: 'l1',
+      context: null, deletedAt: null, createdAt: '2026-07-02T09:00:00.000Z', updatedAt: '2026-07-02T09:00:00.000Z',
+    });
+
+    const json = await exportToJsonString(noPhotos, new Date('2026-07-03T12:00:00.000Z'));
+    __setListRepositoryForTests(new InMemoryListRepository());
+    __setNoteRepositoryForTests(new InMemoryNoteRepository());
+    __setChatRepositoryForTests(new InMemoryChatRepository());
+    await importBackup(json);
+
+    expect((await getNoteRepository().getAll())[0].listId).toBe('l1');
+    expect((await getChatRepository().getAll())[0].listId).toBe('l1');
+  });
+
+  it('wirft eine Zuordnung weg, deren Liste im Backup fehlt — sonst hinge sie an einem Projekt, das nie aufgeht', async () => {
+    const json = JSON.stringify({
+      app: 'stille',
+      schemaVersion: 1,
+      exportedAt: '2026-07-03T12:00:00.000Z',
+      lists: [],
+      tasks: [],
+      notes: [{ id: 'n1', body: 'Verwaist', listId: 'weg' }],
+      chats: [{ id: 'c1', title: 'Auch verwaist', listId: 'weg' }],
+    });
+    await importBackup(json);
+    expect((await getNoteRepository().getAll())[0].listId).toBeNull();
+    expect((await getChatRepository().getAll())[0].listId).toBeNull();
+  });
+
   it('lehnt fremdes/ungültiges JSON ab', async () => {
     await expect(importBackup('kein json')).rejects.toThrow('Kein gültiges JSON.');
     await expect(importBackup('{"app":"cairn","schemaVersion":1}')).rejects.toThrow('Kein Erinnerungen-Backup');

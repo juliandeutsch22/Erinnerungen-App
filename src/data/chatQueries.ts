@@ -32,7 +32,7 @@ export function useAllChatMessages() {
 export function useCreateChat() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { title?: string; eventId?: string | null; taskId?: string | null; noteId?: string | null; context?: string | null }) => {
+    mutationFn: async (input: { title?: string; eventId?: string | null; taskId?: string | null; noteId?: string | null; listId?: string | null; context?: string | null }) => {
       const now = new Date().toISOString();
       const chat: Chat = {
         id: newId(),
@@ -40,6 +40,7 @@ export function useCreateChat() {
         eventId: input.eventId ?? null,
         taskId: input.taskId ?? null,
         noteId: input.noteId ?? null,
+        listId: input.listId ?? null,
         context: input.context ?? null,
         deletedAt: null,
         createdAt: now,

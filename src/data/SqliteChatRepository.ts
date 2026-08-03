@@ -5,7 +5,8 @@ import type { Chat, ChatMessage } from './types';
 
 type ChatRow = {
   id: string; title: string; event_id: string | null; task_id: string | null;
-  note_id: string | null; context: string | null; deleted_at: string | null; created_at: string; updated_at: string;
+  note_id: string | null; list_id: string | null; context: string | null;
+  deleted_at: string | null; created_at: string; updated_at: string;
 };
 type MessageRow = { id: string; chat_id: string; role: string; content: string; created_at: string };
 
@@ -16,6 +17,8 @@ function toChat(r: ChatRow): Chat {
     eventId: r.event_id,
     taskId: r.task_id,
     noteId: r.note_id,
+    // Nachgerüstete Spalte (v1.72.0) — alte Zeilen liefern `undefined`.
+    listId: r.list_id ?? null,
     context: r.context,
     deletedAt: r.deleted_at,
     createdAt: r.created_at,
@@ -43,9 +46,9 @@ export class SqliteChatRepository implements ChatRepository {
   async create(chat: Chat): Promise<void> {
     const db = await getDb();
     await db.runAsync(
-      `INSERT OR REPLACE INTO chats (id, title, event_id, task_id, note_id, context, deleted_at, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [chat.id, chat.title, chat.eventId, chat.taskId, chat.noteId, chat.context, chat.deletedAt, chat.createdAt, chat.updatedAt],
+      `INSERT OR REPLACE INTO chats (id, title, event_id, task_id, note_id, list_id, context, deleted_at, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [chat.id, chat.title, chat.eventId, chat.taskId, chat.noteId, chat.listId ?? null, chat.context, chat.deletedAt, chat.createdAt, chat.updatedAt],
     );
   }
 
@@ -54,13 +57,15 @@ export class SqliteChatRepository implements ChatRepository {
     const sets: string[] = [];
     const args: (string | null)[] = [];
     const map: Record<string, string> = {
-      title: 'title', eventId: 'event_id', taskId: 'task_id', noteId: 'note_id', context: 'context', deletedAt: 'deleted_at',
+      title: 'title', eventId: 'event_id', taskId: 'task_id', noteId: 'note_id', listId: 'list_id',
+      context: 'context', deletedAt: 'deleted_at',
       createdAt: 'created_at', updatedAt: 'updated_at',
     };
     for (const [key, col] of Object.entries(map)) {
       if (key in patch) {
         sets.push(`${col} = ?`);
-        args.push((patch as Record<string, string | null>)[key]);
+        // `undefined` ist für SQLite kein Wert — siehe SqliteNoteRepository.
+        args.push((patch as Record<string, string | null | undefined>)[key] ?? null);
       }
     }
     if (sets.length === 0) return;

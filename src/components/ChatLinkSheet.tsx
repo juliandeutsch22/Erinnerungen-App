@@ -1,7 +1,10 @@
-// ChatLinkSheet.tsx — „Zuweisen"-Sheet eines Chats: nachträglich an EINE
-// Notiz, EINE Erinnerung und/oder EINEN Termin hängen (Tippen wählt/löst,
-// Sheet bleibt offen). Termin-Zuweisung friert den Kontext-Snapshot ein;
-// Notiz/Aufgabe werden ohnehin live gelesen.
+// ChatLinkSheet.tsx — „Zuweisen"-Sheet eines Chats: nachträglich an EINE Liste
+// (Projekt), EINE Notiz, EINE Erinnerung und/oder EINEN Termin hängen (Tippen
+// wählt/löst, Sheet bleibt offen). Termin-Zuweisung friert den Kontext-Snapshot
+// ein; Notiz/Aufgabe werden ohnehin live gelesen.
+//
+// Die Liste steht zuoberst: sie ist der ORT (siehe `Note.listId`), die anderen
+// drei sind Bezüge auf einzelne Dinge.
 import { Check } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
@@ -13,7 +16,7 @@ import { Type } from '@/components/Type';
 import { useDeviceEvents } from '@/data/calendarQueries';
 import { useChats, useUpdateChat } from '@/data/chatQueries';
 import { useNotes } from '@/data/noteQueries';
-import { useTasks } from '@/data/queries';
+import { useLists, useTasks } from '@/data/queries';
 import { buildEventContext } from '@/lib/assistant';
 import { addDays, formatDueDate, todayStr } from '@/lib/dates';
 import { hasCalendarPermission } from '@/lib/deviceCalendar';
@@ -29,6 +32,7 @@ export function ChatLinkSheet({ chatId, onClose }: { chatId: string; onClose: ()
   const { data: chats } = useChats();
   const { data: tasks } = useTasks();
   const { data: notes } = useNotes();
+  const { data: lists } = useLists();
   const updateChat = useUpdateChat();
 
   const chat = (chats ?? []).find((c) => c.id === chatId);
@@ -66,14 +70,36 @@ export function ChatLinkSheet({ chatId, onClose }: { chatId: string; onClose: ()
 
   if (!chat) return null;
 
-  const toggle = (patch: { taskId?: string | null; noteId?: string | null; eventId?: string | null; context?: string | null }) => {
+  const toggle = (patch: { taskId?: string | null; noteId?: string | null; eventId?: string | null; listId?: string | null; context?: string | null }) => {
     hapticSelect();
     updateChat.mutate({ id: chat.id, patch });
   };
 
   return (
     <BottomSheet visible title="Chat zuweisen" onClose={onClose}>
-      <Type variant="eyebrow" tone="text3" style={{ marginBottom: Spacing.xs }}>Notizen</Type>
+      <Type variant="eyebrow" tone="text3" style={{ marginBottom: Spacing.xs }}>Liste</Type>
+      {(lists ?? []).length === 0 && <Type variant="caption" tone="text3">Keine Listen.</Type>}
+      {(lists ?? []).length > 0 && (
+        <Group>
+          {(lists ?? []).map((l, i) => (
+            <View key={l.id}>
+              {i > 0 && <RowDivider />}
+              <PressableScale
+                accessibilityLabel={`Liste ${l.name} ${chat.listId === l.id ? 'lösen' : 'zuweisen'}`}
+                onPress={() => toggle({ listId: chat.listId === l.id ? null : l.id })}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.md, paddingHorizontal: Spacing.md }}
+              >
+                {/* Punkt in der Listenfarbe — wie im Listen-Tab. */}
+                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: l.color }} />
+                <Type variant="body" numberOfLines={1} style={{ flex: 1 }}>{l.name}</Type>
+                {chat.listId === l.id && <Check size={17} color={colors.teal} strokeWidth={2.4} />}
+              </PressableScale>
+            </View>
+          ))}
+        </Group>
+      )}
+
+      <Type variant="eyebrow" tone="text3" style={{ marginTop: Spacing.lg, marginBottom: Spacing.xs }}>Notizen</Type>
       {activeNotes.length === 0 && <Type variant="caption" tone="text3">Keine Notizen.</Type>}
       {activeNotes.length > 0 && (
         <Group>
