@@ -1,5 +1,8 @@
 // listen.tsx — Grid aus Glass-Karten (Icon, Name, offene Anzahl); Tap = Liste,
 // Long-Press = bearbeiten; „Neue Liste" ist dieselbe Karte, nur leer.
+// JEDE Kachel hier ist gleich gebaut: nacktes Zeichen auf der Platte, Zahl
+// rechts, Beschriftung darunter — getoente Flaechen bedeuten in dieser App
+// „aktiv" und haben unter einem Symbol nichts verloren (siehe unten).
 // Darüber die Smart-Ansichten Geplant / Alle (Fahrplan §3.3).
 import { useRouter } from 'expo-router';
 import { CalendarClock, CalendarDays, ChevronRight, Filter as FilterIcon, Layers, PauseCircle, Plus, SlidersHorizontal, UserRound } from 'lucide-react-native';
@@ -230,20 +233,25 @@ export default function ListenScreen() {
                 }}
                 style={{ width: '47%', flexGrow: 1 }}
               >
-                <Glass variant="card" radius={R.xl} style={Shadow.md} contentStyle={{ padding: Spacing.md, gap: Spacing.sm }}>
+                <Glass variant="card" radius={R.xl} style={Shadow.md} contentStyle={{ padding: Spacing.md, gap: Spacing.xs }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <View
-                      style={{
-                        width: 38,
-                        height: 38,
-                        borderRadius: R.md,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: `${l.color}1F`,
-                      }}
-                    >
-                      <Icon size={19} color={l.color} strokeWidth={2} />
-                    </View>
+                    {/* Das Zeichen liegt auf der Platte — ohne getönte Fläche.
+                        Bis v1.74.3 saß es in einem 38er-Quadrat in der
+                        Listenfarbe. Das war aus zwei Gründen falsch:
+                        · Auf DIESEM Bildschirm hatten damit nur die echten
+                          Listen eine Fläche, „Geplant" und „Alle" nicht —
+                          zwei Bauweisen für dieselbe Kachel.
+                        · Schwerer wiegt: in der GANZEN übrigen App bedeutet
+                          eine getönte Fläche hinter einem Zeichen „an /
+                          gewählt / aktiv" (MicButton beim Zuhören, WeekStrip
+                          am gewählten Tag, ListEditorSheet beim gewählten
+                          Symbol, RescheduleSheet an der gewählten Option).
+                          Hier bedeutete sie gar nichts — sie war das einzige
+                          rein schmückende Vorkommen und hat damit ein Signal
+                          verbraucht, das woanders etwas sagt.
+                        Die Listenfarbe trägt jetzt das Zeichen selbst, genau
+                        wie bei Geplant (Blau) und Alle (Oliv). */}
+                    <Icon size={20} color={l.color} strokeWidth={2} />
                     <Type variant="heading" tabular tone="text2">{openByList.get(l.id) ?? 0}</Type>
                   </View>
                   <Type variant="label" numberOfLines={1}>{l.name}</Type>
@@ -275,54 +283,27 @@ export default function ListenScreen() {
           {/* „Neue Liste" — dieselbe Karte, nur leer.
               Bis v1.74 war das eine flache, mittig gesetzte Well: kein Marmor,
               kein Schatten, keine Fase, und als einzige Kachel des Gitters
-              zentriert. Damit unterschied sie sich in DREI Dingen gleichzeitig
-              vom Nachbarn (Material, Ausrichtung, Rhythmus) und las sich wie
-              ein Fremdkörper statt wie ein freier Platz.
-              Jetzt: dieselbe Glas-Platte, dieselbe Geometrie, dieselbe
-              Grundlinie — nur ohne Zahl, mit ruhigerem Schatten und in Text3.
-              Ein leerer Sockel derselben Reihe. */}
+              zentriert. Danach drei Runden Feinschliff (v1.74.1–.3), in denen
+              ich die Kachel immer nur gegen ihre direkten NACHBARN gehalten
+              habe. Der richtige Vergleich war die ganze Seite: jede Kachel
+              hier trägt jetzt ein nacktes Zeichen auf der Platte, rechts die
+              Zahl (wo es eine gibt) und darunter die Beschriftung. Die leere
+              unterscheidet sich nur noch durch das, was ihr FEHLT — die Zahl —
+              und durch den leiseren Schatten und die graue Schrift. */}
           <PressableScale
             accessibilityLabel="Neue Liste anlegen"
             onPress={() => setEditorList(null)}
             style={{ width: '47%', flexGrow: 1 }}
           >
-            <Glass variant="card" radius={R.xl} style={Shadow.sm} contentStyle={{ padding: Spacing.md, gap: Spacing.sm, minHeight: 94 }}>
-              <View
-                style={{
-                  width: 38,
-                  height: 38,
-                  borderRadius: R.md,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  // Keine Fläche — das Zeichen liegt direkt auf der Steinplatte.
-                  //
-                  // Der Bildschirm kennt zwei Kachel-Arten, und das ist die
-                  // Regel dahinter: „Geplant" und „Alle" tragen ihr Zeichen
-                  // NACKT, nur echte Listen haben das getönte Quadrat — weil
-                  // dieses Quadrat die Identitätsfarbe der Liste trägt. „Neue
-                  // Liste" ist keine Liste, sondern eine Handlung; sie gehört
-                  // zu den nackten. (v1.74.2/.3 hatten hier erst Stein-, dann
-                  // Akzent-Tönung: beide Male hatte ich die Kachel nur gegen
-                  // ihre direkten Nachbarn gehalten, nicht gegen die Karten
-                  // darüber.)
-                  //
-                  // Das Quadrat bleibt als MASS stehen, damit die Beschriftung
-                  // auf derselben Grundlinie sitzt wie bei den Nachbarn.
-                  backgroundColor: 'transparent',
-                }}
-              >
-                {/* Teal, wie JEDES „lege etwas an" in dieser App (Kopfzeilen-Plus,
-                    Neue Notiz, Assistent fragen, Neuer Mensch). Bis v1.74.1 war
-                    es hier grau — ein Erbstück der alten Geister-Karte, das den
-                    Umbau überlebt hat. Grau heißt in Stoa „Zustand, kein Knopf"
-                    (der Glyph in der EINEN Zeile, der Zähler-Stepper); hier ist
-                    es aber der einzige Weg, eine Liste anzulegen. Die Beschriftung
-                    bleibt Text3: sie sitzt im NAMENS-Feld der Karte, und dort
-                    steht noch kein Name. */}
-                {/* Ohne Fläche darf das Zeichen etwas größer sein, sonst
-                    verliert es sich in dem 38er-Feld. */}
-                <Plus size={24} color={colors.teal} strokeWidth={2} />
+            <Glass variant="card" radius={R.xl} style={Shadow.sm} contentStyle={{ padding: Spacing.md, gap: Spacing.xs }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                {/* Teal, wie JEDES „lege etwas an" in dieser App. Eine Spur
+                    größer als die Listen-Symbole: das Plus sind zwei Striche
+                    ohne Umriss und wirkt bei gleicher Zahl kleiner. */}
+                <Plus size={22} color={colors.teal} strokeWidth={2.2} />
               </View>
+              {/* Text3, weil die Zeile im NAMENS-Feld sitzt und dort noch kein
+                  Name steht. */}
               <Type variant="label" tone="text3" numberOfLines={1}>Neue Liste</Type>
             </Glass>
           </PressableScale>
