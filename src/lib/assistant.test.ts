@@ -214,6 +214,34 @@ describe('buildAppContext', () => {
   });
 });
 
+describe('extractActions — Menschen am Termin', () => {
+  it('liest die Namen und wirft Dubletten und Leeres weg', () => {
+    const { actions } = extractActions(
+      '```stoa-aktionen\n{"termine":[{"titel":"Abendessen","datum":"2026-08-05","personen":["Anna"," anna ","","Papa"]}]}\n```',
+    );
+    expect(actions?.termine[0].personen).toEqual(['Anna', 'Papa']);
+  });
+
+  it('nimmt auch einen einzelnen String an — Modelle liefern beides', () => {
+    const { actions } = extractActions(
+      '```stoa-aktionen\n{"termine":[{"titel":"Abendessen","datum":"2026-08-05","personen":"Anna"}]}\n```',
+    );
+    expect(actions?.termine[0].personen).toEqual(['Anna']);
+  });
+
+  it('ohne Namen bleibt das Feld leer statt zu einer leeren Liste zu werden', () => {
+    const { actions } = extractActions('```stoa-aktionen\n{"termine":[{"titel":"X","datum":"2026-08-05"}]}\n```');
+    expect(actions?.termine[0].personen).toBeUndefined();
+  });
+
+  it('schreibt die Menschen auf die Bestätigungskarte', () => {
+    expect(terminUnter({ datum: '2026-08-05', start: '19:00', personen: ['Anna', 'Papa'] }, (d) => d)).toContain(
+      'mit Anna, Papa',
+    );
+    expect(terminUnter({ datum: '2026-08-05', start: '19:00' }, (d) => d)).not.toContain('mit ');
+  });
+});
+
 describe('extractActions — Warten auf und Menschen', () => {
   it('liest „wartet_auf" und „person" an einer neuen Aufgabe', () => {
     const { actions } = extractActions(

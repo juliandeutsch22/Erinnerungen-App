@@ -35,6 +35,7 @@ async function frisch() {
   const { SqlitePhotoRepository } = require('./SqlitePhotoRepository');
   const { SqliteDocumentRepository } = require('./SqliteDocumentRepository');
   const { SqlitePersonRepository } = require('./SqlitePersonRepository');
+  const { SqliteEventPersonRepository } = require('./SqliteEventPersonRepository');
   const { getDb } = require('./db');
   // Erzwingt Schema + Migrationen + Seed, bevor der Test etwas erwartet.
   const db = await getDb();
@@ -48,6 +49,7 @@ async function frisch() {
     photos: new SqlitePhotoRepository(),
     documents: new SqliteDocumentRepository(),
     people: new SqlitePersonRepository(),
+    eventPeople: new SqliteEventPersonRepository(),
   };
 }
 
@@ -224,6 +226,47 @@ describe('Warten auf und Menschen (v1.73.0)', () => {
     expect((await tasks.getAll())[0].waiting).toBe(true);
     expect((await notes.getAll())[0].personId).toBeNull();
     expect((await chats.getAll())[0].personId).toBeNull();
+  });
+});
+
+describe('Menschen an Terminen (v1.74.0)', () => {
+  it('haengt mehrere Menschen an einen Termin und loest sie einzeln', async () => {
+    const { eventPeople } = await frisch();
+    await eventPeople.link('ev-1', 'p1');
+    await eventPeople.link('ev-1', 'p2');
+    await eventPeople.link('ev-2', 'p1');
+    expect((await eventPeople.getAll()).length).toBe(3);
+
+    await eventPeople.unlink('ev-1', 'p1');
+    const rest = await eventPeople.getAll();
+    expect(rest.map((l: { eventId: string; personId: string }) => `${l.eventId}:${l.personId}`).sort()).toEqual([
+      'ev-1:p2',
+      'ev-2:p1',
+    ]);
+  });
+
+  it('haengt denselben Menschen NICHT zweimal an denselben Termin', async () => {
+    const { eventPeople } = await frisch();
+    expect(await eventPeople.link('ev-1', 'p1')).not.toBeNull();
+    expect(await eventPeople.link('ev-1', 'p1')).toBeNull();
+    expect((await eventPeople.getAll()).length).toBe(1);
+  });
+
+  it('raeumt beim Loeschen eines Menschen ALLE seine Termine ab', async () => {
+    const { eventPeople } = await frisch();
+    await eventPeople.link('ev-1', 'p1');
+    await eventPeople.link('ev-2', 'p1');
+    await eventPeople.link('ev-1', 'p2');
+    await eventPeople.removeForPerson('p1');
+    expect((await eventPeople.getAll()).map((l: { personId: string }) => l.personId)).toEqual(['p2']);
+  });
+
+  it('nimmt fertige Verknuepfungen aus dem Backup zurueck, ohne IDs zu vergeben', async () => {
+    const { eventPeople } = await frisch();
+    await eventPeople.restore([{ id: 'l1', eventId: 'ev-9', personId: 'p1', addedAt: '2026-08-03T09:00:00.000Z' }]);
+    const [l] = await eventPeople.getAll();
+    expect(l.id).toBe('l1');
+    expect(l.addedAt).toBe('2026-08-03T09:00:00.000Z');
   });
 });
 

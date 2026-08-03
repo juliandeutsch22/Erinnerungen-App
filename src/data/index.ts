@@ -7,6 +7,7 @@ import { DocumentRepository, InMemoryDocumentRepository } from './DocumentReposi
 import { InMemoryJournalRepository, JournalRepository } from './JournalRepository';
 import { InMemoryListRepository, ListRepository } from './ListRepository';
 import { InMemoryNoteRepository, NoteRepository } from './NoteRepository';
+import { EventPersonRepository, InMemoryEventPersonRepository } from './EventPersonRepository';
 import { InMemoryPersonRepository, PersonRepository } from './PersonRepository';
 import { InMemoryPhotoRepository, PhotoRepository } from './PhotoRepository';
 import { InMemoryTaskRepository, TaskRepository } from './TaskRepository';
@@ -19,6 +20,7 @@ let chatSingleton: ChatRepository | null = null;
 let documentSingleton: DocumentRepository | null = null;
 let journalSingleton: JournalRepository | null = null;
 let personSingleton: PersonRepository | null = null;
+let eventPersonSingleton: EventPersonRepository | null = null;
 
 export function getListRepository(): ListRepository {
   if (listSingleton) return listSingleton;
@@ -109,6 +111,17 @@ export function getPersonRepository(): PersonRepository {
   return personSingleton;
 }
 
+export function getEventPersonRepository(): EventPersonRepository {
+  if (eventPersonSingleton) return eventPersonSingleton;
+  if (Platform.OS === 'web') {
+    eventPersonSingleton = new InMemoryEventPersonRepository();
+  } else {
+    const { SqliteEventPersonRepository } = require('./SqliteEventPersonRepository') as typeof import('./SqliteEventPersonRepository');
+    eventPersonSingleton = new SqliteEventPersonRepository();
+  }
+  return eventPersonSingleton;
+}
+
 /** Nur für Tests: erlaubt das Einsetzen eigener Repository-Instanzen. */
 export function __setListRepositoryForTests(repo: ListRepository | null) {
   listSingleton = repo;
@@ -134,6 +147,9 @@ export function __setJournalRepositoryForTests(repo: JournalRepository | null) {
 export function __setPersonRepositoryForTests(repo: PersonRepository | null) {
   personSingleton = repo;
 }
+export function __setEventPersonRepositoryForTests(repo: EventPersonRepository | null) {
+  eventPersonSingleton = repo;
+}
 
 export type { ListRepository } from './ListRepository';
 export type { TaskRepository } from './TaskRepository';
@@ -143,3 +159,4 @@ export type { ChatRepository } from './ChatRepository';
 export type { DocumentRepository } from './DocumentRepository';
 export type { JournalRepository } from './JournalRepository';
 export type { PersonRepository } from './PersonRepository';
+export type { EventPersonRepository } from './EventPersonRepository';

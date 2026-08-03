@@ -28,6 +28,7 @@ import { LIST_COLORS } from '@/components/listMeta';
 import * as Clipboard from 'expo-clipboard';
 
 import { useCreateAssistantEvents, useDeviceEvents } from '@/data/calendarQueries';
+import { useToggleEventPerson } from '@/data/eventPersonQueries';
 import { useCreatePerson, usePeople } from '@/data/personQueries';
 import { useAppendMessage, useChatMessages, useChats, useUpdateChat } from '@/data/chatQueries';
 import { useCreateNote, useNotes, useUpdateNote } from '@/data/noteQueries';
@@ -336,6 +337,7 @@ export default function ChatScreen() {
   const { data: lists } = useLists();
   const { data: people } = usePeople();
   const createPerson = useCreatePerson();
+  const linkEventPerson = useToggleEventPerson();
 
   // App-Schnappschuss (abschaltbar in den Einstellungen): Termine der
   // nächsten ~5 Wochen + offene Aufgaben + Listen + Notiz-Titel. Das Journal
@@ -448,6 +450,7 @@ export default function ChatScreen() {
       completeTask: (t) => completeTask.mutateAsync(t),
       trashTask: (id) => deleteTask.mutateAsync(id),
       createEvents: (termine) => createEvents(termine),
+      linkEventPerson: (eventId, personId) => linkEventPerson.mutateAsync({ eventId, personId, dran: false }),
       colorAt: (i) => LIST_COLORS[i % LIST_COLORS.length],
         taskEventId: chat?.eventId ?? null,
       });

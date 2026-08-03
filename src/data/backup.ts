@@ -14,7 +14,8 @@ import { isRrule } from '@/lib/dates';
 import type { FilterRange, SavedFilter } from '@/lib/taskFilters';
 import { remapListColor } from './colorRebrand';
 import type { EventDocument } from './DocumentRepository';
-import { getChatRepository, getDocumentRepository, getJournalRepository, getListRepository, getNoteRepository, getPersonRepository, getPhotoRepository, getTaskRepository } from './index';
+import type { EventPerson } from './EventPersonRepository';
+import { getChatRepository, getDocumentRepository, getEventPersonRepository, getJournalRepository, getListRepository, getNoteRepository, getPersonRepository, getPhotoRepository, getTaskRepository } from './index';
 import type { JournalEntry } from './JournalRepository';
 import { DEFAULT_LIST_ID } from './ListRepository';
 import type { EventPhoto } from './PhotoRepository';
@@ -54,6 +55,8 @@ export type BackupBundle = {
   notes: Note[];
   /** Menschen (v1.73.0) — ältere Backups haben das Feld nicht. */
   people: Person[];
+  /** Wer bei welchem Termin dabei ist (v1.74.0). */
+  eventPeople: EventPerson[];
   savedFilters: SavedFilter[];
   photos: BackupPhoto[];
   chats: Chat[];
@@ -88,11 +91,12 @@ export type BackupSources = BackupStoreSlice & {
 };
 
 export async function buildBackup(sources: BackupSources, now: Date = new Date()): Promise<BackupBundle> {
-  const [lists, tasks, notes, people, photoLinks, chats, chatMessages, docLinks, journal] = await Promise.all([
+  const [lists, tasks, notes, people, eventPeople, photoLinks, chats, chatMessages, docLinks, journal] = await Promise.all([
     getListRepository().getAll(),
     getTaskRepository().getAll(),
     getNoteRepository().getAll(),
     getPersonRepository().getAll(),
+    getEventPersonRepository().getAll(),
     getPhotoRepository().getAll(),
     getChatRepository().getAll(),
     getChatRepository().getAllMessages(),
@@ -121,6 +125,7 @@ export async function buildBackup(sources: BackupSources, now: Date = new Date()
     tasks,
     notes,
     people,
+    eventPeople,
     savedFilters: sources.savedFilters,
     photos,
     chats,
@@ -303,6 +308,25 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
   }
   const personIds = new Set(people.map((p) => p.id));
 
+  // Termin-Verknüpfungen: die eventId zeigt auf den Gerätekalender und bleibt
+  // wie bei Fotos erhalten; die personId muss im Backup jemanden treffen.
+  const rawEventPeople = Array.isArray(parsed.eventPeople) ? parsed.eventPeople : [];
+  const eventPeople: EventPerson[] = [];
+  const paare = new Set<string>();
+  for (const l of rawEventPeople) {
+    if (!isRecord(l) || !str(l.id) || !str(l.eventId) || !str(l.personId)) continue;
+    if (!personIds.has(l.personId)) continue;
+    const paar = `${l.eventId}|${l.personId}`;
+    if (paare.has(paar)) continue;
+    paare.add(paar);
+    eventPeople.push({
+      id: l.id,
+      eventId: l.eventId,
+      personId: l.personId,
+      addedAt: str(l.addedAt) ? l.addedAt : new Date().toISOString(),
+    });
+  }
+
   const lists: List[] = [];
   for (const l of rawLists) {
     if (!isRecord(l) || !str(l.id) || !str(l.name)) throw new Error('Ungültige Liste im Backup.');
@@ -475,6 +499,7 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
   const docRepo = getDocumentRepository();
   const journalRepo = getJournalRepository();
   const personRepo = getPersonRepository();
+  const eventPersonRepo = getEventPersonRepository();
   await taskRepo.clearAll();
   await listRepo.clearAll();
   await photoRepo.clearAll();
@@ -483,8 +508,10 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
   await docRepo.clearAll();
   await journalRepo.clearAll();
   await personRepo.clearAll();
+  await eventPersonRepo.clearAll();
   // Menschen vor allem anderen: danach zeigen die Zuordnungen ins Leere nicht.
   for (const p of people) await personRepo.create(p);
+  await eventPersonRepo.restore(eventPeople);
   for (const l of lists) await listRepo.create(l);
   for (const t of tasks) await taskRepo.create(t);
   for (const n of notes) await noteRepo.create(n);

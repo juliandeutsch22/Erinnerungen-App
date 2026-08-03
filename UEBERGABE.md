@@ -1766,6 +1766,43 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
       `elementFromPoint` trifft sie statt des Knopfes, obwohl er zu sehen ist.
       Fällt der Treffertest aus, wird das Element direkt geklickt.
 
+74. **Menschen an Terminen** (v1.74.0). In §8.73 stand noch, das ginge nicht,
+    weil EventKit keine schreibbaren Teilnehmer hat. **Das war die falsche
+    Frage.** EventKit gibt Teilnehmer tatsächlich nur lesend heraus (und sie zu
+    setzen hieße, die Einladungs-Verwaltung des Systems anzufassen, die Mails
+    verschickt) — aber Stoa hängt seit jeher EIGENE Daten an Gerätetermine:
+    Fotos und Dokumente liegen in eigenen Tabellen, adressiert über die
+    EventKit-ID. Menschen gehen genauso.
+    · Neue Tabelle `event_people` + `EventPersonRepository`. Anders als bei
+      Aufgabe/Notiz/Chat sind es MEHRERE Menschen pro Termin — ein Abendessen
+      hat selten genau einen Teilnehmer. Deshalb Kästchen statt eines Hakens.
+    · `EventMenschen` im Termin-Editor („Wer ist dabei"), VOR den Aufgaben: wer
+      dabei ist, gehört zum Termin selbst, die Aufgaben sind schon die
+      Vorbereitung darauf. Ein neuer Name ist sofort dabei — man tippt ihn ja,
+      weil er dazugehört.
+    · Der Personen-Screen bekommt einen Termin-Abschnitt (Fenster −14/+35 Tage,
+      dasselbe, das die App ohnehin lädt).
+    · **`createDeviceEvent` gibt jetzt die Event-ID zurück** (`createEvent`
+      liefert das Event — typisiert, also von tsc geprüft), und
+      `useCreateAssistantEvents` liefert je Termin eine ID statt einer Anzahl,
+      IN DERSELBEN REIHENFOLGE. Diese Reihenfolge IST die Zuordnung: ohne sie
+      wären „Abendessen" und „Anna" ein Termin und eine Person, die einander
+      nicht kennen.
+    · Assistent: `personen` (Namen-Array) am Termin — Schema, Prompt, Parser
+      (Dubletten und Leeres fliegen raus, ein einzelner String wird angenommen)
+      und `applyActions`. Die Namen stehen über `terminUnter` VOR dem
+      Übernehmen auf der Karte. Wird ein Termin nicht angelegt (kein
+      Kalenderzugriff), entsteht auch kein Mensch auf Vorrat.
+    · Löschen einer Person räumt die Termin-Verknüpfungen ausdrücklich mit weg
+      — sie liegen in einer eigenen Tabelle und wären sonst Waisen.
+    · ⚠️ **Grenze der Verifikation, ehrlich:** der Termin-Editor braucht einen
+      ECHTEN Gerätetermin, den es im Web nicht gibt
+      (`deviceCalendarAvailable === false`). „Wer ist dabei" und der
+      Termin-Abschnitt auf dem Personen-Screen sind deshalb NUR am Gerät zu
+      sehen. Geprüft ist, was prüfbar ist: 8 neue Jest-Tests (SQLite
+      ausgeführt, Backup, applyActions, Parser) und `terminmenschen.mjs`
+      (5 Prüfungen) für den Assistenten-Weg samt Leitplanke.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

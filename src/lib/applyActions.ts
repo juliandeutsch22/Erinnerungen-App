@@ -30,7 +30,16 @@ export type ApplyDeps = {
   completeTask: (task: Task) => Promise<unknown>;
   /** Papierkorb — NIE endgültig löschen. */
   trashTask: (id: string) => Promise<unknown>;
-  createEvents: (termine: AssistantAction['termine']) => Promise<number>;
+  /**
+   * Legt die Termine an und gibt je Termin die EventKit-ID zurück (null =
+   * nicht angelegt), in DERSELBEN Reihenfolge wie die Eingabe.
+   *
+   * Die Reihenfolge ist die ganze Zuordnung: an ihr hängt, welcher Mensch zu
+   * welchem Termin gehört. Ein `Promise<number>` (bis v1.73) konnte das nicht.
+   */
+  createEvents: (termine: AssistantAction['termine']) => Promise<(string | null)[]>;
+  /** Hängt einen Menschen an einen Termin. Fehlt sie, bleibt „personen" folgenlos. */
+  linkEventPerson?: (eventId: string, personId: string) => Promise<unknown>;
   /** Farbe für ein neues Projekt (Index = wievieltes in diesem Durchgang). */
   colorAt: (index: number) => string;
   /** Verknüpfung für neu angelegte Aufgaben (Chat an einem Termin). */
@@ -260,7 +269,20 @@ export async function applyAssistantActions(a: AssistantAction, deps: ApplyDeps)
     notizen += 1;
   }
 
-  const termine = a.termine.length > 0 ? await deps.createEvents(a.termine) : 0;
+  // Termine zuletzt — und gleich danach die Menschen daran. Erst hier gibt es
+  // die Event-IDs; vorher existiert der Termin im Gerätekalender noch nicht.
+  const eventIds = a.termine.length > 0 ? await deps.createEvents(a.termine) : [];
+  if (deps.linkEventPerson) {
+    for (let i = 0; i < a.termine.length; i += 1) {
+      const eventId = eventIds[i];
+      if (!eventId) continue;
+      for (const name of a.termine[i].personen ?? []) {
+        const personId = await resolvePerson(name);
+        if (personId) await deps.linkEventPerson(eventId, personId);
+      }
+    }
+  }
+  const termine = eventIds.filter(Boolean).length;
 
   return { projekte, aufgaben, notizen, termine, aenderungen, rueckgaengig };
 }

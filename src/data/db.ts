@@ -87,6 +87,14 @@ export function getDb(): Promise<SQLiteDatabase> {
           created_at TEXT NOT NULL,
           updated_at TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS event_people (
+          id TEXT PRIMARY KEY NOT NULL,
+          event_id TEXT NOT NULL,
+          person_id TEXT NOT NULL,
+          added_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_event_people_event ON event_people (event_id);
+        CREATE INDEX IF NOT EXISTS idx_event_people_person ON event_people (person_id);
         CREATE TABLE IF NOT EXISTS people (
           id TEXT PRIMARY KEY NOT NULL,
           name TEXT NOT NULL,

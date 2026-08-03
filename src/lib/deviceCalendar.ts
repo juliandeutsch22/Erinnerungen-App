@@ -131,10 +131,12 @@ export type EventDraft = {
   end: Date;
 };
 
-export async function createDeviceEvent(calendarId: string, draft: EventDraft): Promise<void> {
+/** Legt den Termin an und gibt seine EventKit-ID zurück — an ihr hängen Fotos,
+ *  Dokumente und (seit v1.74.0) die Menschen. */
+export async function createDeviceEvent(calendarId: string, draft: EventDraft): Promise<string | null> {
   const Calendar = mod();
   const cal = await Calendar.ExpoCalendar.get(calendarId);
-  await cal.createEvent({
+  const created = await cal.createEvent({
     title: draft.title,
     notes: draft.notes ?? undefined,
     location: draft.location ?? undefined,
@@ -142,6 +144,7 @@ export async function createDeviceEvent(calendarId: string, draft: EventDraft): 
     startDate: draft.start,
     endDate: draft.end,
   });
+  return created?.id ?? null;
 }
 
 // ——— Termin aus einer Assistenten-Aktion (Sprach-Sheet, Chat, Braindump). ———
@@ -197,19 +200,24 @@ export function buildEventDraft(input: AssistantEventInput): EventDraft {
   return { title: input.titel, notes: input.notiz ?? null, location: input.ort ?? null, allDay: false, start, end };
 }
 
-/** Legt einen Termin im Standard-Kalender an. Kümmert sich um Berechtigung und
- *  Kalender-Wahl; gibt zurück, ob es geklappt hat (false = kein Zugriff/Web). */
-export async function createAssistantEvent(input: AssistantEventInput): Promise<boolean> {
-  if (!deviceCalendarAvailable) return false;
+/**
+ * Legt einen Termin im Standard-Kalender an. Kümmert sich um Berechtigung und
+ * Kalender-Wahl; gibt die Event-ID zurück (null = kein Zugriff/Web/Fehler).
+ *
+ * Die ID zählt seit v1.74.0: an ihr hängen die Menschen, die der Assistent im
+ * selben Zug vorgeschlagen hat. Ohne sie wären „Abendessen" und „Anna" ein
+ * Termin und eine Person, die einander nicht kennen.
+ */
+export async function createAssistantEvent(input: AssistantEventInput): Promise<string | null> {
+  if (!deviceCalendarAvailable) return null;
   try {
     const granted = await ensureCalendarPermission();
-    if (!granted) return false;
+    if (!granted) return null;
     const calId = await defaultCalendarId();
-    if (!calId) return false;
-    await createDeviceEvent(calId, buildEventDraft(input));
-    return true;
+    if (!calId) return null;
+    return await createDeviceEvent(calId, buildEventDraft(input));
   } catch {
-    return false;
+    return null;
   }
 }
 

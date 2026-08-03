@@ -21,6 +21,7 @@ import { SchluesselWeg } from '@/components/SchluesselWeg';
 import { Screen } from '@/components/Screen';
 import { Type } from '@/components/Type';
 import { useCreateAssistantEvents, useDeviceEvents } from '@/data/calendarQueries';
+import { useToggleEventPerson } from '@/data/eventPersonQueries';
 import { useCreatePerson, usePeople } from '@/data/personQueries';
 import { useCreateNote } from '@/data/noteQueries';
 import { useCompleteTask, useCreateList, useCreateTask, useDeleteTask, useLists, useTasks, useUpdateTask } from '@/data/queries';
@@ -57,6 +58,7 @@ export default function VerwalterScreen() {
   const { data: lists } = useLists();
   const { data: people } = usePeople();
   const createPerson = useCreatePerson();
+  const linkEventPerson = useToggleEventPerson();
   const [calGranted, setCalGranted] = useState(false);
   React.useEffect(() => {
     void hasCalendarPermission().then(setCalGranted);
@@ -161,6 +163,7 @@ export default function VerwalterScreen() {
         completeTask: (t) => completeTask.mutateAsync(t),
         trashTask: (id) => deleteTask.mutateAsync(id),
         createEvents: (termine) => createEvents(termine),
+        linkEventPerson: (eventId, personId) => linkEventPerson.mutateAsync({ eventId, personId, dran: false }),
         colorAt: (i) => LIST_COLORS[i % LIST_COLORS.length],
       });
     } catch (e) {

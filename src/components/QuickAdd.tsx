@@ -33,6 +33,7 @@ import { PressableScale } from '@/components/PressableScale';
 import { Type } from '@/components/Type';
 import { LIST_COLORS } from '@/components/listMeta';
 import { useCreateAssistantEvents, useDeviceEvents } from '@/data/calendarQueries';
+import { useToggleEventPerson } from '@/data/eventPersonQueries';
 import { useCreatePerson, usePeople } from '@/data/personQueries';
 import { useCreateNote, useDeleteNote, useNotes } from '@/data/noteQueries';
 import { useCompleteTask, useCreateList, useCreateTask, useDeleteList, useDeleteTask, useLists, useRestoreTask, useTasks, useUpdateTask } from '@/data/queries';
@@ -124,6 +125,7 @@ export function QuickAdd({
   const { data: lists } = useLists();
   const { data: people } = usePeople();
   const createPerson = useCreatePerson();
+  const linkEventPerson = useToggleEventPerson();
   const { data: notes } = useNotes();
 
   const apiKey = useSettings((s) => s.geminiApiKey);
@@ -400,6 +402,7 @@ export function QuickAdd({
         completeTask: (t) => completeTask.mutateAsync(t),
         trashTask: (id) => deleteTask.mutateAsync(id),
         createEvents: (termine) => createEvents(termine),
+        linkEventPerson: (eventId, personId) => linkEventPerson.mutateAsync({ eventId, personId, dran: false }),
         colorAt: (i) => LIST_COLORS[i % LIST_COLORS.length],
         // Der Bildschirm ist der Kontext — sonst luege der „→ Liste"-Chip.
         defaultListId: listId,

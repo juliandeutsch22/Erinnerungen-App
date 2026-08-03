@@ -163,9 +163,12 @@ meisten Wirkung pro Zeile Code. Alle **NEU**, sofern nicht anders vermerkt.
   `person/[id].tsx` führt alles zu einem Menschen zusammen. Frei getippt, nicht
   aus den Systemkontakten (`expo-contacts` wäre nativ → eigene Risikoklasse).
   Der Assistent kann eine Person nach Namen zuordnen oder anlegen — erst nach
-  dem Bestätigungs-Tipp. **Offen geblieben:** Menschen an Terminen (der
-  Gerätekalender hat dafür kein Feld, das wir schreiben dürfen, ohne die
-  Teilnehmer-Verwaltung von EventKit anzufassen).
+  dem Bestätigungs-Tipp.
+- ~~**Menschen an Terminen**~~ — umgesetzt in v1.74.0 (UEBERGABE §8.74). Eigene
+  Tabelle `event_people`, wie Fotos und Dokumente am Termin; MEHRERE Menschen
+  pro Termin. Der Assistent kann sie beim Anlegen mitgeben. Die
+  EventKit-Teilnehmer bleiben unangetastet — sie sind nur lesbar, und sie zu
+  setzen hieße Einladungsmails zu verschicken.
 - **Wiedervorlage an Notizen** `[JS · klein]` — *Notizen haben kein Datum, gar
   keins.* Ein Gedanke, der in drei Wochen relevant wird, hat in Stoa keinen Ort
   außer einer Aufgabe, die er nicht ist. Ein optionales „zeig mir das wieder

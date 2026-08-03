@@ -2,7 +2,7 @@
 // Bewusst OHNE eigenen Server: das Gerät spricht die API direkt an — keine
 // laufenden Kosten, kein Mittelsmann. Reine Logik testbar (Prompt-Bau,
 // Antwort-Extraktion); der fetch selbst wird im Test nicht ausgeführt.
-import { type ChatMessage, type List, type Note, newId, normalizeTag, type Person, type Rrule, type Subtask, type Task } from '@/data/types';
+import { type ChatMessage, type List, type Note, newId, normalizePersonName, normalizeTag, type Person, type Rrule, type Subtask, type Task } from '@/data/types';
 import { anchorWeekdayRrule, isRrule, rruleLabel, toDateStr } from '@/lib/dates';
 import { noteTitle } from '@/lib/noteLogic';
 import type { DeviceEvent } from '@/lib/deviceCalendar';
@@ -113,6 +113,8 @@ const P_AKTIONEN_RUMPF =
   '„enddatum" ist der letzte Tag EINSCHLIESSLICH: „3. bis 10. August" heißt ' +
   'datum 2026-08-03 und enddatum 2026-08-10. Bei einem eintägigen Termin lass ' +
   'es weg. ' +
+  'Ist jemand DABEI („Abendessen mit Anna", „Übergabe mit Herrn Brandt"), ' +
+  'gehören die Namen in „personen" — nur die Namen, nichts weiter. ' +
   'Im Zweifel: fester Zeitpunkt/Verabredung → Termin, etwas zu TUN → Aufgabe. ';
 
 const P_CHECKLISTE = '„checkliste" nur, wenn der Chat zu einer Notiz gehört; ';
@@ -191,6 +193,7 @@ const ACTION_SCHEMA = {
           ende: { type: 'STRING' },
           ort: { type: 'STRING' },
           notiz: { type: 'STRING' },
+          personen: { type: 'ARRAY', items: { type: 'STRING' } },
         },
         required: ['titel', 'datum'],
       },
@@ -287,7 +290,18 @@ export type AssistantAction = {
     person?: string;
   }[];
   /** Feste Verabredungen → Gerätekalender. datum Pflicht; ohne start = ganztägig. */
-  termine: { titel: string; datum: string; enddatum?: string; start?: string; ende?: string; ort?: string; notiz?: string }[];
+  termine: {
+    titel: string;
+    datum: string;
+    enddatum?: string;
+    start?: string;
+    ende?: string;
+    ort?: string;
+    notiz?: string;
+    /** Wer dabei ist — als NAMEN. Werden beim Übernehmen auf vorhandene
+     *  Menschen aufgelöst oder angelegt. Mehrere sind normal. */
+    personen?: string[];
+  }[];
   /** Neue Projekte/Listen. Werden VOR den Aufgaben angelegt, damit deren
    *  „liste" auf die frische Liste zeigen kann. */
   listen: { name: string; ziel?: string; deadline?: string }[];
@@ -424,6 +438,23 @@ const ACTION_RE = /```stoa-aktionen\s*\n([\s\S]*?)```/;
  * eine verworfene Einkaufsliste wäre der teuerste Fehler an dieser Stelle.
  * Leer → undefined, damit die Aufgabe wie bisher ohne Checkliste entsteht.
  */
+/** Namen aus dem Vorschlag: leere raus, Dubletten raus (Groß/Klein egal). */
+function parsePersonen(raw: unknown): string[] | undefined {
+  const liste = Array.isArray(raw) ? raw : typeof raw === 'string' ? [raw] : [];
+  const gesehen = new Set<string>();
+  const namen: string[] = [];
+  for (const n of liste) {
+    if (typeof n !== 'string') continue;
+    const name = n.trim();
+    if (name.length === 0) continue;
+    const schluessel = normalizePersonName(name);
+    if (gesehen.has(schluessel)) continue;
+    gesehen.add(schluessel);
+    namen.push(name);
+  }
+  return namen.length > 0 ? namen : undefined;
+}
+
 function parseSchritte(raw: unknown): string[] | undefined {
   const items = Array.isArray(raw)
     ? raw.filter((s): s is string => typeof s === 'string')
@@ -535,6 +566,8 @@ function parseActionJson(jsonText: string): AssistantAction | null {
             // Freier Text — keine Form zu prüfen, nur leer auszusortieren.
             ort: typeof t.ort === 'string' && (t.ort as string).trim().length > 0 ? (t.ort as string).trim() : undefined,
             notiz: typeof t.notiz === 'string' && (t.notiz as string).trim().length > 0 ? (t.notiz as string).trim() : undefined,
+            // Namen: leere raus, Dubletten raus (auch „Anna" und „anna").
+            personen: parsePersonen(t.personen),
           }))
       : [];
     const listen = Array.isArray(raw.listen)
@@ -1174,11 +1207,14 @@ export function ortZusatz(t: { ort?: string }): string {
  * das ist Kontext des Bildschirms, nicht des Termins.
  */
 export function terminUnter(
-  t: { datum: string; enddatum?: string; start?: string; ende?: string; ort?: string },
+  t: { datum: string; enddatum?: string; start?: string; ende?: string; ort?: string; personen?: string[] },
   fmt: (d: string) => string,
 ): string {
   const zeit = t.start ? `${t.start}${t.ende ? `–${t.ende}` : ''}` : 'ganztägig';
-  return `${terminDatum(t, fmt)} · ${zeit}${ortZusatz(t)}`;
+  // Die Menschen müssen VOR dem Übernehmen dastehen: sie werden womöglich
+  // angelegt, und angelegt wird in dieser App nichts unsichtbar.
+  const mit = (t.personen ?? []).length > 0 ? ` · mit ${(t.personen ?? []).join(', ')}` : '';
+  return `${terminDatum(t, fmt)} · ${zeit}${ortZusatz(t)}${mit}`;
 }
 
 /** Antworttext aus der Gemini-Response ziehen (defensiv). */

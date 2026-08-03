@@ -3,7 +3,8 @@
 // Aufgaben, Notizen und Chats.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { getChatRepository, getNoteRepository, getPersonRepository, getTaskRepository } from './index';
+import { eventPeopleKey } from './eventPersonQueries';
+import { getChatRepository, getEventPersonRepository, getNoteRepository, getPersonRepository, getTaskRepository } from './index';
 import { queryKeys } from './queries';
 import type { NewPerson, Person } from './types';
 import { newId, normalizePersonName } from './types';
@@ -77,6 +78,10 @@ export function useDeletePerson() {
       for (const t of tasks) if (t.personId === id) await getTaskRepository().update(t.id, { personId: null });
       for (const n of notes) if (n.personId === id) await getNoteRepository().update(n.id, { personId: null });
       for (const c of chats) if (c.personId === id) await getChatRepository().update(c.id, { personId: null });
+      // Termin-Verknüpfungen liegen in einer eigenen Tabelle — sie müssen
+      // ausdrücklich mit weg, sonst bliebe ein Termin an einem Menschen
+      // hängen, den es nicht mehr gibt.
+      await getEventPersonRepository().removeForPerson(id);
       await getPersonRepository().remove(id);
     },
     onSuccess: () => {
@@ -84,6 +89,7 @@ export function useDeletePerson() {
       void qc.invalidateQueries({ queryKey: queryKeys.tasks });
       void qc.invalidateQueries({ queryKey: ['notes'] });
       void qc.invalidateQueries({ queryKey: ['chats'] });
+      void qc.invalidateQueries({ queryKey: eventPeopleKey });
     },
   });
 }

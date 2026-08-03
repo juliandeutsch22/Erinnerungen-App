@@ -48,7 +48,11 @@ function deps(over: Partial<ApplyDeps> = {}) {
     trashTask: async (id) => log.push(`papierkorb:${id}`),
     createEvents: async (t) => {
       log.push(`termine:${t.length}`);
-      return t.length;
+      // Wie am Gerät: je Termin eine ID, in derselben Reihenfolge.
+      return t.map((_, i) => `ev-${i}`);
+    },
+    linkEventPerson: async (eventId, personId) => {
+      log.push(`termin-mensch:${eventId}:${personId}`);
     },
     createPerson: async (input) => {
       log.push(`mensch:${input.name}`);
@@ -357,5 +361,63 @@ describe('Warten auf und Menschen', () => {
     // Nur die Aufgabe steht im Rückgängig-Block, der Mensch bleibt.
     expect(res.rueckgaengig.aufgaben).toEqual(['t-X']);
     expect(JSON.stringify(res.rueckgaengig)).not.toContain('p-Neu');
+  });
+});
+
+describe('Menschen an Terminen', () => {
+  it('hängt die Menschen an den RICHTIGEN Termin — die Reihenfolge ist die Zuordnung', async () => {
+    const d = deps();
+    await applyAssistantActions(
+      {
+        ...leer,
+        termine: [
+          { titel: 'Abendessen', datum: '2026-08-05', personen: ['Anna'] },
+          { titel: 'Übergabe', datum: '2026-08-06', personen: ['Herr Brandt', 'Anna'] },
+        ],
+      },
+      d.deps,
+    );
+    expect(d.log.filter((x) => x.startsWith('termin-mensch:'))).toEqual([
+      'termin-mensch:ev-0:p-Anna',
+      'termin-mensch:ev-1:p-Herr Brandt',
+      'termin-mensch:ev-1:p-Anna',
+    ]);
+  });
+
+  it('überspringt einen Termin, der gar nicht angelegt wurde (kein Kalenderzugriff)', async () => {
+    const d = deps({ createEvents: async () => [null] });
+    const res = await applyAssistantActions(
+      { ...leer, termine: [{ titel: 'Abendessen', datum: '2026-08-05', personen: ['Anna'] }] },
+      d.deps,
+    );
+    expect(res.termine).toBe(0);
+    expect(d.log.filter((x) => x.startsWith('termin-mensch:'))).toEqual([]);
+    // Und es wird auch kein Mensch auf Vorrat angelegt.
+    expect(d.log.filter((x) => x.startsWith('mensch:'))).toEqual([]);
+  });
+
+  it('legt einen Menschen nur EINMAL an, auch wenn er an zwei Terminen steht', async () => {
+    const d = deps();
+    await applyAssistantActions(
+      {
+        ...leer,
+        termine: [
+          { titel: 'A', datum: '2026-08-05', personen: ['Anna'] },
+          { titel: 'B', datum: '2026-08-06', personen: ['anna'] },
+        ],
+      },
+      d.deps,
+    );
+    expect(d.log.filter((x) => x.startsWith('mensch:'))).toEqual(['mensch:Anna']);
+  });
+
+  it('lässt „personen" folgenlos, wenn der Aufrufer nicht verknüpfen kann', async () => {
+    const d = deps({ linkEventPerson: undefined });
+    const res = await applyAssistantActions(
+      { ...leer, termine: [{ titel: 'A', datum: '2026-08-05', personen: ['Anna'] }] },
+      d.deps,
+    );
+    expect(res.termine).toBe(1);
+    expect(d.log.filter((x) => x.startsWith('termin-mensch:'))).toEqual([]);
   });
 });

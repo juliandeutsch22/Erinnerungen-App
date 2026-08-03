@@ -10,6 +10,7 @@ import { BottomSheet } from '@/components/BottomSheet';
 import { DisclosureChevron } from '@/components/DisclosureChevron';
 import { Chip } from '@/components/Chip';
 import { GlassButton } from '@/components/GlassButton';
+import { EventMenschen } from '@/components/EventMenschen';
 import { LinkedNotes } from '@/components/LinkedNotes';
 import { MiniCalendar } from '@/components/MiniCalendar';
 import { DocumentStrip } from '@/components/DocumentStrip';
@@ -338,6 +339,18 @@ export function EventEditorSheet({
 
       {/* Aufgaben zum Termin — macht den Termin zum kleinen Projekt
           (Vorbereiten, Mitbringen …). Erst für gespeicherte Termine. */}
+      {/* Wer ist dabei — erst für gespeicherte Termine (die Verknüpfung
+          braucht eine Event-ID). Steht VOR den Aufgaben: wer dabei ist,
+          gehört zum Termin selbst; die Aufgaben sind schon die Vorbereitung. */}
+      {isEdit && event && (
+        <View style={{ marginTop: Spacing.md }}>
+          <Hairline />
+          <View style={{ marginTop: Spacing.md }}>
+            <EventMenschen eventId={event.id} />
+          </View>
+        </View>
+      )}
+
       {isEdit && event && (
         <View style={{ marginTop: Spacing.md }}>
           <Hairline />

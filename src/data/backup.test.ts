@@ -5,16 +5,18 @@ import {
   __setDocumentRepositoryForTests,
   __setJournalRepositoryForTests,
   __setListRepositoryForTests,
+  __setEventPersonRepositoryForTests,
   __setNoteRepositoryForTests,
   __setPersonRepositoryForTests,
   __setPhotoRepositoryForTests,
   __setTaskRepositoryForTests,
- getChatRepository, getDocumentRepository, getJournalRepository, getListRepository, getNoteRepository, getPersonRepository, getPhotoRepository, getTaskRepository } from './index';
+ getChatRepository, getDocumentRepository, getEventPersonRepository, getJournalRepository, getListRepository, getNoteRepository, getPersonRepository, getPhotoRepository, getTaskRepository } from './index';
 import { InMemoryChatRepository } from './ChatRepository';
 import { InMemoryDocumentRepository } from './DocumentRepository';
 import { InMemoryJournalRepository } from './JournalRepository';
 import { InMemoryListRepository } from './ListRepository';
 import { InMemoryNoteRepository } from './NoteRepository';
+import { InMemoryEventPersonRepository } from './EventPersonRepository';
 import { InMemoryPersonRepository } from './PersonRepository';
 import { InMemoryPhotoRepository } from './PhotoRepository';
 import { InMemoryTaskRepository } from './TaskRepository';
@@ -54,6 +56,7 @@ describe('Backup', () => {
     __setDocumentRepositoryForTests(new InMemoryDocumentRepository());
     __setJournalRepositoryForTests(new InMemoryJournalRepository());
     __setPersonRepositoryForTests(new InMemoryPersonRepository());
+    __setEventPersonRepositoryForTests(new InMemoryEventPersonRepository());
   });
 
   afterEach(() => {
@@ -65,6 +68,7 @@ describe('Backup', () => {
     __setDocumentRepositoryForTests(null);
     __setJournalRepositoryForTests(null);
     __setPersonRepositoryForTests(null);
+    __setEventPersonRepositoryForTests(null);
   });
 
   it('Roundtrip: Export → Import stellt Listen + Aufgaben wieder her', async () => {
@@ -211,6 +215,7 @@ describe('Backup', () => {
     __setDocumentRepositoryForTests(new InMemoryDocumentRepository());
     __setJournalRepositoryForTests(new InMemoryJournalRepository());
     __setPersonRepositoryForTests(new InMemoryPersonRepository());
+    __setEventPersonRepositoryForTests(new InMemoryEventPersonRepository());
 
     const result = await importBackup(json, {
       writeDocumentFromBase64: async (ext, data) => `file:///new/doc.${ext}#${data.length}`,
@@ -311,6 +316,7 @@ describe('Backup', () => {
 
     const json = await exportToJsonString(noPhotos, new Date('2026-07-03T12:00:00.000Z'));
     __setPersonRepositoryForTests(new InMemoryPersonRepository());
+    __setEventPersonRepositoryForTests(new InMemoryEventPersonRepository());
     __setTaskRepositoryForTests(new InMemoryTaskRepository());
     __setNoteRepositoryForTests(new InMemoryNoteRepository());
     await importBackup(json);
@@ -370,6 +376,38 @@ describe('Backup', () => {
     expect((await getTaskRepository().getAll())[0].waiting).toBe(false);
   });
 
+  it('sichert, wer bei welchem Termin dabei ist', async () => {
+    await getPersonRepository().create({ id: 'p1', name: 'Anna', note: null, sort: 1, createdAt: '2026-07-01T08:00:00.000Z' });
+    await getEventPersonRepository().restore([
+      { id: 'l1', eventId: 'ev-9', personId: 'p1', addedAt: '2026-07-02T09:00:00.000Z' },
+    ]);
+
+    const json = await exportToJsonString(noPhotos, new Date('2026-07-03T12:00:00.000Z'));
+    __setPersonRepositoryForTests(new InMemoryPersonRepository());
+    __setEventPersonRepositoryForTests(new InMemoryEventPersonRepository());
+    await importBackup(json);
+
+    const links = await getEventPersonRepository().getAll();
+    expect(links).toHaveLength(1);
+    // Die eventId zeigt auf den Gerätekalender und bleibt wie bei Fotos stehen.
+    expect(links[0].eventId).toBe('ev-9');
+    expect(links[0].personId).toBe('p1');
+  });
+
+  it('wirft eine Termin-Verknüpfung weg, deren Mensch im Backup fehlt', async () => {
+    const json = JSON.stringify({
+      app: 'stille',
+      schemaVersion: 3,
+      exportedAt: '2026-07-03T12:00:00.000Z',
+      lists: [],
+      tasks: [],
+      people: [],
+      eventPeople: [{ id: 'l1', eventId: 'ev-9', personId: 'weg' }],
+    });
+    await importBackup(json);
+    expect(await getEventPersonRepository().getAll()).toEqual([]);
+  });
+
   it('lehnt fremdes/ungültiges JSON ab', async () => {
     await expect(importBackup('kein json')).rejects.toThrow('Kein gültiges JSON.');
     await expect(importBackup('{"app":"cairn","schemaVersion":1}')).rejects.toThrow('Kein Erinnerungen-Backup');
@@ -386,6 +424,7 @@ describe('Papierkorb im Backup', () => {
     __setDocumentRepositoryForTests(new InMemoryDocumentRepository());
     __setJournalRepositoryForTests(new InMemoryJournalRepository());
     __setPersonRepositoryForTests(new InMemoryPersonRepository());
+    __setEventPersonRepositoryForTests(new InMemoryEventPersonRepository());
   });
 
   it('deletedAt überlebt den Export/Import-Roundtrip', async () => {
@@ -455,6 +494,7 @@ describe('summarizeBundle / describeSummary — ehrlicher Bericht', () => {
     __setDocumentRepositoryForTests(new InMemoryDocumentRepository());
     __setJournalRepositoryForTests(new InMemoryJournalRepository());
     __setPersonRepositoryForTests(new InMemoryPersonRepository());
+    __setEventPersonRepositoryForTests(new InMemoryEventPersonRepository());
   });
 
   it('zählt aktive Einträge und weist Dokumente ohne Inhalt aus', async () => {

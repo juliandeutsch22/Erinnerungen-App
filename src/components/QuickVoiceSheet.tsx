@@ -29,6 +29,7 @@ import { GlassButton } from '@/components/GlassButton';
 import { PressableScale } from '@/components/PressableScale';
 import { Type } from '@/components/Type';
 import { useCreateAssistantEvents } from '@/data/calendarQueries';
+import { useToggleEventPerson } from '@/data/eventPersonQueries';
 import { useCreatePerson, usePeople } from '@/data/personQueries';
 import { useCreateNote } from '@/data/noteQueries';
 import { useCompleteTask, useCreateList, useCreateTask, useDeleteTask, useLists, useUpdateTask } from '@/data/queries';
@@ -347,6 +348,7 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
   const { data: lists } = useLists();
   const { data: people } = usePeople();
   const createPerson = useCreatePerson();
+  const linkEventPerson = useToggleEventPerson();
   const today = todayStr();
 
   const [phase, setPhase] = useState<QuickVoicePhase>('listening');
@@ -566,6 +568,7 @@ export function QuickVoiceSheet({ visible, onClose, apiKey }: { visible: boolean
         completeTask: (t) => completeTask.mutateAsync(t),
         trashTask: (id) => deleteTask.mutateAsync(id),
         createEvents: (termine) => createEvents(termine),
+        linkEventPerson: (eventId, personId) => linkEventPerson.mutateAsync({ eventId, personId, dran: false }),
         colorAt: (i) => LIST_COLORS[i % LIST_COLORS.length],
       });
     } catch (e) {

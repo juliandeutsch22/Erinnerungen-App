@@ -64,13 +64,14 @@ export function useCreateEvent() {
  *  wirklich angelegt wurden (0 im Web / ohne Kalender-Zugriff). */
 export function useCreateAssistantEvents() {
   const invalidate = useInvalidateEvents();
-  return async (termine: AssistantEventInput[]): Promise<number> => {
-    let created = 0;
-    for (const t of termine) {
-      if (await createAssistantEvent(t)) created += 1;
-    }
-    if (created > 0) invalidate();
-    return created;
+  // Gibt je Termin die EventKit-ID zurück (null, wenn es nicht geklappt hat) —
+  // in DERSELBEN Reihenfolge wie die Eingabe, damit der Aufrufer die Menschen
+  // dem richtigen Termin zuordnen kann.
+  return async (termine: AssistantEventInput[]): Promise<(string | null)[]> => {
+    const ids: (string | null)[] = [];
+    for (const t of termine) ids.push(await createAssistantEvent(t));
+    if (ids.some(Boolean)) invalidate();
+    return ids;
   };
 }
 
