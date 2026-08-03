@@ -34,7 +34,10 @@ Achterbahn. Konkret:
   Fläche `chisel={false}`.
 - **Flächen:** `GlassPanel`/`Glass` (Steinton + Marmor-Textur) statt nackter
   Views; tonale Flächen statt Strichlinien/Umrandungen; flache, weiche
-  Schatten. Die Platte trägt Lichtgrat oben, Schattengrat unten und zarte
+  Schatten. Eine getönte Fläche HINTER einem Zeichen bedeutet in dieser App
+  „an / gewählt / aktiv" (MicButton, WeekStrip, gewähltes Symbol, gewählte
+  Option) — nie Schmuck. Ein Symbol, das nur es selbst ist, liegt nackt auf
+  der Platte und trägt seine Farbe im Strich. Die Platte trägt Lichtgrat oben, Schattengrat unten und zarte
   Fasen an den Seiten — sie ist behauen, nicht gezeichnet, und trägt deshalb
   KEINE Umrandung. Die Haarlinie bleibt nur getönten Flächen und Pills.
 - **Seams:** Trennung innerhalb eines Panels über `<Seam>`; der Mäander

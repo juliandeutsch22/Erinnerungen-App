@@ -1875,6 +1875,34 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
       `${colors.teal}1F`. Zwei Rückfragen für eine Karte — die Kachel war der
       Ort, an dem drei Erbstücke gleichzeitig lagen.
 
+77. **Die getönte Fläche bedeutet „aktiv" — und sonst nichts** (v1.74.4).
+    Julian, nach der dritten Runde an derselben Kachel: „ich finde es generell
+    etwas uneinheitlich. Die Geplant- und Alle-Kacheln haben doch auch keinen
+    Hintergrund bei den Symbolen."
+    · Die Suche danach, wo in der App sonst eine getönte Fläche hinter einem
+      Zeichen sitzt, liefert sechs Stellen — und **alle sechs meinen dasselbe:
+      an / gewählt / aktiv.** MicButton beim Zuhören, WeekStrip am gewählten
+      Tag, ListEditorSheet beim gewählten Symbol UND bei gesetzter Deadline,
+      RescheduleSheet an der gewählten Option, QuickVoiceSheet beim Aufnehmen.
+      Das Quadrat an den Listen-Kacheln war das EINZIGE rein schmückende
+      Vorkommen. Es sagte nichts über einen Zustand und hat damit ein Signal
+      verbraucht, das überall sonst etwas bedeutet — das wiegt schwerer als
+      die Uneinheitlichkeit auf diesem einen Bildschirm.
+    · Jetzt trägt jede der sechs Kacheln dieselbe Bauweise: nacktes Zeichen in
+      der eigenen Farbe auf der Platte, Zahl rechts, Beschriftung darunter. Die
+      Listenfarbe steckt im Zeichen selbst, wie bei Geplant (Blau) und Alle
+      (Oliv). Die leere Kachel unterscheidet sich nur noch durch das, was ihr
+      FEHLT: die Zahl. Nebenbei ist auch der Rhythmus einer geworden — die
+      Listen-Kacheln nutzten `gap: sm`, die Smart-Karten `gap: xs`.
+    · **Die Lehre, teuer bezahlt:** v1.74.1 bis .3 waren drei Runden an
+      derselben Kachel, in denen ich sie jedes Mal nur gegen ihre direkten
+      NACHBARN gehalten und einen anderen Teil repariert habe (Material,
+      Zeichenfarbe, Flächenfarbe). Die richtige Frage war nicht „sieht sie aus
+      wie ihr Nachbar?", sondern **„was BEDEUTET dieses Gestaltungsmittel in
+      dieser App?"**. Die hätte in einem Schritt zum Ziel geführt.
+      Für die nächste Design-Rückmeldung: erst das Mittel in der ganzen App
+      suchen, dann die Stelle ändern.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**
