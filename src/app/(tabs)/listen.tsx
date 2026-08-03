@@ -278,9 +278,9 @@ export default function ListenScreen() {
               zentriert. Damit unterschied sie sich in DREI Dingen gleichzeitig
               vom Nachbarn (Material, Ausrichtung, Rhythmus) und las sich wie
               ein Fremdkörper statt wie ein freier Platz.
-              Jetzt: dieselbe Glas-Platte, dieselbe Geometrie, dasselbe
-              Symbolquadrat oben links — nur ohne Zahl, mit ruhigerem Schatten
-              und in Text3. Ein leerer Sockel derselben Reihe. */}
+              Jetzt: dieselbe Glas-Platte, dieselbe Geometrie, dieselbe
+              Grundlinie — nur ohne Zahl, mit ruhigerem Schatten und in Text3.
+              Ein leerer Sockel derselben Reihe. */}
           <PressableScale
             accessibilityLabel="Neue Liste anlegen"
             onPress={() => setEditorList(null)}
@@ -294,14 +294,21 @@ export default function ListenScreen() {
                   borderRadius: R.md,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  // Dieselbe Tönung wie bei den echten Listen (`${farbe}1F`),
-                  // hier im Akzent. Bis v1.74.2 stand hier der neutrale
-                  // Stein-Ton — gedacht als „die Farbe kommt erst mit der
-                  // Liste", gelesen als grauer Kasten um ein blaues Zeichen.
-                  // Nirgends sonst in der App hält eine getönte Fläche ein
-                  // Glyph in einer ANDEREN Farbe: Fläche und Zeichen sind
-                  // überall ein Ton. Also folgt die Fläche dem Plus.
-                  backgroundColor: `${colors.teal}1F`,
+                  // Keine Fläche — das Zeichen liegt direkt auf der Steinplatte.
+                  //
+                  // Der Bildschirm kennt zwei Kachel-Arten, und das ist die
+                  // Regel dahinter: „Geplant" und „Alle" tragen ihr Zeichen
+                  // NACKT, nur echte Listen haben das getönte Quadrat — weil
+                  // dieses Quadrat die Identitätsfarbe der Liste trägt. „Neue
+                  // Liste" ist keine Liste, sondern eine Handlung; sie gehört
+                  // zu den nackten. (v1.74.2/.3 hatten hier erst Stein-, dann
+                  // Akzent-Tönung: beide Male hatte ich die Kachel nur gegen
+                  // ihre direkten Nachbarn gehalten, nicht gegen die Karten
+                  // darüber.)
+                  //
+                  // Das Quadrat bleibt als MASS stehen, damit die Beschriftung
+                  // auf derselben Grundlinie sitzt wie bei den Nachbarn.
+                  backgroundColor: 'transparent',
                 }}
               >
                 {/* Teal, wie JEDES „lege etwas an" in dieser App (Kopfzeilen-Plus,
@@ -312,7 +319,9 @@ export default function ListenScreen() {
                     es aber der einzige Weg, eine Liste anzulegen. Die Beschriftung
                     bleibt Text3: sie sitzt im NAMENS-Feld der Karte, und dort
                     steht noch kein Name. */}
-                <Plus size={19} color={colors.teal} strokeWidth={2.2} />
+                {/* Ohne Fläche darf das Zeichen etwas größer sein, sonst
+                    verliert es sich in dem 38er-Feld. */}
+                <Plus size={24} color={colors.teal} strokeWidth={2} />
               </View>
               <Type variant="label" tone="text3" numberOfLines={1}>Neue Liste</Type>
             </Glass>
