@@ -10,7 +10,7 @@
 // ist der Moment, in dem sie einem einfällt. Ein eigener Verwaltungs-Ort dafür
 // wäre ein Umweg, den niemand geht.
 import { Check, Plus, UserRound } from 'lucide-react-native';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { TextInput, View } from 'react-native';
 
 import { PressableScale } from '@/components/PressableScale';
@@ -18,9 +18,13 @@ import { Group, RowDivider } from '@/components/SheetParts';
 import { Type } from '@/components/Type';
 import { useCreatePerson, usePeople } from '@/data/personQueries';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
+import { filterPersonen, kuerzePersonen } from '@/lib/personMerge';
 import { webNoOutline } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
 import { R, Spacing, T } from '@/theme/theme.tokens';
+
+/** So viele Namen stehen ungefiltert da — darüber wird gekürzt statt gescrollt. */
+const KURZ = 6;
 
 export function PersonWahl({
   selected,
@@ -35,6 +39,17 @@ export function PersonWahl({
   const createPerson = useCreatePerson();
   const [entwurf, setEntwurf] = useState('');
 
+  // EIN Feld, zwei Berufe: was man tippt, engt zuerst die Liste ein und legt
+  // erst auf Tipp an. Ein eigenes Suchfeld daneben wäre ein zweites Feld für
+  // dieselbe Frage („wen meinst du?") — und genau das macht Oberflächen voll.
+  // Wer einen Namen tippt, der schon da ist, sieht ihn sofort und tippt ihn an;
+  // wer einen neuen tippt, sieht eine leere Liste und daneben das Plus.
+  const treffer = useMemo(() => filterPersonen(people ?? [], entwurf), [people, entwurf]);
+  const [gezeigt, versteckt] = useMemo(
+    () => (entwurf.trim() ? [treffer, 0] : kuerzePersonen(treffer, new Set(selected ? [selected] : []), KURZ)),
+    [treffer, entwurf, selected],
+  );
+
   const anlegen = () => {
     const name = entwurf.trim();
     if (!name) return;
@@ -48,9 +63,9 @@ export function PersonWahl({
 
   return (
     <View style={{ gap: Spacing.sm }}>
-      {(people ?? []).length > 0 && (
+      {gezeigt.length > 0 && (
         <Group>
-          {(people ?? []).map((p, i) => {
+          {gezeigt.map((p, i) => {
             const dran = selected === p.id;
             return (
               <React.Fragment key={p.id}>
@@ -77,6 +92,22 @@ export function PersonWahl({
         </Group>
       )}
 
+      {/* Sagt, dass da mehr ist, und wie man drankommt — statt es zu verstecken
+          oder alles auszubreiten. */}
+      {versteckt > 0 && (
+        <Type variant="caption" tone="text3" style={{ paddingHorizontal: Spacing.md }}>
+          {`… und ${versteckt} weitere — tippe einen Namen`}
+        </Type>
+      )}
+
+      {/* Nichts gefunden: die Zeile darunter ist dann kein Suchfeld mehr,
+          sondern ein Angebot. */}
+      {entwurf.trim().length > 0 && gezeigt.length === 0 && (
+        <Type variant="caption" tone="text3" style={{ paddingHorizontal: Spacing.md }}>
+          Niemand mit diesem Namen — mit dem Plus legst du ihn an.
+        </Type>
+      )}
+
       <View
         style={{
           flexDirection: 'row',
@@ -90,11 +121,11 @@ export function PersonWahl({
         }}
       >
         <TextInput
-          accessibilityLabel="Name — direkt anlegen"
+          accessibilityLabel="Person suchen oder anlegen"
           value={entwurf}
           onChangeText={setEntwurf}
           onSubmitEditing={anlegen}
-          placeholder="Name — direkt anlegen"
+          placeholder="Suchen oder neuen Namen tippen"
           placeholderTextColor={colors.text3}
           returnKeyType="done"
           style={[{ flex: 1, fontSize: T.md, color: colors.text, paddingVertical: Spacing.sm + 2, minHeight: 24 }, webNoOutline]}

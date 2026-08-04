@@ -2001,6 +2001,28 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
       Änderungen an `EventPersonen` sind im Web nicht prüfbar — der
       Termin-Editor braucht einen echten Gerätekalender.
 
+80. **Das Zuordnungs-Feld sucht, bevor es anlegt** (v1.77.0). Julian, mit Blick
+    auf acht Namen im Aufgaben-Editor: „außerdem sollte man beim Hinzufügen nach
+    Personen suchen können, da es sonst schnell unübersichtlich werden kann."
+    · **Kein zweites Feld.** Das vorhandene Eingabefeld bekam einen zweiten
+      Beruf: was man tippt, engt zuerst die Liste ein; angelegt wird erst auf
+      Tipp aufs Plus. Ein eigenes Suchfeld daneben wäre ein ZWEITES Feld für
+      dieselbe Frage („wen meinst du?") gewesen — genau so werden Oberflächen
+      voll. Der Platzhalter sagt jetzt beides: „Suchen oder neuen Namen tippen".
+    · Gesucht wird in Name UND Notiz, wie im Suche-Tab: „Dachdecker" findet
+      Herrn Brandt auch dann, wenn einem gerade nur einfällt, WAS er ist.
+    · **Gekürzt statt gescrollt:** ungefiltert stehen höchstens sechs Namen da,
+      darunter „… und N weitere — tippe einen Namen". Wer GEWÄHLT ist, bleibt
+      dabei immer sichtbar (`kuerzePersonen`) — sonst könnte man ihn nicht mehr
+      lösen, und das wäre eine verlorene Funktion, keine aufgeräumte.
+    · Findet die Suche nichts, steht dort ein Satz statt einer Leere: „Niemand
+      mit diesem Namen — mit dem Plus legst du ihn an." Die leere Liste ist
+      damit kein Fehler, sondern das Angebot.
+    · Beide Blöcke (`PersonWahl`, `EventPersonen`) tragen dasselbe; die Logik
+      liegt als `filterPersonen`/`kuerzePersonen` in `lib/personMerge.ts`.
+    · Verifikation: 525 Tests (neun neue für die zwei Funktionen), tsc sauber,
+      eslint 28/0, 22 Touren grün (neu: `suchen.mjs` mit acht Namen).
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

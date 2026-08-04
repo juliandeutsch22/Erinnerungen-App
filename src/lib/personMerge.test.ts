@@ -7,7 +7,7 @@
 // zwei Ansichten verteilt. Diese Datei prüft, dass beides nicht passiert.
 import type { NewPerson, Person } from '@/data/types';
 
-import { findePerson, personNachtrag } from './personMerge';
+import { filterPersonen, findePerson, kuerzePersonen, personNachtrag } from './personMerge';
 
 const person = (p: Partial<Person> & { id: string; name: string }): Person => ({
   note: null,
@@ -20,6 +20,65 @@ const person = (p: Partial<Person> & { id: string; name: string }): Person => ({
 });
 
 const eingabe = (p: Partial<NewPerson> & { name: string }): NewPerson => ({ ...p });
+
+describe('filterPersonen', () => {
+  const alle = [
+    person({ id: 'p1', name: 'Anna Meier', note: 'Kollegin' }),
+    person({ id: 'p2', name: 'Herr Brandt', note: 'Dachdecker' }),
+    person({ id: 'p3', name: 'Papa' }),
+  ];
+
+  it('gibt ohne Suche alle zurück', () => {
+    expect(filterPersonen(alle, '   ')).toHaveLength(3);
+  });
+
+  it('findet mitten im Namen und ohne Rücksicht auf Groß/Klein', () => {
+    expect(filterPersonen(alle, 'BRAND').map((p) => p.id)).toEqual(['p2']);
+    expect(filterPersonen(alle, 'meier').map((p) => p.id)).toEqual(['p1']);
+  });
+
+  it('findet auch über die Notiz — man weiß oft nur, WAS jemand ist', () => {
+    expect(filterPersonen(alle, 'dachdecker').map((p) => p.id)).toEqual(['p2']);
+  });
+
+  it('kommt mit einer Person ohne Notiz klar', () => {
+    expect(filterPersonen(alle, 'papa').map((p) => p.id)).toEqual(['p3']);
+  });
+
+  it('gibt nichts zurück, wenn nichts passt — das ist das Signal zum Anlegen', () => {
+    expect(filterPersonen(alle, 'Zlatan')).toEqual([]);
+  });
+});
+
+describe('kuerzePersonen', () => {
+  const viele = Array.from({ length: 10 }, (_, i) => person({ id: `p${i}`, name: `Person ${i}` }));
+
+  it('lässt kurze Listen unangetastet', () => {
+    const [gezeigt, versteckt] = kuerzePersonen(viele.slice(0, 4), new Set(), 6);
+    expect(gezeigt).toHaveLength(4);
+    expect(versteckt).toBe(0);
+  });
+
+  it('kürzt und sagt, wie viele fehlen', () => {
+    const [gezeigt, versteckt] = kuerzePersonen(viele, new Set(), 6);
+    expect(gezeigt.map((p) => p.id)).toEqual(['p0', 'p1', 'p2', 'p3', 'p4', 'p5']);
+    expect(versteckt).toBe(4);
+  });
+
+  it('zeigt Gewählte IMMER — sonst könnte man sie nicht mehr lösen', () => {
+    // p9 steht weit hinten und wäre weggekürzt worden.
+    const [gezeigt, versteckt] = kuerzePersonen(viele, new Set(['p9']), 6);
+    expect(gezeigt.map((p) => p.id)).toContain('p9');
+    expect(gezeigt).toHaveLength(7);
+    expect(versteckt).toBe(3);
+  });
+
+  it('zählt eine Gewählte nicht doppelt, wenn sie ohnehin vorn steht', () => {
+    const [gezeigt, versteckt] = kuerzePersonen(viele, new Set(['p1']), 6);
+    expect(gezeigt).toHaveLength(6);
+    expect(versteckt).toBe(4);
+  });
+});
 
 describe('findePerson', () => {
   const anna = person({ id: 'p1', name: 'Anna' });

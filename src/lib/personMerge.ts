@@ -12,6 +12,20 @@ import type { NewPerson, Person } from '@/data/types';
 import { normalizePersonName } from '@/data/types';
 
 /**
+ * Wen meint dieser getippte Text? Dieselbe Frage wie unten, nur unentschieden:
+ * beim Tippen weiß man noch nicht, ob eine Person gemeint ist, die es gibt,
+ * oder eine, die es gleich geben soll.
+ *
+ * Gesucht wird in Name UND Notiz — genau wie im Suche-Tab. „Dachdecker" findet
+ * Herrn Brandt auch dann, wenn einem gerade nur einfällt, WAS er ist.
+ */
+export function filterPersonen(alle: Person[], suche: string): Person[] {
+  const q = suche.trim().toLowerCase();
+  if (!q) return alle;
+  return alle.filter((p) => `${p.name} ${p.note ?? ''}`.toLowerCase().includes(q));
+}
+
+/**
  * Wen meint dieser Eintrag? Die Adressbuch-Herkunft schlägt den Namen: derselbe
  * Kontakt zweimal importiert bleibt EINE Person, auch wenn er im Adressbuch
  * inzwischen anders heißt (Heirat, Tippfehler, Firma umbenannt).
@@ -33,6 +47,21 @@ export function findePerson(alle: Person[], input: NewPerson): Person | undefine
  * Jürgen Deutsch") — im Personen-Editor tut das der Import ausdrücklich, weil
  * man den Kontakt dort gerade ausgesucht hat, aber nicht hier im Vorbeigehen.
  */
+/**
+ * Kürzt eine ungefilterte Liste auf ein erträgliches Maß — was gewählt ist,
+ * bleibt IMMER sichtbar, sonst könnte man es nicht mehr lösen.
+ *
+ * Gibt `[gezeigt, versteckt]` zurück. Bei einer Suche wird nicht gekürzt: wer
+ * tippt, hat schon selbst gekürzt.
+ */
+export function kuerzePersonen(treffer: Person[], gewaehlt: Set<string>, grenze: number): [Person[], number] {
+  if (treffer.length <= grenze) return [treffer, 0];
+  const kopf = treffer.slice(0, grenze);
+  const fehlende = treffer.slice(grenze).filter((p) => gewaehlt.has(p.id));
+  const gezeigt = [...kopf, ...fehlende];
+  return [gezeigt, treffer.length - gezeigt.length];
+}
+
 export function personNachtrag(vorhanden: Person, input: NewPerson): Partial<Omit<Person, 'id'>> {
   const nachtrag: Partial<Omit<Person, 'id'>> = {};
   if (!vorhanden.phone && input.phone) nachtrag.phone = input.phone;

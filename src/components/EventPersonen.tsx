@@ -17,9 +17,13 @@ import { Type } from '@/components/Type';
 import { useEventPeople, useToggleEventPerson } from '@/data/eventPersonQueries';
 import { useCreatePerson, usePeople } from '@/data/personQueries';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
+import { filterPersonen, kuerzePersonen } from '@/lib/personMerge';
 import { webNoOutline } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
 import { R, Spacing, T } from '@/theme/theme.tokens';
+
+/** So viele Namen stehen ungefiltert da — darüber wird gekürzt statt gescrollt. */
+const KURZ = 6;
 
 export function EventPersonen({
   eventId,
@@ -76,6 +80,15 @@ export function EventPersonen({
   // Das Häkchen sagt ohnehin, wer dabei ist; die Reihenfolge muss es nicht
   // noch einmal sagen. Nebenbei ist sie damit dieselbe wie in `PersonWahl`.
 
+  // EIN Feld, zwei Berufe — wie in `PersonWahl`: tippen engt ein, das Plus legt
+  // an. Wer dabei ist, bleibt beim Kürzen IMMER sichtbar, sonst könnte man ihn
+  // nicht mehr lösen.
+  const treffer = useMemo(() => filterPersonen(people ?? [], entwurf), [people, entwurf]);
+  const [gezeigt, versteckt] = useMemo(
+    () => (entwurf.trim() ? [treffer, 0] : kuerzePersonen(treffer, dabei, KURZ)),
+    [treffer, entwurf, dabei],
+  );
+
   const anlegen = () => {
     const name = entwurf.trim();
     if (!name) return;
@@ -89,7 +102,7 @@ export function EventPersonen({
   return (
     <View style={{ gap: Spacing.xs }}>
       <Type variant="eyebrow" tone="text3">Wer ist dabei</Type>
-      {(people ?? []).map((p) => {
+      {gezeigt.map((p) => {
         const ist = dabei.has(p.id);
         return (
           <PressableScale
@@ -129,6 +142,13 @@ export function EventPersonen({
         );
       })}
 
+      {versteckt > 0 && (
+        <Type variant="caption" tone="text3">{`… und ${versteckt} weitere — tippe einen Namen`}</Type>
+      )}
+      {entwurf.trim().length > 0 && gezeigt.length === 0 && (
+        <Type variant="caption" tone="text3">Niemand mit diesem Namen — mit dem Plus legst du ihn an.</Type>
+      )}
+
       <View
         style={{
           flexDirection: 'row',
@@ -143,11 +163,11 @@ export function EventPersonen({
         }}
       >
         <TextInput
-          accessibilityLabel="Name — direkt anlegen und hinzufügen"
+          accessibilityLabel="Person suchen oder anlegen"
           value={entwurf}
           onChangeText={setEntwurf}
           onSubmitEditing={anlegen}
-          placeholder="Name — direkt anlegen"
+          placeholder="Suchen oder neuen Namen tippen"
           placeholderTextColor={colors.text3}
           returnKeyType="done"
           style={[{ flex: 1, fontSize: T.md, color: colors.text, paddingVertical: Spacing.sm + 2, minHeight: 24 }, webNoOutline]}
