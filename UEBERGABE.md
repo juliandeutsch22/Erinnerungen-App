@@ -2071,6 +2071,17 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
       (`bilder73.mjs` ist ein alter Screenshot-Helfer aus v1.73, kein Prüfstück
       — er läuft seit Längerem nicht mehr durch und gehört nicht zur Suite.)
 
+82. **Zwei falsche Aussagen, gefunden beim Nachschauen** (v1.78.1).
+    · Die Zähl-Zeile im Suche-Tab endete auf „durchsuchbar" und nannte drei von
+      sieben Bereichen — Personen, Dokumente, Chats und die Abendbetrachtung
+      fehlten, obwohl die Suche sie führt. Sie sagt jetzt nur noch, WIE VIEL da
+      ist; was durchsucht wird, steht ohnehin im leeren Zustand darunter.
+    · Der Datei-Kopf von `personen.tsx` beschrieb einen Entwurf, den ich in
+      derselben Sitzung wieder verworfen hatte („zeigt nur noch die, bei denen
+      etwas liegt"). Ein Kommentar, der einen nicht gebauten Zustand behauptet,
+      ist schlimmer als keiner — die nächste Sitzung baut darauf auf. **Merke:
+      nach einem Rückbau die Kommentare mitziehen, nicht nur den Code.**
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

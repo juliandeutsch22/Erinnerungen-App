@@ -177,11 +177,16 @@ export default function SucheScreen() {
       <Reveal>
         <View style={{ gap: Spacing.xs }}>
           <Type variant="title">Suche</Type>
-          {/* Ruhige Zähl-Zeile — dieselbe Stimme wie die Tages-Bilanz auf Heute. */}
+          {/* Ruhige Zähl-Zeile — dieselbe Stimme wie die Tages-Bilanz auf Heute.
+              Sie sagt, WIE VIEL da ist, nicht was durchsucht wird: bis v1.78
+              endete sie auf „durchsuchbar" und nannte drei von sieben
+              Bereichen — Personen, Dokumente, Chats und die Abendbetrachtung
+              fehlten, obwohl die Suche sie führt. Was durchsucht wird, steht
+              ohnehin im leeren Zustand darunter. */}
           <Type variant="caption" tone="text3" tabular>
             {(() => {
               const noteCount = (notes ?? []).filter((n) => n.deletedAt === null).length;
-              return `${(tasks ?? []).length} ${(tasks ?? []).length === 1 ? 'Aufgabe' : 'Aufgaben'} · ${(lists ?? []).length} ${(lists ?? []).length === 1 ? 'Liste' : 'Listen'} · ${noteCount} ${noteCount === 1 ? 'Notiz' : 'Notizen'} durchsuchbar`;
+              return `${(tasks ?? []).length} ${(tasks ?? []).length === 1 ? 'Aufgabe' : 'Aufgaben'} · ${(lists ?? []).length} ${(lists ?? []).length === 1 ? 'Liste' : 'Listen'} · ${noteCount} ${noteCount === 1 ? 'Notiz' : 'Notizen'}`;
             })()}
           </Type>
         </View>

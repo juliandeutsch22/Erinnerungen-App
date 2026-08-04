@@ -1,9 +1,9 @@
 // personen.tsx — alle Personen, vollständig.
 //
-// Der Listen-Tab zeigt seit v1.78.0 nur noch die, bei denen etwas liegt: er
-// beantwortet „was liegt bei wem?", und wer nichts offen hat, ist darauf keine
-// Antwort. Hier ist der Ort für die vollständige Liste — mit demselben Suchfeld
-// wie im Zuordnungs-Block, damit man bei vielen Namen nicht scrollen muss.
+// Der Listen-Tab zeigt seit v1.78.0 nur noch DREI — die, bei denen am meisten
+// liegt. Er beantwortet „was liegt bei wem?", und dafür braucht es keine
+// vollständige Liste. Hier ist der Ort für die vollständige, mit einem
+// Suchfeld, damit man bei vielen Namen nicht scrollen muss.
 //
 // Bewusst KEIN sechster Tab: man kommt selten hierher, und wenn, dann von der
 // Stelle, an der einem die Person gerade fehlt.
