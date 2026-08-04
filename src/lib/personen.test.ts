@@ -1,4 +1,4 @@
-// personMerge.test.ts — der Kitt zwischen den zwei Wegen zu einer Person.
+// personen.test.ts — der Kitt zwischen den zwei Wegen zu einer Person.
 //
 // Stoa hat zwei: den schnellen im Aufgaben-/Termin-Editor (nur ein Name) und
 // den ausführlichen im Listen-Tab (Nummer, E-Mail, Adressbuch). Der schnelle
@@ -7,7 +7,7 @@
 // zwei Ansichten verteilt. Diese Datei prüft, dass beides nicht passiert.
 import type { NewPerson, Person } from '@/data/types';
 
-import { filterPersonen, findePerson, kuerzePersonen, personNachtrag } from './personMerge';
+import { filterPersonen, findePerson, kuerzePersonen, ordnePersonen, personNachtrag } from './personen';
 
 const person = (p: Partial<Person> & { id: string; name: string }): Person => ({
   note: null,
@@ -137,5 +137,39 @@ describe('personNachtrag', () => {
   it('sagt mit einem leeren Ergebnis, dass nichts zu schreiben ist', () => {
     const anna = person({ id: 'p1', name: 'Anna' });
     expect(personNachtrag(anna, eingabe({ name: 'Anna' }))).toEqual({});
+  });
+});
+
+describe('ordnePersonen', () => {
+  const anna = person({ id: 'p1', name: 'Anna', createdAt: '2026-01-01T00:00:00.000Z' });
+  const brandt = person({ id: 'p2', name: 'Brandt', createdAt: '2026-02-01T00:00:00.000Z' });
+  const papa = person({ id: 'p3', name: 'Papa', createdAt: '2026-03-01T00:00:00.000Z' });
+  const alle = [anna, brandt, papa];
+
+  it('stellt die jüngste nach vorn, wenn bei niemandem etwas liegt', () => {
+    // Sonst wäre eine gerade angelegte Person hinter allen älteren — und damit
+    // hinter der Kürzungsgrenze. Man legt sie an und sie ist weg.
+    expect(ordnePersonen(alle, new Map()).map((p) => p.id)).toEqual(['p3', 'p2', 'p1']);
+  });
+
+  it('holt trotzdem nach vorn, bei wem etwas liegt', () => {
+    const last = new Map([['p1', { wartend: 0, offen: 2 }]]);
+    expect(ordnePersonen(alle, last).map((p) => p.id)).toEqual(['p1', 'p3', 'p2']);
+  });
+
+  it('wiegt Wartendes schwerer als Offenes — daran arbeitet man selbst nicht', () => {
+    const last = new Map([
+      ['p1', { wartend: 0, offen: 9 }],
+      ['p2', { wartend: 1, offen: 0 }],
+    ]);
+    expect(ordnePersonen(alle, last).map((p) => p.id)).toEqual(['p2', 'p1', 'p3']);
+  });
+
+  it('entscheidet Gleichstand nach dem Alter', () => {
+    const last = new Map([
+      ['p1', { wartend: 1, offen: 0 }],
+      ['p2', { wartend: 1, offen: 0 }],
+    ]);
+    expect(ordnePersonen(alle, last).map((p) => p.id)).toEqual(['p2', 'p1', 'p3']);
   });
 });

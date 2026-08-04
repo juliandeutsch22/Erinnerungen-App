@@ -30,7 +30,7 @@ import { Type } from '@/components/Type';
 import { useCompleteList, useCompleteTask, useLists, useReopenList, useReopenTask, useTasks } from '@/data/queries';
 import type { Task } from '@/data/types';
 import { todayStr } from '@/lib/dates';
-import { byTimeThenCreation, groupPlanned, isOpen, listProgress, listenGruppe, projectDeadlineLabel, projectState, recentlyCompleted } from '@/lib/taskLogic';
+import { byTimeThenCreation, groupPlanned, isOpen, kuerzeErledigte, listProgress, listenGruppe, projectDeadlineLabel, projectState, recentlyCompleted } from '@/lib/taskLogic';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { shareText } from '@/lib/share';
 import { listToShareText } from '@/lib/shareText';
@@ -123,6 +123,10 @@ export default function ListeDetailScreen() {
     return gruppen;
   }, [scoped, today]);
   const completed = useMemo(() => recentlyCompleted(scoped, today), [scoped, today]);
+  // In „Alle" werden aus 30 Tagen schnell dreistellige Zahlen — dann scrollt
+  // man an hundert abgehakten Zeilen vorbei, um an das zu kommen, was darunter
+  // steht. Gezeigt wird das Letzte; der Rest ist über die Suche erreichbar.
+  const [gezeigteErledigte, restErledigte] = useMemo(() => kuerzeErledigte(completed), [completed]);
   const progress = useMemo(() => listProgress(scoped), [scoped]);
   const isProject = !!(list && (list.goal || list.deadline));
   // Ruht das Projekt (abgeschlossen oder alles erledigt), mahnt nichts mehr.
@@ -328,7 +332,17 @@ export default function ListeDetailScreen() {
                 <Type variant="eyebrow" tone="text3">Erledigt · {completed.length}</Type>
                 <DisclosureChevron open={showCompleted} color={colors.text3} />
               </PressableScale>
-              {showCompleted && <View style={{ marginTop: Spacing.xs }}>{completed.map((t) => renderRow(t, isSmartView))}</View>}
+              {showCompleted && (
+                <View style={{ marginTop: Spacing.xs }}>
+                  {gezeigteErledigte.map((t) => renderRow(t, isSmartView))}
+                  {/* Nicht verschweigen, sondern den Weg nennen. */}
+                  {restErledigte > 0 && (
+                    <Type variant="caption" tone="text3" style={{ paddingTop: Spacing.sm }}>
+                      {`… und ${restErledigte} weitere aus den letzten 30 Tagen — über die Suche zu finden`}
+                    </Type>
+                  )}
+                </View>
+              )}
             </>
           )}
         </GlassPanel>

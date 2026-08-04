@@ -1,6 +1,6 @@
 // taskLogic.test.ts — Überfällig-Ableitung, Abhak-Semantik, Gruppierungen.
 import type { List, Task } from '@/data/types';
-import { adoptOverdueToToday, groupPlanned, listProgress, groupToday, groupUpcomingDays, isDueToday, isOverdue, recentlyCompleted, resolveCompletion, projectState, projectDeadlineLabel, projectShowsDeadline, isCurrent, isDormant, isExpired, isWaiting, expiredTasks, lifespanLabel, listenGruppe, waitingLabel, waitingTasks } from './taskLogic';
+import { adoptOverdueToToday, groupPlanned, listProgress, groupToday, groupUpcomingDays, isDueToday, isOverdue, recentlyCompleted, resolveCompletion, projectState, projectDeadlineLabel, projectShowsDeadline, kuerzeErledigte, isCurrent, isDormant, isExpired, isWaiting, expiredTasks, lifespanLabel, listenGruppe, waitingLabel, waitingTasks } from './taskLogic';
 
 const TODAY = '2026-07-03';
 
@@ -80,6 +80,35 @@ describe('recentlyCompleted', () => {
     const older = task({ id: 'b', completedAt: '2026-06-10T10:00:00.000Z' });
     const ancient = task({ id: 'c', completedAt: '2026-05-01T10:00:00.000Z' });
     expect(recentlyCompleted([older, ancient, fresh], TODAY).map((t) => t.id)).toEqual(['a', 'b']);
+  });
+});
+
+describe('kuerzeErledigte', () => {
+  const viele = Array.from({ length: 40 }, (_, i) => task({ id: `t${i}` }));
+
+  it('lässt kurze Listen ganz', () => {
+    const [gezeigt, rest] = kuerzeErledigte(viele.slice(0, 5));
+    expect(gezeigt).toHaveLength(5);
+    expect(rest).toBe(0);
+  });
+
+  it('kürzt auf die Grenze und beziffert den Rest', () => {
+    // In „Alle" werden aus 30 Tagen schnell dreistellige Zahlen; wer das Panel
+    // darunter erreichen will, scrollte vorher daran vorbei.
+    const [gezeigt, rest] = kuerzeErledigte(viele, 15);
+    expect(gezeigt).toHaveLength(15);
+    expect(rest).toBe(25);
+  });
+
+  it('behält die Reihenfolge — das Letzte zuerst', () => {
+    const [gezeigt] = kuerzeErledigte(viele, 3);
+    expect(gezeigt.map((t) => t.id)).toEqual(['t0', 't1', 't2']);
+  });
+
+  it('kommt mit genau der Grenze klar', () => {
+    const [gezeigt, rest] = kuerzeErledigte(viele.slice(0, 15), 15);
+    expect(gezeigt).toHaveLength(15);
+    expect(rest).toBe(0);
   });
 });
 

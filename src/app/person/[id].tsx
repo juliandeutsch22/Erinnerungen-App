@@ -13,6 +13,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Linking, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { DisclosureChevron } from '@/components/DisclosureChevron';
 import { GlassPanel } from '@/components/GlassPanel';
 import { PersonEditorSheet } from '@/components/PersonEditorSheet';
 import { PressableScale } from '@/components/PressableScale';
@@ -36,7 +37,7 @@ import { addDays, formatDueDate, toDateStr, todayStr } from '@/lib/dates';
 import { hasCalendarPermission } from '@/lib/deviceCalendar';
 import { hapticSelect } from '@/lib/haptics';
 import { noteTitle } from '@/lib/noteLogic';
-import { isOpen, isWaiting, recentlyCompleted } from '@/lib/taskLogic';
+import { isOpen, isWaiting, kuerzeErledigte, recentlyCompleted } from '@/lib/taskLogic';
 import { useColors } from '@/theme/ThemeProvider';
 import { R, Spacing } from '@/theme/theme.tokens';
 
@@ -67,6 +68,8 @@ export default function PersonScreen() {
   const wartend = useMemo(() => meine.filter((t) => isWaiting(t)), [meine]);
   const offen = useMemo(() => meine.filter((t) => isOpen(t) && !isWaiting(t)), [meine]);
   const erledigt = useMemo(() => recentlyCompleted(meine, today), [meine, today]);
+  const [gezeigteErledigte, restErledigte] = useMemo(() => kuerzeErledigte(erledigt), [erledigt]);
+  const [zeigeErledigt, setZeigeErledigt] = useState(false);
   const meineNotizen = useMemo(
     () => (notes ?? []).filter((n) => n.personId === id && n.deletedAt === null),
     [notes, id],
@@ -296,11 +299,32 @@ export default function PersonScreen() {
                 </View>
               )}
 
+              {/* Eingeklappt — bei einer langen Bekanntschaft ist das der
+                  längste Abschnitt hier, und der uninteressanteste. */}
               {erledigt.length > 0 && (
                 <View>
                   <Seam variant="ornament" marginVertical={Spacing.md} />
-                  <Type variant="eyebrow" tone="text3">Erledigt · {erledigt.length}</Type>
-                  <View style={{ marginTop: Spacing.xs }}>{erledigt.map(renderRow)}</View>
+                  <PressableScale
+                    accessibilityLabel={zeigeErledigt ? 'Erledigte ausblenden' : 'Erledigte anzeigen'}
+                    onPress={() => {
+                      hapticSelect();
+                      setZeigeErledigt((v) => !v);
+                    }}
+                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+                  >
+                    <Type variant="eyebrow" tone="text3">Erledigt · {erledigt.length}</Type>
+                    <DisclosureChevron open={zeigeErledigt} color={colors.text3} />
+                  </PressableScale>
+                  {zeigeErledigt && (
+                    <View style={{ marginTop: Spacing.xs }}>
+                      {gezeigteErledigte.map(renderRow)}
+                      {restErledigte > 0 && (
+                        <Type variant="caption" tone="text3" style={{ paddingTop: Spacing.sm }}>
+                          {`… und ${restErledigte} weitere aus den letzten 30 Tagen — über die Suche zu finden`}
+                        </Type>
+                      )}
+                    </View>
+                  )}
                 </View>
               )}
             </>

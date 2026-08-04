@@ -18,7 +18,7 @@ import { Group, RowDivider } from '@/components/SheetParts';
 import { Type } from '@/components/Type';
 import { useCreatePerson, usePeople } from '@/data/personQueries';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
-import { filterPersonen, kuerzePersonen } from '@/lib/personMerge';
+import { filterPersonen, kuerzePersonen } from '@/lib/personen';
 import { webNoOutline } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
 import { R, Spacing, T } from '@/theme/theme.tokens';

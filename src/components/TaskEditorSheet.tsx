@@ -3,7 +3,7 @@
 // Detail-Zeilen (Liste / Fällig / Wiederholung / Flagge) mit aktuellem Wert,
 // die erst beim Antippen ihre Chips aufklappen — keine Chip-Wand. Der
 // Primär-Button sitzt fest im Sheet-Footer. Löschen zweistufig.
-import { CalendarDays, CalendarX2, Clock, Flag, ListChecks, type LucideIcon, Minus, PauseCircle, Plus, Repeat, Tag as TagIcon, Trash2, UserRound, X, Hourglass, Moon } from 'lucide-react-native';
+import { CalendarDays, CalendarX2, Clock, Flag, Hourglass, ListChecks, Minus, Moon, MoreHorizontal, PauseCircle, Plus, Repeat, Tag as TagIcon, Trash2, UserRound, X, type LucideIcon } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { TextInput, View } from 'react-native';
 
@@ -117,6 +117,12 @@ export function TaskEditorSheet({
   const [confirmDelete, setConfirmDelete] = useState(false);
   // Neue Aufgabe: Fällig direkt offen (häufigste Aktion); Bearbeiten: alles kompakt.
   const [section, setSection] = useState<Section | null>(task === null ? 'due' : null);
+  /**
+   * „Mehr": die selten gebrauchten Zeilen. Eine Zeile MIT Inhalt zeigt sich
+   * immer — sonst wäre ein gesetzter Zeitraum plötzlich unsichtbar, und das
+   * Aufräumen hätte eine Funktion gekostet statt Platz zu schaffen.
+   */
+  const [mehr, setMehr] = useState(false);
 
   const canSave = title.trim().length > 0;
   const isEdit = task !== null;
@@ -216,6 +222,13 @@ export function TaskEditorSheet({
     onSaved?.();
     onClose();
   };
+
+  const zeigeZeitraum = mehr || startDate !== null || expiresOn !== null;
+  const zeigeWarten = mehr || waiting;
+  const zeigeWiederholung = mehr || rrule !== null;
+  const zeigeFlagge = mehr || flagged;
+  /** Ist ohnehin alles zu sehen, braucht es den Aufklapper nicht. */
+  const alleWeiteren = zeigeZeitraum && zeigeWarten && zeigeWiederholung && zeigeFlagge;
 
   const footer = (
     <View>
@@ -421,73 +434,6 @@ export function TaskEditorSheet({
         )}
         <RowDivider />
 
-        {/* Lebensspanne — ab wann sie auftaucht, bis wann sie Sinn hat.
-            Zusammen in EINER Zeile: es sind die zwei Enden derselben Sache,
-            und getrennt wären es zwei Zeilen, die fast nie beide benutzt werden. */}
-        <DetailRow
-          icon={Hourglass}
-          iconColor={startDate || expiresOn ? colors.teal : colors.text3}
-          label="Zeitraum"
-          value={spanLabel}
-          valueTone={startDate || expiresOn ? 'teal' : 'text3'}
-          expanded={section === 'span'}
-          onPress={() => toggleSection('span')}
-        />
-        {section === 'span' && (
-          <Expanded>
-            <View style={{ gap: Spacing.md }}>
-              <View style={{ gap: Spacing.xs }}>
-                <Type variant="label" tone="text2">Zeig sie mir ab</Type>
-                <Type variant="caption" tone="text3">
-                  Vorher liegt sie nicht im Weg — sie ist da, nur nicht jetzt.
-                </Type>
-                <View style={{ borderRadius: R.lg, borderWidth: 1, borderColor: colors.chipBorder, backgroundColor: colors.bg2, padding: Spacing.sm }}>
-                  <MiniCalendar selected={startDate} onSelect={setStartDate} />
-                </View>
-                {startDate && (
-                  <PressableScale
-                    accessibilityLabel="Startdatum entfernen"
-                    onPress={() => {
-                      hapticSelect();
-                      setStartDate(null);
-                    }}
-                    style={{ alignSelf: 'center', paddingVertical: Spacing.xs }}
-                  >
-                    <Type variant="label" tone="text3">Startdatum entfernen</Type>
-                  </PressableScale>
-                )}
-              </View>
-
-              <Seam />
-
-              <View style={{ gap: Spacing.xs }}>
-                <Type variant="label" tone="text2">Danach ist sie gegenstandslos</Type>
-                <Type variant="caption" tone="text3">
-                  Nicht überfällig, sondern erledigt durch Zeitablauf — Karten fürs
-                  Konzert kauft man danach nicht mehr.
-                </Type>
-                <View style={{ borderRadius: R.lg, borderWidth: 1, borderColor: colors.chipBorder, backgroundColor: colors.bg2, padding: Spacing.sm }}>
-                  <MiniCalendar selected={expiresOn} onSelect={setExpiresOn} />
-                </View>
-                {expiresOn && (
-                  <PressableScale
-                    accessibilityLabel="Verfallsdatum entfernen"
-                    onPress={() => {
-                      hapticSelect();
-                      setExpiresOn(null);
-                    }}
-                    style={{ alignSelf: 'center', paddingVertical: Spacing.xs }}
-                  >
-                    <Type variant="label" tone="text3">Verfallsdatum entfernen</Type>
-                  </PressableScale>
-                )}
-              </View>
-            </View>
-          </Expanded>
-        )}
-
-        <RowDivider />
-
         {/* An wem hängt das? Steht VOR „Warten auf", weil das Warten meistens
             auf genau diese Person zeigt — und weil sie auch ohne
             Warten trägt („mit Anna wegen Urlaub reden"). */}
@@ -509,203 +455,307 @@ export function TaskEditorSheet({
               <PersonWahl selected={personId} onSelect={setPersonId} />
             </View>
           </Expanded>
+          )}
+
+        {/* „Mehr" — die selten gebrauchten Zeilen. Sichtbar sind sie
+            trotzdem, SOBALD sie etwas enthalten: eine gesetzte Wiederholung
+            hinter einem Aufklapper zu verstecken hieße, sie zu verlieren.
+            Vorher standen hier immer sieben Zeilen, auch für die Aufgabe, die
+            nichts weiter braucht als einen Titel und ein Datum. */}
+        {!alleWeiteren && (
+          <>
+            <RowDivider />
+            <PressableScale
+              accessibilityLabel={mehr ? 'Weniger Felder' : 'Mehr Felder'}
+              onPress={() => {
+                hapticSelect();
+                setMehr((v) => !v);
+              }}
+              pressedScale={0.99}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.md, paddingHorizontal: Spacing.md }}
+            >
+              <MoreHorizontal size={18} color={colors.text3} strokeWidth={2} />
+              <Type variant="body" tone="text2" style={{ flex: 1 }}>{mehr ? 'Weniger' : 'Mehr'}</Type>
+              <DisclosureChevron open={mehr} color={colors.text3} />
+            </PressableScale>
+          </>
         )}
 
-        <RowDivider />
+        {zeigeZeitraum && (
+          <>
+            <RowDivider />
+          {/* Lebensspanne — ab wann sie auftaucht, bis wann sie Sinn hat.
+              Zusammen in EINER Zeile: es sind die zwei Enden derselben Sache,
+              und getrennt wären es zwei Zeilen, die fast nie beide benutzt werden. */}
+          <DetailRow
+            icon={Hourglass}
+            iconColor={startDate || expiresOn ? colors.teal : colors.text3}
+            label="Zeitraum"
+            value={spanLabel}
+            valueTone={startDate || expiresOn ? 'teal' : 'text3'}
+            expanded={section === 'span'}
+            onPress={() => toggleSection('span')}
+          />
+          {section === 'span' && (
+            <Expanded>
+              <View style={{ gap: Spacing.md }}>
+                <View style={{ gap: Spacing.xs }}>
+                  <Type variant="label" tone="text2">Zeig sie mir ab</Type>
+                  <Type variant="caption" tone="text3">
+                    Vorher liegt sie nicht im Weg — sie ist da, nur nicht jetzt.
+                  </Type>
+                  <View style={{ borderRadius: R.lg, borderWidth: 1, borderColor: colors.chipBorder, backgroundColor: colors.bg2, padding: Spacing.sm }}>
+                    <MiniCalendar selected={startDate} onSelect={setStartDate} />
+                  </View>
+                  {startDate && (
+                    <PressableScale
+                      accessibilityLabel="Startdatum entfernen"
+                      onPress={() => {
+                        hapticSelect();
+                        setStartDate(null);
+                      }}
+                      style={{ alignSelf: 'center', paddingVertical: Spacing.xs }}
+                    >
+                      <Type variant="label" tone="text3">Startdatum entfernen</Type>
+                    </PressableScale>
+                  )}
+                </View>
 
-        {/* Warten auf — die Aufgabe liegt bei jemand anderem. */}
-        <DetailRow
-          icon={PauseCircle}
-          iconColor={waiting ? colors.teal : colors.text3}
-          label="Warten auf"
-          value={waitingLabelKurz}
-          valueTone={waiting ? 'teal' : 'text3'}
-          expanded={section === 'waiting'}
-          onPress={() => toggleSection('waiting')}
-        />
-        {section === 'waiting' && (
-          <Expanded>
-            <View style={{ gap: Spacing.sm }}>
-              <Type variant="caption" tone="text3">
-                Liegt bei jemand anderem: verschwindet aus „Heute" und aus dem
-                Überfällig-Stapel, bleibt aber im Projekt, in der Suche und in
-                der eigenen Ansicht. Es mahnt nichts.
-              </Type>
-              <PressableScale
-                accessibilityRole="switch"
-                accessibilityState={{ checked: waiting }}
-                accessibilityLabel={waiting ? 'Nicht mehr warten' : 'Auf jemanden warten'}
-                onPress={() => {
-                  hapticSelect();
-                  setWaiting((v) => !v);
-                }}
-                pressedScale={0.99}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.xs }}
-              >
-                <PauseCircle size={18} color={waiting ? colors.teal : colors.text3} strokeWidth={2} />
-                <Type variant="body" style={{ flex: 1 }}>Ich warte darauf</Type>
-                <Type variant="label" tone={waiting ? 'teal' : 'text3'}>{waiting ? 'An' : 'Aus'}</Type>
-              </PressableScale>
-              {waiting && (
+                <Seam />
+
+                <View style={{ gap: Spacing.xs }}>
+                  <Type variant="label" tone="text2">Danach ist sie gegenstandslos</Type>
+                  <Type variant="caption" tone="text3">
+                    Nicht überfällig, sondern erledigt durch Zeitablauf — Karten fürs
+                    Konzert kauft man danach nicht mehr.
+                  </Type>
+                  <View style={{ borderRadius: R.lg, borderWidth: 1, borderColor: colors.chipBorder, backgroundColor: colors.bg2, padding: Spacing.sm }}>
+                    <MiniCalendar selected={expiresOn} onSelect={setExpiresOn} />
+                  </View>
+                  {expiresOn && (
+                    <PressableScale
+                      accessibilityLabel="Verfallsdatum entfernen"
+                      onPress={() => {
+                        hapticSelect();
+                        setExpiresOn(null);
+                      }}
+                      style={{ alignSelf: 'center', paddingVertical: Spacing.xs }}
+                    >
+                      <Type variant="label" tone="text3">Verfallsdatum entfernen</Type>
+                    </PressableScale>
+                  )}
+                </View>
+              </View>
+            </Expanded>
+            )}
+          </>
+        )}
+
+        {zeigeWarten && (
+          <>
+            <RowDivider />
+          {/* Warten auf — die Aufgabe liegt bei jemand anderem. */}
+          <DetailRow
+            icon={PauseCircle}
+            iconColor={waiting ? colors.teal : colors.text3}
+            label="Warten auf"
+            value={waitingLabelKurz}
+            valueTone={waiting ? 'teal' : 'text3'}
+            expanded={section === 'waiting'}
+            onPress={() => toggleSection('waiting')}
+          />
+          {section === 'waiting' && (
+            <Expanded>
+              <View style={{ gap: Spacing.sm }}>
+                <Type variant="caption" tone="text3">
+                  Liegt bei jemand anderem: verschwindet aus „Heute" und aus dem
+                  Überfällig-Stapel, bleibt aber im Projekt, in der Suche und in
+                  der eigenen Ansicht. Es mahnt nichts.
+                </Type>
+                <PressableScale
+                  accessibilityRole="switch"
+                  accessibilityState={{ checked: waiting }}
+                  accessibilityLabel={waiting ? 'Nicht mehr warten' : 'Auf jemanden warten'}
+                  onPress={() => {
+                    hapticSelect();
+                    setWaiting((v) => !v);
+                  }}
+                  pressedScale={0.99}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.xs }}
+                >
+                  <PauseCircle size={18} color={waiting ? colors.teal : colors.text3} strokeWidth={2} />
+                  <Type variant="body" style={{ flex: 1 }}>Ich warte darauf</Type>
+                  <Type variant="label" tone={waiting ? 'teal' : 'text3'}>{waiting ? 'An' : 'Aus'}</Type>
+                </PressableScale>
+                {waiting && (
+                  <TextInput
+                    accessibilityLabel="Worauf gewartet wird"
+                    value={waitingFor}
+                    onChangeText={setWaitingFor}
+                    placeholder="Worauf? (z. B. Angebot, Rückruf)"
+                    placeholderTextColor={colors.text3}
+                    style={[
+                      { fontSize: T.md, color: colors.text, borderRadius: R.lg, borderWidth: 1, borderColor: colors.chipBorder, backgroundColor: colors.bg2, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm + 2 },
+                      webNoOutline,
+                    ]}
+                  />
+                )}
+              </View>
+            </Expanded>
+            )}
+          </>
+        )}
+
+        {zeigeWiederholung && (
+          <>
+            <RowDivider />
+          {/* Wiederholung */}
+          <DetailRow
+            icon={Repeat}
+            iconColor={rrule ? colors.teal : colors.text3}
+            label="Wiederholung"
+            value={rrule ? rruleLabel(rrule) + (rruleUntil ? ' · endet' : '') : 'Nie'}
+            valueTone={rrule ? 'teal' : 'text3'}
+            expanded={section === 'repeat'}
+            onPress={() => toggleSection('repeat')}
+          />
+          {section === 'repeat' && (
+            <Expanded>
+              {/* Ein Satz statt einer Chip-Liste: „Alle [n] [Einheit]" — damit ist
+                  JEDER Zeitraum möglich, nicht nur vorgedachte. */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+                <Type variant="body" tone="text2">Alle</Type>
+                <PressableScale
+                  accessibilityLabel="Weniger"
+                  onPress={() => applyParts(String(Math.max(1, Number(count) - 1)), unit, afterDone)}
+                  style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.chip, alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Minus size={16} color={colors.text2} strokeWidth={2.4} />
+                </PressableScale>
                 <TextInput
-                  accessibilityLabel="Worauf gewartet wird"
-                  value={waitingFor}
-                  onChangeText={setWaitingFor}
-                  placeholder="Worauf? (z. B. Angebot, Rückruf)"
-                  placeholderTextColor={colors.text3}
+                  value={count}
+                  onChangeText={(t) => applyParts(t.replace(/[^0-9]/g, '').slice(0, 3), unit, afterDone)}
+                  keyboardType="number-pad"
+                  accessibilityLabel="Anzahl"
+                  selectTextOnFocus
+                  {...keyboardDoneProps}
                   style={[
-                    { fontSize: T.md, color: colors.text, borderRadius: R.lg, borderWidth: 1, borderColor: colors.chipBorder, backgroundColor: colors.bg2, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm + 2 },
+                    { width: 56, textAlign: 'center', paddingVertical: 6, borderRadius: R.md, backgroundColor: colors.chip, color: colors.text, fontSize: T.md, fontVariant: ['tabular-nums'] },
                     webNoOutline,
                   ]}
                 />
-              )}
-            </View>
-          </Expanded>
-        )}
-
-        <RowDivider />
-
-        {/* Wiederholung */}
-        <DetailRow
-          icon={Repeat}
-          iconColor={rrule ? colors.teal : colors.text3}
-          label="Wiederholung"
-          value={rrule ? rruleLabel(rrule) + (rruleUntil ? ' · endet' : '') : 'Nie'}
-          valueTone={rrule ? 'teal' : 'text3'}
-          expanded={section === 'repeat'}
-          onPress={() => toggleSection('repeat')}
-        />
-        {section === 'repeat' && (
-          <Expanded>
-            {/* Ein Satz statt einer Chip-Liste: „Alle [n] [Einheit]" — damit ist
-                JEDER Zeitraum möglich, nicht nur vorgedachte. */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
-              <Type variant="body" tone="text2">Alle</Type>
-              <PressableScale
-                accessibilityLabel="Weniger"
-                onPress={() => applyParts(String(Math.max(1, Number(count) - 1)), unit, afterDone)}
-                style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.chip, alignItems: 'center', justifyContent: 'center' }}
-              >
-                <Minus size={16} color={colors.text2} strokeWidth={2.4} />
-              </PressableScale>
-              <TextInput
-                value={count}
-                onChangeText={(t) => applyParts(t.replace(/[^0-9]/g, '').slice(0, 3), unit, afterDone)}
-                keyboardType="number-pad"
-                accessibilityLabel="Anzahl"
-                selectTextOnFocus
-                {...keyboardDoneProps}
-                style={[
-                  { width: 56, textAlign: 'center', paddingVertical: 6, borderRadius: R.md, backgroundColor: colors.chip, color: colors.text, fontSize: T.md, fontVariant: ['tabular-nums'] },
-                  webNoOutline,
-                ]}
-              />
-              <PressableScale
-                accessibilityLabel="Mehr"
-                onPress={() => applyParts(String(Math.min(999, Number(count) + 1)), unit, afterDone)}
-                style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.chip, alignItems: 'center', justifyContent: 'center' }}
-              >
-                <Plus size={16} color={colors.text2} strokeWidth={2.4} />
-              </PressableScale>
-            </View>
-            <ChipWrap>
-              {UNITS.map((u) => (
-                <Chip
-                  key={u.value}
-                  label={u.label}
-                  active={rrule !== null && !isWeekdayRule(rrule) && unit === u.value}
-                  onPress={() => applyParts(count, u.value, afterDone)}
-                />
-              ))}
-            </ChipWrap>
-
-            {/* Der eigentliche Unterschied — in einem Satz erklärt. */}
-            <Type variant="eyebrow" tone="text3" style={{ marginTop: Spacing.md, marginBottom: Spacing.xs }}>Gezählt ab</Type>
-            <ChipWrap>
-              <Chip
-                label="Fälligkeit"
-                active={rrule !== null && !isWeekdayRule(rrule) && !afterDone}
-                onPress={() => applyParts(count, unit, false)}
-              />
-              <Chip
-                label="Erledigen"
-                active={afterDone}
-                onPress={() => applyParts(count, unit, true)}
-              />
-            </ChipWrap>
-            <Type variant="caption" tone="text3" style={{ marginTop: Spacing.xs }}>
-              {afterDone
-                ? 'Der nächste Termin zählt ab dem Tag, an dem du abhakst.'
-                : 'Der nächste Termin folgt dem Kalender, unabhängig vom Abhaken.'}
-            </Type>
-
-            {/* Feste Tage: „jeden Montag und Donnerstag" lässt sich als „alle n
-                Wochen" nicht ausdrücken. Mo–Fr ergibt automatisch das
-                bestehende Preset „Werktags" (buildWeekdayRrule) — deshalb
-                braucht es dafür keinen eigenen Knopf mehr. */}
-            <Type variant="eyebrow" tone="text3" style={{ marginTop: Spacing.md, marginBottom: Spacing.xs }}>An festen Tagen</Type>
-            <ChipWrap>
-              {WEEKDAY_ORDER.map((tag) => {
-                const gewaehlt = weekdaysOf(rrule);
-                const an = gewaehlt.includes(tag);
-                return (
+                <PressableScale
+                  accessibilityLabel="Mehr"
+                  onPress={() => applyParts(String(Math.min(999, Number(count) + 1)), unit, afterDone)}
+                  style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.chip, alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Plus size={16} color={colors.text2} strokeWidth={2.4} />
+                </PressableScale>
+              </View>
+              <ChipWrap>
+                {UNITS.map((u) => (
                   <Chip
-                    key={tag}
-                    label={WEEKDAY_SHORT[tag]}
-                    active={an}
-                    onPress={() => {
-                      const naechste = an ? gewaehlt.filter((t) => t !== tag) : [...gewaehlt, tag];
-                      const gebaut = buildWeekdayRrule(naechste);
-                      setRrule(gebaut);
-                      if (!gebaut) setRruleUntil(null);
-                    }}
+                    key={u.value}
+                    label={u.label}
+                    active={rrule !== null && !isWeekdayRule(rrule) && unit === u.value}
+                    onPress={() => applyParts(count, u.value, afterDone)}
                   />
-                );
-              })}
-            </ChipWrap>
+                ))}
+              </ChipWrap>
 
-            <Type variant="eyebrow" tone="text3" style={{ marginTop: Spacing.md, marginBottom: Spacing.xs }}>Sonderfall</Type>
-            <ChipWrap>
-              <Chip label="Nie" active={rrule === null} onPress={() => { setRrule(null); setRruleUntil(null); }} />
-            </ChipWrap>
+              {/* Der eigentliche Unterschied — in einem Satz erklärt. */}
+              <Type variant="eyebrow" tone="text3" style={{ marginTop: Spacing.md, marginBottom: Spacing.xs }}>Gezählt ab</Type>
+              <ChipWrap>
+                <Chip
+                  label="Fälligkeit"
+                  active={rrule !== null && !isWeekdayRule(rrule) && !afterDone}
+                  onPress={() => applyParts(count, unit, false)}
+                />
+                <Chip
+                  label="Erledigen"
+                  active={afterDone}
+                  onPress={() => applyParts(count, unit, true)}
+                />
+              </ChipWrap>
+              <Type variant="caption" tone="text3" style={{ marginTop: Spacing.xs }}>
+                {afterDone
+                  ? 'Der nächste Termin zählt ab dem Tag, an dem du abhakst.'
+                  : 'Der nächste Termin folgt dem Kalender, unabhängig vom Abhaken.'}
+              </Type>
 
-            {rrule && (
-              <>
-                <Type variant="eyebrow" tone="text3" style={{ marginTop: Spacing.md, marginBottom: Spacing.xs }}>Endet</Type>
-                <ChipWrap>
-                  {ENDS.map((e) => {
-                    const date = e.months === null ? null : addMonths(today, e.months);
-                    const active = e.months === null ? rruleUntil === null : rruleUntil === date;
-                    return <Chip key={e.label} label={e.label} active={active} onPress={() => setRruleUntil(date)} />;
-                  })}
-                </ChipWrap>
-              </>
+              {/* Feste Tage: „jeden Montag und Donnerstag" lässt sich als „alle n
+                  Wochen" nicht ausdrücken. Mo–Fr ergibt automatisch das
+                  bestehende Preset „Werktags" (buildWeekdayRrule) — deshalb
+                  braucht es dafür keinen eigenen Knopf mehr. */}
+              <Type variant="eyebrow" tone="text3" style={{ marginTop: Spacing.md, marginBottom: Spacing.xs }}>An festen Tagen</Type>
+              <ChipWrap>
+                {WEEKDAY_ORDER.map((tag) => {
+                  const gewaehlt = weekdaysOf(rrule);
+                  const an = gewaehlt.includes(tag);
+                  return (
+                    <Chip
+                      key={tag}
+                      label={WEEKDAY_SHORT[tag]}
+                      active={an}
+                      onPress={() => {
+                        const naechste = an ? gewaehlt.filter((t) => t !== tag) : [...gewaehlt, tag];
+                        const gebaut = buildWeekdayRrule(naechste);
+                        setRrule(gebaut);
+                        if (!gebaut) setRruleUntil(null);
+                      }}
+                    />
+                  );
+                })}
+              </ChipWrap>
+
+              <Type variant="eyebrow" tone="text3" style={{ marginTop: Spacing.md, marginBottom: Spacing.xs }}>Sonderfall</Type>
+              <ChipWrap>
+                <Chip label="Nie" active={rrule === null} onPress={() => { setRrule(null); setRruleUntil(null); }} />
+              </ChipWrap>
+
+              {rrule && (
+                <>
+                  <Type variant="eyebrow" tone="text3" style={{ marginTop: Spacing.md, marginBottom: Spacing.xs }}>Endet</Type>
+                  <ChipWrap>
+                    {ENDS.map((e) => {
+                      const date = e.months === null ? null : addMonths(today, e.months);
+                      const active = e.months === null ? rruleUntil === null : rruleUntil === date;
+                      return <Chip key={e.label} label={e.label} active={active} onPress={() => setRruleUntil(date)} />;
+                    })}
+                  </ChipWrap>
+                </>
+              )}
+            </Expanded>
             )}
-          </Expanded>
+          </>
         )}
-        <RowDivider />
 
-        {/* Flagge: direkter Schalter, kein Aufklappen nötig. */}
-        <PressableScale
-          accessibilityRole="switch"
-          accessibilityState={{ checked: flagged }}
-          accessibilityLabel={flagged ? 'Flagge entfernen' : 'Flagge setzen'}
-          onPress={() => {
-            hapticSelect();
-            setFlagged((v) => !v);
-          }}
-          pressedScale={0.99}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.md, paddingHorizontal: Spacing.md }}
-        >
-          <Flag
-            size={18}
-            color={flagged ? colors.indigo : colors.text3}
-            fill={flagged ? colors.indigo : 'transparent'}
-            strokeWidth={2}
-          />
-          <Type variant="body" style={{ flex: 1 }}>Flagge</Type>
-          <Type variant="label" tone={flagged ? 'indigo' : 'text3'}>{flagged ? 'Gesetzt' : 'Aus'}</Type>
-        </PressableScale>
+        {zeigeFlagge && (
+          <>
+            <RowDivider />
+          {/* Flagge: direkter Schalter, kein Aufklappen nötig. */}
+          <PressableScale
+            accessibilityRole="switch"
+            accessibilityState={{ checked: flagged }}
+            accessibilityLabel={flagged ? 'Flagge entfernen' : 'Flagge setzen'}
+            onPress={() => {
+              hapticSelect();
+              setFlagged((v) => !v);
+            }}
+            pressedScale={0.99}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.md, paddingHorizontal: Spacing.md }}
+          >
+            <Flag
+              size={18}
+              color={flagged ? colors.indigo : colors.text3}
+              fill={flagged ? colors.indigo : 'transparent'}
+              strokeWidth={2}
+            />
+            <Type variant="body" style={{ flex: 1 }}>Flagge</Type>
+            <Type variant="label" tone={flagged ? 'indigo' : 'text3'}>{flagged ? 'Gesetzt' : 'Aus'}</Type>
+          </PressableScale>
+          </>
+        )}
       </Group>
 
       {/* Tags — kontextübergreifend, per Eingabe + Vorschläge. */}

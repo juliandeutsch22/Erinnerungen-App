@@ -29,6 +29,26 @@ export function recentlyCompleted(tasks: Task[], today: string): Task[] {
     .sort((a, b) => (a.completedAt! < b.completedAt! ? 1 : -1));
 }
 
+/** So viele erledigte Aufgaben werden höchstens aufgelistet. */
+export const ERLEDIGT_KURZ = 15;
+
+/**
+ * Kürzt die Erledigt-Liste auf ein Maß, das man noch überblickt.
+ *
+ * Das 30-Tage-Fenster oben verhindert, dass die Liste EWIG wird — in „Alle"
+ * werden daraus trotzdem schnell dreistellige Zahlen, und dann scrollt man an
+ * hundert abgehakten Zeilen vorbei, um an das Panel darunter zu kommen.
+ *
+ * Wofür der Abschnitt da ist, sind zwei Fragen: „habe ich das schon abgehakt?"
+ * und „das war ein Versehen, zurück damit". Beide betreffen das Letzte, nicht
+ * das Vorletzte hundert. Was darüber hinausgeht, findet die Suche — sie führt
+ * Erledigte ausdrücklich mit.
+ */
+export function kuerzeErledigte(erledigte: Task[], grenze: number = ERLEDIGT_KURZ): [Task[], number] {
+  if (erledigte.length <= grenze) return [erledigte, 0];
+  return [erledigte.slice(0, grenze), erledigte.length - grenze];
+}
+
 /**
  * Abhak-Semantik (Fahrplan §5): mit Wiederholung wandert `dueDate` zum nächsten
  * Vorkommen nach heute und die Aufgabe bleibt offen; ohne Wiederholung wird

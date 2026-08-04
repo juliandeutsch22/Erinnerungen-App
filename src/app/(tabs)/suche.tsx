@@ -79,63 +79,92 @@ export default function SucheScreen() {
   const q = query.trim().toLowerCase();
   const inScope = (s: Scope) => scope === 'alle' || scope === s;
 
-  const taskHits = useMemo(() => {
-    if (!q || !inScope('aufgaben')) return [];
+  const taskHitsAlle = useMemo(() => {
+    if (!q) return [];
     // Volltext (Titel, Notiz, Tags, Unteraufgaben) — reine Logik in taskFilters.
     return (tasks ?? [])
       .filter((t) => taskMatchesQuery(t, q))
       .sort((a, b) => Number(a.completedAt !== null) - Number(b.completedAt !== null))
       .slice(0, 50);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks, q, scope]);
+  }, [tasks, q]);
 
-  const listHits = useMemo(() => {
-    if (!q || !inScope('listen')) return [];
+  const listHitsAlle = useMemo(() => {
+    if (!q) return [];
     return (lists ?? []).filter((l) => l.name.toLowerCase().includes(q));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lists, q, scope]);
+  }, [lists, q]);
 
   // Personen: Name UND Notiz - „Dachdecker“ findet sie auch, wenn sie
   // „Herr Brandt“ heißt und das Gewerbe nur in der Notiz steht.
-  const personHits = useMemo(() => {
-    if (!q || !inScope('personen')) return [];
+  const personHitsAlle = useMemo(() => {
+    if (!q) return [];
     return (people ?? []).filter((p) => p.name.toLowerCase().includes(q) || (p.note ?? '').toLowerCase().includes(q));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [people, q, scope]);
+  }, [people, q]);
 
-  const noteHits = useMemo(() => {
-    if (!q || !inScope('notizen')) return [];
+  const noteHitsAlle = useMemo(() => {
+    if (!q) return [];
     return (notes ?? []).filter((n) => n.deletedAt === null && n.body.toLowerCase().includes(q)).slice(0, 30);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notes, q, scope]);
+  }, [notes, q]);
 
   // Dokumente: Dateinamen durchsuchbar, Tippen öffnet die iOS-Vorschau.
   const { data: docs } = useDocuments();
-  const docHits = useMemo(() => {
-    if (!q || !inScope('dokumente')) return [];
+  const docHitsAlle = useMemo(() => {
+    if (!q) return [];
     return (docs ?? []).filter((d) => d.name.toLowerCase().includes(q)).slice(0, 20);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [docs, q, scope]);
+  }, [docs, q]);
 
   const { data: journalEntries } = useJournal();
-  const journalHits = useMemo(() => {
-    if (!q || !inScope('abend')) return [];
+  const journalHitsAlle = useMemo(() => {
+    if (!q) return [];
     return (journalEntries ?? []).filter((e) => e.text.toLowerCase().includes(q)).slice(0, 20);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [journalEntries, q, scope]);
+  }, [journalEntries, q]);
 
   const { data: chats } = useChats();
   const { data: allChatMessages } = useAllChatMessages();
-  const chatHits = useMemo(() => {
-    if (!q || !inScope('chats')) return [];
+  const chatHitsAlle = useMemo(() => {
+    if (!q) return [];
     const matchingChatIds = new Set(
       (allChatMessages ?? []).filter((m) => m.content.toLowerCase().includes(q)).map((m) => m.chatId),
     );
     return (chats ?? [])
       .filter((c) => c.deletedAt === null && (c.title.toLowerCase().includes(q) || matchingChatIds.has(c.id)))
       .slice(0, 20);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chats, allChatMessages, q, scope]);
+  }, [chats, allChatMessages, q]);
+
+  // Erst gesucht, dann gefiltert. Bis v1.77 rechnete jede Trefferliste den
+  // Bereich schon mit ein und lieferte sonst nichts — damit ließ sich nicht
+  // sagen, WIE VIEL in den anderen Bereichen läge, und die Chip-Reihe musste
+  // alle acht Bereiche anbieten, auch die leeren.
+  const taskHits = inScope('aufgaben') ? taskHitsAlle : [];
+  const listHits = inScope('listen') ? listHitsAlle : [];
+  const personHits = inScope('personen') ? personHitsAlle : [];
+  const noteHits = inScope('notizen') ? noteHitsAlle : [];
+  const docHits = inScope('dokumente') ? docHitsAlle : [];
+  const journalHits = inScope('abend') ? journalHitsAlle : [];
+  const chatHits = inScope('chats') ? chatHitsAlle : [];
+
+  /** Wie viel liegt in jedem Bereich? Grundlage der Chip-Reihe. */
+  const proBereich = useMemo(() => {
+    const m = new Map<Scope, number>();
+    m.set('aufgaben', taskHitsAlle.length);
+    m.set('listen', listHitsAlle.length);
+    m.set('personen', personHitsAlle.length);
+    m.set('notizen', noteHitsAlle.length);
+    m.set('dokumente', docHitsAlle.length);
+    m.set('abend', journalHitsAlle.length);
+    m.set('chats', chatHitsAlle.length);
+    return m;
+  }, [taskHitsAlle, listHitsAlle, personHitsAlle, noteHitsAlle, docHitsAlle, journalHitsAlle, chatHitsAlle]);
+
+  /**
+   * Nur Bereiche, in denen wirklich etwas liegt — mit Anzahl. Eine Reihe aus
+   * acht Chips über einem leeren Bildschirm war Zierde: sie sagte nichts, außer
+   * dass es Bereiche gibt. Jetzt sagt sie, WO die Treffer sind, und
+   * verschwindet, solange nichts getippt ist.
+   */
+  const bereiche = useMemo(
+    () => SCOPES.filter((s) => s.value === 'alle' || (proBereich.get(s.value) ?? 0) > 0),
+    [proBereich],
+  );
 
   const toggle = (task: Task) => (next: boolean) => {
     if (next) complete.mutate(task);
@@ -180,35 +209,40 @@ export default function SucheScreen() {
       </Reveal>
 
       {/* Bereichs-Chips: „Alle" oder ein Bereich — nochmal tippen hebt auf.
-          Die Reihe ist breiter als der Bildschirm (sieben Bereiche, „Abend-
-          betrachtung" allein 150 px). Sie muss deshalb bis an die ECHTE Kante
-          reichen: der Screen setzt lg-Padding, und ohne das negative Gegenstück
-          endete die Reihe 24 px vor dem Rand — der letzte sichtbare Chip war
-          mittendrin abgeschnitten und daneben stand leerer Streifen. Das liest
-          sich wie ein Fehler, nicht wie „hier geht es weiter". Jetzt schiebt
-          sich der Chip unter den Bildschirmrand, was genau das sagt; das
-          Padding wandert in den Inhalt, damit der erste Chip weiter mit der
-          Überschrift fluchtet. */}
-      <Reveal delay={75}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={{ marginHorizontal: -Spacing.lg }}
-          contentContainerStyle={{ gap: Spacing.sm, paddingHorizontal: Spacing.lg }}
-        >
-          {SCOPES.map((s) => (
-            <Chip
-              key={s.value}
-              label={s.label}
-              active={scope === s.value}
-              onPress={() => {
-                hapticSelect();
-                setScope(scope === s.value && s.value !== 'alle' ? 'alle' : s.value);
-              }}
-            />
-          ))}
-        </ScrollView>
-      </Reveal>
+          Seit v1.78.0 erst NACH der Eingabe, und nur für Bereiche mit
+          Treffern, mit deren Anzahl. Vorher standen alle acht immer da, auch
+          über einem leeren Bildschirm: eine scrollende Reihe, die nichts sagte
+          außer „es gibt Bereiche". Bleibt nur ein einziger Bereich übrig, wäre
+          selbst der Chip überflüssig — dann sagt schon die Überschrift darunter,
+          worum es geht (`bereiche.length > 2`, denn „Alle" zählt mit).
+
+          Falls die Reihe wieder breiter wird als der Bildschirm: sie muss bis
+          an die ECHTE Kante reichen. Der Screen setzt lg-Padding, und ohne das
+          negative Gegenstück endete sie 24 px vor dem Rand — der letzte Chip
+          war mittendrin abgeschnitten und daneben stand ein leerer Streifen.
+          Das liest sich wie ein Fehler, nicht wie „hier geht es weiter". */}
+      {q.length > 0 && bereiche.length > 2 && (
+        <Reveal delay={75}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ marginHorizontal: -Spacing.lg }}
+            contentContainerStyle={{ gap: Spacing.sm, paddingHorizontal: Spacing.lg }}
+          >
+            {bereiche.map((s) => (
+              <Chip
+                key={s.value}
+                label={s.value === 'alle' ? s.label : `${s.label} ${proBereich.get(s.value) ?? 0}`}
+                active={scope === s.value}
+                onPress={() => {
+                  hapticSelect();
+                  setScope(scope === s.value && s.value !== 'alle' ? 'alle' : s.value);
+                }}
+              />
+            ))}
+          </ScrollView>
+        </Reveal>
+      )}
 
       {/* Ohne Eingabe: die zuletzt gesuchten Begriffe — oder eine stille Einladung. */}
       {q.length === 0 && (

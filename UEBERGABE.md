@@ -2023,6 +2023,54 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
     · Verifikation: 525 Tests (neun neue für die zwei Funktionen), tsc sauber,
       eslint 28/0, 22 Touren grün (neu: `suchen.mjs` mit acht Namen).
 
+81. **Aufräumen ohne Funktionsverlust** (v1.78.0). Julian: „setze das alles um.
+    und außerdem: wenn man bei Listen auf ‚Alle' geht und dann Erledigt
+    aufklappt, sieht man alle jemals erledigten Aufgaben untereinander."
+    · **Der Listen-Tab zeigte seine Listen nicht mehr.** Das Personen-Panel
+      stand ÜBER dem Listen-Gitter und wuchs unbegrenzt; bei acht Personen war
+      genau das unter der Falz, wonach der Tab benannt ist. Jetzt: höchstens
+      DREI Personen, geordnet nach dem, was bei ihnen liegt (`ordnePersonen` —
+      Wartendes wiegt schwerer als Offenes), darunter eine Zeile „Alle
+      Personen · N" auf den neuen Bildschirm `/personen` (mit demselben
+      Suchfeld wie im Zuordnungs-Block).
+    · **Die Falle dabei, fast hineingelaufen:** der erste Entwurf zeigte NUR
+      Personen mit Last. Sehr aufgeräumt — aber wer eine Person anlegt und ihr
+      noch nichts zugeordnet hat, sieht sie danach nicht mehr. Man legt sie an
+      und sie ist weg. Deshalb wird nicht gefiltert, sondern geordnet: unter
+      den Stillen steht die JÜNGSTE oben, damit die gerade angelegte sichtbar
+      ist. Aufräumen darf nie heißen, dass etwas verschwindet, das man gerade
+      selbst gemacht hat.
+    · **Die Suche zeigte acht Bereichs-Chips, bevor man getippt hatte** — eine
+      scrollende Reihe über einem leeren Bildschirm, die nichts sagte außer
+      „es gibt Bereiche". Jetzt erscheinen sie erst NACH der Eingabe, nur für
+      Bereiche mit Treffern, mit deren Anzahl („Aufgaben 3"). Bleibt nur ein
+      Bereich übrig, entfällt auch die Reihe. Dafür mussten die Trefferlisten
+      vom Bereichsfilter entkoppelt werden: erst suchen, dann filtern.
+    · **Der Aufgaben-Editor hatte sieben aufklappbare Zeilen**, drei davon
+      selten. Zeitraum, Warten auf, Wiederholung und Flagge liegen jetzt hinter
+      „Mehr" — aber NUR solange sie leer sind. Eine gesetzte Wiederholung hinter
+      einem Aufklapper zu verstecken hieße, sie zu verlieren. Für die normale
+      Aufgabe bleiben drei Zeilen: Fällig, Person, Mehr.
+    · **Erledigt** (Julians Fund): das 30-Tage-Fenster gab es schon, aber in
+      „Alle" werden daraus dreistellige Zahlen, und man scrollt an hundert
+      abgehakten Zeilen vorbei. Jetzt höchstens 15, darunter „… und N weitere
+      aus den letzten 30 Tagen — über die Suche zu finden" (die Suche führt
+      Erledigte ausdrücklich mit, sonst wäre der Satz gelogen). Auf dem
+      Personen-Bildschirm ist der Abschnitt zusätzlich eingeklappt.
+    · Neue reine Funktionen mit Tests: `ordnePersonen` in `lib/personen.ts`
+      (aus `personMerge.ts` umbenannt — das Modul beantwortet inzwischen mehr
+      als „wer ist gemeint") und `kuerzeErledigte` in `lib/taskLogic.ts`. Die
+      Zählung „was liegt bei wem" liegt als `usePersonenLast()` an EINER Stelle,
+      weil sie jetzt zwei Bildschirme speist.
+    · **Fallstrick für Touren:** `chips.mjs` prüfte die GEOMETRIE der alten
+      Reihe und musste neu geschrieben werden. Beim Messen bitte daran denken,
+      dass Playwrights `fill()` den waagerechten Behälter mitscrollt — die
+      erste Messung sah wie ein Layout-Fehler aus (`left: -23` statt `24`) und
+      war nur ein Scroll-Stand. Vier weitere Touren mussten „Mehr" aufklappen.
+    · Verifikation: 533 Tests, tsc sauber, eslint 28/0, 23 Touren grün.
+      (`bilder73.mjs` ist ein alter Screenshot-Helfer aus v1.73, kein Prüfstück
+      — er läuft seit Längerem nicht mehr durch und gehört nicht zur Suite.)
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

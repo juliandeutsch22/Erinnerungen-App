@@ -2,12 +2,15 @@
 // (['people']); alles Weitere (was hängt an wem) ist ein reiner Filter über
 // Aufgaben, Notizen und Chats.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
 
-import { findePerson, personNachtrag } from '@/lib/personMerge';
+import type { PersonLast } from '@/lib/personen';
+import { findePerson, personNachtrag } from '@/lib/personen';
+import { isOpen, isWaiting } from '@/lib/taskLogic';
 
 import { eventPeopleKey } from './eventPersonQueries';
 import { getChatRepository, getEventPersonRepository, getNoteRepository, getPersonRepository, getTaskRepository } from './index';
-import { queryKeys } from './queries';
+import { queryKeys, useTasks } from './queries';
 import type { NewPerson, Person } from './types';
 import { newId } from './types';
 
@@ -109,4 +112,30 @@ export function useDeletePerson() {
       void qc.invalidateQueries({ queryKey: eventPeopleKey });
     },
   });
+}
+
+/**
+ * Was bei jeder Person liegt: Wartendes und Offenes, getrennt gezählt.
+ *
+ * Als Hook, weil es seit v1.78.0 an zwei Stellen gebraucht wird (Listen-Tab
+ * und `/personen`) — zwei Kopien derselben Zählung wären zwei Gelegenheiten,
+ * unterschiedliche Zahlen anzuzeigen.
+ */
+export function usePersonenLast(): Map<string, PersonLast> {
+  const { data: tasks } = useTasks();
+  return useMemo(() => {
+    const map = new Map<string, PersonLast>();
+    const hol = (id: string) => {
+      const vorhanden = map.get(id) ?? { wartend: 0, offen: 0 };
+      map.set(id, vorhanden);
+      return vorhanden;
+    };
+    for (const t of tasks ?? []) {
+      if (!t.personId || !isOpen(t)) continue;
+      const l = hol(t.personId);
+      if (isWaiting(t)) l.wartend += 1;
+      else l.offen += 1;
+    }
+    return map;
+  }, [tasks]);
 }

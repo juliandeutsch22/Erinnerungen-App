@@ -5,7 +5,7 @@
 // „aktiv" und haben unter einem Symbol nichts verloren (siehe unten).
 // Darüber die Smart-Ansichten Geplant / Alle (Fahrplan §3.3).
 import { useRouter } from 'expo-router';
-import { CalendarClock, CalendarDays, ChevronRight, Filter as FilterIcon, Layers, PauseCircle, Plus, SlidersHorizontal, UserRound } from 'lucide-react-native';
+import { CalendarClock, CalendarDays, ChevronRight, Filter as FilterIcon, Layers, PauseCircle, Plus, SlidersHorizontal, UserRound, Users } from 'lucide-react-native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import ReanimatedSwipeable, { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
@@ -15,6 +15,7 @@ import { Glass } from '@/components/Glass';
 import { GlassPanel } from '@/components/GlassPanel';
 import { NeuLink } from '@/components/NeuKnopf';
 import { PersonEditorSheet } from '@/components/PersonEditorSheet';
+import { PersonZeile } from '@/components/PersonZeile';
 import { ListEditorSheet } from '@/components/ListEditorSheet';
 import { listIcon } from '@/components/listMeta';
 import { PressableScale } from '@/components/PressableScale';
@@ -38,13 +39,17 @@ import {
 import type { List, Person, Task } from '@/data/types';
 import { applyFilter } from '@/lib/taskFilters';
 import { addDays, formatDueDate, toDateStr, todayStr } from '@/lib/dates';
-import { usePeople } from '@/data/personQueries';
-import { isCurrent, isOpen, isWaiting, listProgress, projectDeadlineLabel, projectState, waitingTasks } from '@/lib/taskLogic';
+import { usePeople, usePersonenLast } from '@/data/personQueries';
+import { ordnePersonen } from '@/lib/personen';
+import { isCurrent, isOpen, listProgress, projectDeadlineLabel, projectState, waitingTasks } from '@/lib/taskLogic';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 import { useSettings } from '@/theme/settings.store';
 import { QUICK_ADD_CLEARANCE, TAB_BAR_SAFE_BOTTOM } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
 import { R, Shadow, Spacing, T } from '@/theme/theme.tokens';
+
+/** So viele Personen stehen im Listen-Tab; der Rest liegt hinter „Alle Personen“. */
+const PERSONEN_KURZ = 3;
 
 export default function ListenScreen() {
   const colors = useColors();
@@ -85,18 +90,17 @@ export default function ListenScreen() {
   // abarbeitet.
   const { data: people } = usePeople();
   const wartend = useMemo(() => waitingTasks(tasks ?? []), [tasks]);
-  const wartendProPerson = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const t of wartend) if (t.personId) map.set(t.personId, (map.get(t.personId) ?? 0) + 1);
-    return map;
-  }, [wartend]);
-  const offenProPerson = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const t of tasks ?? []) {
-      if (t.personId && isOpen(t) && !isWaiting(t)) map.set(t.personId, (map.get(t.personId) ?? 0) + 1);
-    }
-    return map;
-  }, [tasks]);
+  const personenLast = usePersonenLast();
+  // Erst die, bei denen etwas liegt — der Abschnitt beantwortet „was liegt bei
+  // wem?", und wer nichts offen hat, ist darauf keine Antwort. Gekürzt wird
+  // danach: bis v1.77 wuchs das Panel unbegrenzt und schob ausgerechnet das
+  // Listen-Gitter unter den Rand, nach dem der Tab benannt ist.
+  const gezeigtePersonen = useMemo(
+    () =>
+      ordnePersonen(people ?? [], personenLast).slice(0, PERSONEN_KURZ),
+    [people, personenLast],
+  );
+  const restPersonen = (people ?? []).length - gezeigtePersonen.length;
   const openTotal = useMemo(() => (tasks ?? []).filter((t) => isOpen(t) && isCurrent(t, today)).length, [tasks, today]);
   const openPlanned = useMemo(() => (tasks ?? []).filter((t) => isOpen(t) && isCurrent(t, today) && t.dueDate !== null).length, [tasks, today]);
 
@@ -192,36 +196,39 @@ export default function ListenScreen() {
                 <Type variant="caption" tone="text3" tabular>{wartend.length}</Type>
                 <ChevronRight size={15} color={colors.text3} strokeWidth={2} />
               </PressableScale>
-              {(people ?? []).map((p) => {
-                const w = wartendProPerson.get(p.id) ?? 0;
-                const o = offenProPerson.get(p.id) ?? 0;
-                return (
-                  <View key={p.id}>
-                    <Seam marginVertical={2} />
-                    <PressableScale
-                      accessibilityLabel={`Alles zu ${p.name} ansehen`}
-                      onPress={() => router.push(`/person/${p.id}`)}
-                      onLongPress={() => {
-                        hapticSelect();
-                        setEditorPerson(p);
-                      }}
-                      pressedScale={0.99}
-                      style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.sm }}
-                    >
-                      <UserRound size={18} color={colors.text3} strokeWidth={2} />
-                      <View style={{ flex: 1 }}>
-                        <Type variant="body" numberOfLines={1}>{p.name}</Type>
-                        {p.note && <Type variant="caption" tone="text3" numberOfLines={1}>{p.note}</Type>}
-                      </View>
-                      {/* Zwei Zahlen, zwei Bedeutungen: was bei ihm liegt und
-                          was bei mir. Nur die, die es gibt. */}
-                      {w > 0 && <Type variant="caption" tone="teal" tabular>{w} wartet</Type>}
-                      {o > 0 && <Type variant="caption" tone="text3" tabular>{o} offen</Type>}
-                      <ChevronRight size={15} color={colors.text3} strokeWidth={2} />
-                    </PressableScale>
-                  </View>
-                );
-              })}
+              {gezeigtePersonen.map((p) => (
+                <View key={p.id}>
+                  <Seam marginVertical={2} />
+                  <PersonZeile
+                    person={p}
+                    wartend={personenLast.get(p.id)?.wartend ?? 0}
+                    offen={personenLast.get(p.id)?.offen ?? 0}
+                    onPress={() => router.push(`/person/${p.id}`)}
+                    onLongPress={() => {
+                      hapticSelect();
+                      setEditorPerson(p);
+                    }}
+                  />
+                </View>
+              ))}
+              {/* Der Überlauf ist kein Rest, sondern ein Weg: alle Personen,
+                  mit Suchfeld, auf einem eigenen Bildschirm. */}
+              {restPersonen > 0 && (
+                <View>
+                  <Seam marginVertical={2} />
+                  <PressableScale
+                    accessibilityLabel="Alle Personen ansehen"
+                    onPress={() => router.push('/personen')}
+                    pressedScale={0.99}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.sm }}
+                  >
+                    <Users size={18} color={colors.text3} strokeWidth={2} />
+                    <Type variant="body" tone="text2" style={{ flex: 1 }}>Alle Personen</Type>
+                    <Type variant="caption" tone="text3" tabular>{(people ?? []).length}</Type>
+                    <ChevronRight size={15} color={colors.text3} strokeWidth={2} />
+                  </PressableScale>
+                </View>
+              )}
             </GlassPanel>
             )}
           </View>
