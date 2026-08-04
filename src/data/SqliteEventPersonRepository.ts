@@ -1,4 +1,4 @@
-// SqliteEventPersonRepository.ts — expo-sqlite-Persistenz der Termin-Menschen.
+// SqliteEventPersonRepository.ts — expo-sqlite-Persistenz der Termin-Personen.
 import { getDb } from './db';
 import { type EventPerson, EventPersonRepository } from './EventPersonRepository';
 import { newId } from './types';

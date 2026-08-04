@@ -104,7 +104,7 @@ export type Task = {
    *  beschreibend — den Zustand trägt `waiting`, damit es nie zwei Wahrheiten
    *  gibt. Steht eine PERSON dahinter, gehört sie in `personId`. */
   waitingFor?: string | null;
-  /** Der Mensch, an dem diese Aufgabe hängt (siehe `Person`). */
+  /** Die Person, an der diese Aufgabe hängt (siehe `Person`). */
   personId?: string | null;
   /** Frei vergebbare Tags (kleingeschrieben, ohne #) — kontextübergreifend filterbar. */
   tags: string[];
@@ -135,7 +135,7 @@ export type NewTask = {
 };
 
 /**
- * Ein Mensch, an dem etwas hängt.
+ * Eine Person, an der etwas hängt.
  *
  * Stoa kannte Listen, Termine, Notizen und Tags — aber keine Personen. Dabei
  * hängt ein großer Teil aller offenen Punkte an jemandem: „Angebot vom
@@ -144,9 +144,9 @@ export type NewTask = {
  * es sie gibt. Der Moment, in dem eine Personen-Ansicht trägt, ist der, in dem
  * man jemanden zufällig trifft.
  *
- * Ein Name genügt. Wer mehr will, holt sich den Menschen seit v1.75.0 aus dem
+ * Ein Name genügt. Wer mehr will, holt sich die Person seit v1.75.0 aus dem
  * Adressbuch (siehe `contactId`) — das bleibt aber optional: der Dachdecker,
- * den man nie eingespeichert hat, ist genauso ein Mensch.
+ * den man nie eingespeichert hat, ist genauso eine Person.
  */
 export type Person = {
   id: string;
@@ -162,14 +162,14 @@ export type Person = {
   phone?: string | null;
   email?: string | null;
   /**
-   * Woher der Mensch kam: die Kennung des Adressbuch-Eintrags. NUR Herkunft —
+   * Woher die Person kam: die Kennung des Adressbuch-Eintrags. NUR Herkunft —
    * Name, Nummer und E-Mail liegen als eigene Felder in Stoa.
    *
    * Die Alternative wäre ein reiner Zeiger gewesen (nur die Kennung merken,
    * alles andere live aus den Kontakten lesen). Dagegen sprachen drei Dinge:
-   * ohne Kontakt-Zugriff hätte JEDER Mensch seinen Namen verloren; im Backup
+   * ohne Kontakt-Zugriff hätte JEDE Person ihren Namen verloren; im Backup
    * stünden Kennungen, die auf einem anderen iPhone ins Leere zeigen; und ein
-   * Mensch OHNE Adressbuch-Eintrag („der Dachdecker") könnte gar nicht
+   * Person OHNE Adressbuch-Eintrag („der Dachdecker") könnte gar nicht
    * existieren. Der Preis der Kopie ist, dass sie veraltet — dagegen gibt es
    * „Aus Kontakten aktualisieren".
    */
@@ -227,7 +227,7 @@ export type Note = {
    * Optional im Typ, damit Alt-Daten ohne das Feld gültig bleiben.
    */
   listId?: string | null;
-  /** Der Mensch, um den es in dieser Notiz geht (siehe `Person`). */
+  /** Die Person, um den es in dieser Notiz geht (siehe `Person`). */
   personId?: string | null;
   /** Angeheftet — steht in der Liste oben vor den Datumsgruppen. */
   pinned: boolean;
@@ -250,7 +250,7 @@ export type Chat = {
   /** Zugehörige Liste bzw. Projekt — wie bei der Notiz, siehe dort.
    *  Optional, damit Alt-Daten ohne das Feld gültig bleiben. */
   listId?: string | null;
-  /** Der Mensch, um den es in diesem Chat geht (siehe `Person`). */
+  /** Die Person, um den es in diesem Chat geht (siehe `Person`). */
   personId?: string | null;
   context: string | null;
   /** Papierkorb (30 Tage, wie Notizen), null = aktiv. */

@@ -15,11 +15,11 @@ export type ApplyDeps = {
   lists: List[];
   /** Nur zum Auflösen der Handles in „aenderungen" — darf leer sein. */
   tasks: Task[];
-  /** Bekannte Menschen — für „person" im Vorschlag. Darf leer sein. */
+  /** Bekannte Personen — für „person" im Vorschlag. Darf leer sein. */
   people?: Person[];
   today: string;
   createList: (input: NewList) => Promise<List>;
-  /** Legt einen Menschen an (oder gibt den gleichnamigen vorhandenen zurück).
+  /** Legt eine Person an (oder gibt die gleichnamige vorhandene zurück).
    *  Fehlt die Funktion, wird „person" schlicht ignoriert. */
   createPerson?: (input: NewPerson) => Promise<Person>;
   /** Muss die angelegte Aufgabe zurückgeben — ohne id kein Rückgängig. */
@@ -34,11 +34,11 @@ export type ApplyDeps = {
    * Legt die Termine an und gibt je Termin die EventKit-ID zurück (null =
    * nicht angelegt), in DERSELBEN Reihenfolge wie die Eingabe.
    *
-   * Die Reihenfolge ist die ganze Zuordnung: an ihr hängt, welcher Mensch zu
+   * Die Reihenfolge ist die ganze Zuordnung: an ihr hängt, welche Person zu
    * welchem Termin gehört. Ein `Promise<number>` (bis v1.73) konnte das nicht.
    */
   createEvents: (termine: AssistantAction['termine']) => Promise<(string | null)[]>;
-  /** Hängt einen Menschen an einen Termin. Fehlt sie, bleibt „personen" folgenlos. */
+  /** Hängt eine Person an einen Termin. Fehlt sie, bleibt „personen" folgenlos. */
   linkEventPerson?: (eventId: string, personId: string) => Promise<unknown>;
   /** Farbe für ein neues Projekt (Index = wievieltes in diesem Durchgang). */
   colorAt: (index: number) => string;
@@ -163,13 +163,13 @@ export async function applyAssistantActions(a: AssistantAction, deps: ApplyDeps)
   }
   const alleListen = [...deps.lists, ...frisch];
 
-  // 1b. Menschen. Ein Name aus dem Vorschlag zeigt entweder auf einen
-  //     vorhandenen Menschen (Groß-/Kleinschreibung egal) oder legt einen an.
+  // 1b. Personen. Ein Name aus dem Vorschlag zeigt entweder auf eine
+  //     vorhandene Person (Groß-/Kleinschreibung egal) oder legt eine an.
   //     Angelegt wird erst HIER, also nach dem Bestätigungs-Tipp — vorher
   //     schreibt die App nichts, auch keinen Namen.
   //
-  //     Bewusst NICHT im Rückgängig-Block: ein Mensch ist kein Vorschlag,
-  //     sondern eine Person, die es ab jetzt gibt. Ihn beim Zurücknehmen
+  //     Bewusst NICHT im Rückgängig-Block: eine Person ist kein Vorschlag,
+  //     sondern eine Person, die es ab jetzt gibt. Sie beim Zurücknehmen
   //     wieder zu löschen, würde auch die Zuordnungen mitreißen, die inzwischen
   //     von Hand gesetzt wurden.
   const personenCache = new Map<string, string | null>();
@@ -269,7 +269,7 @@ export async function applyAssistantActions(a: AssistantAction, deps: ApplyDeps)
     notizen += 1;
   }
 
-  // Termine zuletzt — und gleich danach die Menschen daran. Erst hier gibt es
+  // Termine zuletzt — und gleich danach die Personen daran. Erst hier gibt es
   // die Event-IDs; vorher existiert der Termin im Gerätekalender noch nicht.
   const eventIds = a.termine.length > 0 ? await deps.createEvents(a.termine) : [];
   if (deps.linkEventPerson) {

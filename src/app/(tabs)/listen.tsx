@@ -54,7 +54,7 @@ export default function ListenScreen() {
 
   // undefined = Sheet zu, null = neue Liste, List = bearbeiten.
   const [editorList, setEditorList] = useState<List | null | undefined>(undefined);
-  // undefined = Sheet zu, null = neuer Mensch, Person = bearbeiten.
+  // undefined = Sheet zu, null = neuer Person, Person = bearbeiten.
   const [editorPerson, setEditorPerson] = useState<Person | null | undefined>(undefined);
   const savedFilters = useSettings((s) => s.savedFilters);
   const today = todayStr();
@@ -80,7 +80,7 @@ export default function ListenScreen() {
     for (const [id, arr] of byList) map.set(id, listProgress(arr));
     return map;
   }, [tasks]);
-  // Menschen und Wartendes — beides zaehlt bewusst NICHT in die offenen
+  // Personen und Wartendes — beides zaehlt bewusst NICHT in die offenen
   // Aufgaben oben hinein: was bei anderen liegt, ist keine Zahl, die man
   // abarbeitet.
   const { data: people } = usePeople();
@@ -163,21 +163,21 @@ export default function ListenScreen() {
         </View>
       </Reveal>
 
-      {/* Menschen — der Ort, an dem „was liegt bei wem?" beantwortet wird.
+      {/* Personen — der Ort, an dem „was liegt bei wem?" beantwortet wird.
           Der Zugang zu „Warten auf" steht bewusst HIER und nicht als eigene
           Smart-Karte oben: es ist keine Sicht auf den Kalender, sondern die
           Gegenfrage zu allem, was man selbst tut.
 
           Der Abschnitt steht IMMER da — genau wie „Filter" darüber, das seine
           Überschrift und seinen Link auch ohne gespeicherte Filter zeigt. Bis
-          v1.74 erschien er erst, WENN es Menschen gab; angelegt werden konnten
+          v1.74 erschien er erst, WENN es Personen gab; angelegt werden konnten
           sie aber nur nebenbei in einer Aufgabe. Wer nie eine Aufgabe jemandem
           zuordnete, hatte keinen Weg zu diesem Teil der App. */}
       <Reveal delay={105}>
           <View style={{ gap: Spacing.sm }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Type variant="eyebrow" tone="text3">Menschen</Type>
-              <NeuLink label="Neuer Mensch" icon={UserRound} onPress={() => setEditorPerson(null)} />
+              <Type variant="eyebrow" tone="text3">Personen</Type>
+              <NeuLink label="Neue Person" icon={UserRound} onPress={() => setEditorPerson(null)} />
             </View>
             {((people ?? []).length > 0 || wartend.length > 0) && (
             <GlassPanel>

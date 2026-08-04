@@ -67,11 +67,11 @@ export default function ChatsScreen() {
   // „Plane meinen Tag": Chat mit den heutigen Aufgaben + Terminen als Kontext.
   const { data: tasks } = useTasks();
   // Nur Farbe und Namens-IDs — mehr braucht die Zeile nicht, und eine
-  // gelöschte Liste bzw. ein gelöschter Mensch verschwindet von selbst.
+  // gelöschte Liste bzw. ein gelöschter Person verschwindet von selbst.
   const { data: lists } = useLists();
-  const { data: menschen } = usePeople();
+  const { data: personen } = usePeople();
   const listFarbe = useMemo(() => new Map((lists ?? []).map((l) => [l.id, l.color])), [lists]);
-  const menschenIds = useMemo(() => new Set((menschen ?? []).map((p) => p.id)), [menschen]);
+  const personenIds = useMemo(() => new Set((personen ?? []).map((p) => p.id)), [personen]);
   const [calGranted, setCalGranted] = useState(false);
   useEffect(() => {
     void hasCalendarPermission().then(setCalGranted);
@@ -224,7 +224,7 @@ export default function ChatsScreen() {
                     chat={c}
                     today={today}
                     listColor={c.listId ? listFarbe.get(c.listId) : undefined}
-                    hatMensch={!!c.personId && menschenIds.has(c.personId)}
+                    hatPerson={!!c.personId && personenIds.has(c.personId)}
                     onPress={() => router.push(`/chat/${c.id}`)}
                   />
                 </View>
@@ -263,21 +263,21 @@ export default function ChatsScreen() {
   );
 }
 
-/** `listColor`/`hatMensch`: dieselben Erkennungszeichen wie im Notizen-Tab.
- *  Ohne sie war ein Chat, den man einem Projekt oder einem Menschen zugeordnet
+/** `listColor`/`hatPerson`: dieselben Erkennungszeichen wie im Notizen-Tab.
+ *  Ohne sie war ein Chat, den man einem Projekt oder einer Person zugeordnet
  *  hat, außerhalb dieser Ansichten unsichtbar — die Zuordnung hatte an ihrem
  *  EIGENEN Ort keine Folge. */
 function ChatRow({
   chat,
   today,
   listColor,
-  hatMensch,
+  hatPerson,
   onPress,
 }: {
   chat: Chat;
   today: string;
   listColor?: string;
-  hatMensch?: boolean;
+  hatPerson?: boolean;
   onPress: () => void;
 }) {
   const colors = useColors();
@@ -302,7 +302,7 @@ function ChatRow({
         {chat.eventId && <CalendarDays size={12} color={colors.text3} strokeWidth={2} />}
         {chat.noteId && <NotebookPen size={12} color={colors.text3} strokeWidth={2} />}
         {chat.taskId && <ListTodo size={12} color={colors.text3} strokeWidth={2} />}
-        {hatMensch && <UserRound size={12} color={colors.text3} strokeWidth={2} />}
+        {hatPerson && <UserRound size={12} color={colors.text3} strokeWidth={2} />}
         <View style={{ flex: 1 }} />
         <Type variant="caption" tone="text3" tabular>{dateLabel}</Type>
       </View>

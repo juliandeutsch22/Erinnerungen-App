@@ -306,7 +306,7 @@ describe('Backup', () => {
     expect((await getChatRepository().getAll())[0].listId).toBeNull();
   });
 
-  it('sichert Menschen und alles, was an ihnen hängt', async () => {
+  it('sichert Personen und alles, was an ihnen hängt', async () => {
     await getPersonRepository().create({ id: 'p1', name: 'Anna', note: '0170…', sort: 1, createdAt: '2026-07-01T08:00:00.000Z' });
     await getTaskRepository().create(task({ id: 't1', title: 'Urlaub abstimmen', personId: 'p1', waiting: true, waitingFor: 'Rückmeldung' }));
     await getNoteRepository().create({
@@ -350,7 +350,7 @@ describe('Backup', () => {
     expect((await getNoteRepository().getAll())[0].personId).toBeNull();
   });
 
-  it('schluckt doppelte Namen — zwei „Anna" wären zwei Ansichten für einen Menschen', async () => {
+  it('schluckt doppelte Namen — zwei „Anna" wären zwei Ansichten für eine Person', async () => {
     const json = JSON.stringify({
       app: 'stille',
       schemaVersion: 3,
@@ -366,7 +366,7 @@ describe('Backup', () => {
     expect((await getPersonRepository().getAll()).map((p) => p.id)).toEqual(['p1']);
   });
 
-  it('liest Backups ohne Menschen (vor v1.73.0) ohne Fehler', async () => {
+  it('liest Backups ohne Personen (vor v1.73.0) ohne Fehler', async () => {
     const json = JSON.stringify({
       app: 'stille', schemaVersion: 2, exportedAt: '2026-07-03T12:00:00.000Z',
       lists: [], tasks: [{ id: 'x', listId: 'default', title: 'Alt' }],
@@ -394,7 +394,7 @@ describe('Backup', () => {
     expect(links[0].personId).toBe('p1');
   });
 
-  it('wirft eine Termin-Verknüpfung weg, deren Mensch im Backup fehlt', async () => {
+  it('wirft eine Termin-Verknüpfung weg, deren Person im Backup fehlt', async () => {
     const json = JSON.stringify({
       app: 'stille',
       schemaVersion: 3,
@@ -408,7 +408,7 @@ describe('Backup', () => {
     expect(await getEventPersonRepository().getAll()).toEqual([]);
   });
 
-  it('sichert Telefon, E-Mail und Adressbuch-Herkunft eines Menschen', async () => {
+  it('sichert Telefon, E-Mail und Adressbuch-Herkunft einer Person', async () => {
     await getPersonRepository().create({
       id: 'p1', name: 'Herr Brandt', note: 'Dachdecker',
       phone: '+49 170 1234567', email: 'brandt@example.org', contactId: 'ABC-123',
@@ -426,7 +426,7 @@ describe('Backup', () => {
     expect(p.contactId).toBe('ABC-123');
   });
 
-  it('liest Menschen aus Backups vor v1.75.0 ohne die neuen Felder', async () => {
+  it('liest Personen aus Backups vor v1.75.0 ohne die neuen Felder', async () => {
     const json = JSON.stringify({
       app: 'stille', schemaVersion: 3, exportedAt: '2026-07-03T12:00:00.000Z',
       lists: [], tasks: [], people: [{ id: 'p1', name: 'Anna', createdAt: 'A' }],
@@ -550,14 +550,14 @@ describe('summarizeBundle / describeSummary — ehrlicher Bericht', () => {
 
   it('ohne Lücken bleibt der Bericht ein einziger ruhiger Satz', () => {
     const text = describeSummary({ lists: 2, tasks: 5, notes: 1, chats: 0, people: 2, journal: 3, photos: 4, documents: 0, skippedDocuments: [] });
-    expect(text).toBe('Gesichert: 5 Aufgaben, 2 Listen, 1 Notizen, 0 Chats, 2 Menschen, 3 Betrachtungen, 4 Fotos, 0 Dokumente.');
+    expect(text).toBe('Gesichert: 5 Aufgaben, 2 Listen, 1 Notizen, 0 Chats, 2 Personen, 3 Betrachtungen, 4 Fotos, 0 Dokumente.');
   });
 
-  it('nennt die Menschen — ein Bericht, der sie verschweigt, ist nicht ehrlich', async () => {
+  it('nennt die Personen — ein Bericht, der sie verschweigt, ist nicht ehrlich', async () => {
     await getPersonRepository().create({ id: 'p1', name: 'Anna', note: null, sort: 1, createdAt: '2026-07-01T08:00:00.000Z' });
     const json = await exportToJsonString(noPhotos, new Date('2026-07-03T12:00:00.000Z'));
     const summary = summarizeBundle(JSON.parse(json) as BackupBundle);
     expect(summary.people).toBe(1);
-    expect(describeSummary(summary)).toContain('1 Menschen');
+    expect(describeSummary(summary)).toContain('1 Personen');
   });
 });

@@ -52,10 +52,10 @@ function deps(over: Partial<ApplyDeps> = {}) {
       return t.map((_, i) => `ev-${i}`);
     },
     linkEventPerson: async (eventId, personId) => {
-      log.push(`termin-mensch:${eventId}:${personId}`);
+      log.push(`termin-person:${eventId}:${personId}`);
     },
     createPerson: async (input) => {
-      log.push(`mensch:${input.name}`);
+      log.push(`person:${input.name}`);
       return { id: `p-${input.name}`, name: input.name, note: null, sort: 0, createdAt: '2026-07-27T09:00:00.000Z' };
     },
     colorAt: () => '#2B5FA6',
@@ -276,7 +276,7 @@ describe('Rückgängig eines Abhakens bei WIEDERHOLUNG', () => {
   });
 });
 
-describe('Warten auf und Menschen', () => {
+describe('Warten auf und Personen', () => {
   it('legt eine wartende Aufgabe mit Text an', async () => {
     const d = deps();
     await applyAssistantActions(
@@ -295,14 +295,14 @@ describe('Warten auf und Menschen', () => {
     expect(d.createdTasks[0].personId).toBeNull();
   });
 
-  it('findet einen vorhandenen Menschen, statt ihn zu verdoppeln — Groß/Klein egal', async () => {
+  it('findet eine vorhandene Person, statt sie zu verdoppeln — Groß/Klein egal', async () => {
     const d = deps({ people: [person('p1', 'Anna')] });
     await applyAssistantActions({ ...leer, aufgaben: [{ titel: 'Urlaub klären', person: 'anna' }] }, d.deps);
     expect(d.log).toEqual(['aufgabe:Urlaub klären']); // KEIN createPerson
     expect(d.createdTasks[0].personId).toBe('p1');
   });
 
-  it('legt einen unbekannten Menschen an — aber nur EINMAL pro Durchgang', async () => {
+  it('legt eine unbekannte Person an — aber nur EINMAL pro Durchgang', async () => {
     const d = deps();
     await applyAssistantActions(
       {
@@ -314,12 +314,12 @@ describe('Warten auf und Menschen', () => {
       },
       d.deps,
     );
-    expect(d.log.filter((x) => x.startsWith('mensch:'))).toEqual(['mensch:Papa']);
+    expect(d.log.filter((x) => x.startsWith('person:'))).toEqual(['person:Papa']);
     expect(d.createdTasks[0].personId).toBe('p-Papa');
     expect(d.createdTasks[1].personId).toBe('p-Papa');
   });
 
-  it('ignoriert „person" still, wenn der Aufrufer gar keine Menschen führt', async () => {
+  it('ignoriert „person" still, wenn der Aufrufer gar keine Personen führt', async () => {
     const d = deps({ createPerson: undefined });
     await applyAssistantActions({ ...leer, aufgaben: [{ titel: 'X', person: 'Anna' }] }, d.deps);
     expect(d.createdTasks[0].personId).toBeNull();
@@ -348,24 +348,24 @@ describe('Warten auf und Menschen', () => {
     expect(d.patches[0].patch).toEqual({ waiting: true, waitingFor: 'Rückruf vom Amt' });
   });
 
-  it('löst den Menschen über eine Änderung wieder', async () => {
+  it('löst die Person über eine Änderung wieder', async () => {
     const bestehend = task('abc123', 'Urlaub', { personId: 'p1' });
     const d = deps({ tasks: [bestehend], people: [person('p1', 'Anna')] });
     await applyAssistantActions({ ...leer, aenderungen: [{ handle: 'abc123'.slice(-6), person: null }] }, d.deps);
     expect(d.patches[0].patch.personId).toBeNull();
   });
 
-  it('macht das Anlegen eines Menschen NICHT rückgängig — er ist kein Vorschlag', async () => {
+  it('macht das Anlegen einer Person NICHT rückgängig — sie ist kein Vorschlag', async () => {
     const d = deps();
     const res = await applyAssistantActions({ ...leer, aufgaben: [{ titel: 'X', person: 'Neu' }] }, d.deps);
-    // Nur die Aufgabe steht im Rückgängig-Block, der Mensch bleibt.
+    // Nur die Aufgabe steht im Rückgängig-Block, die Person bleibt.
     expect(res.rueckgaengig.aufgaben).toEqual(['t-X']);
     expect(JSON.stringify(res.rueckgaengig)).not.toContain('p-Neu');
   });
 });
 
-describe('Menschen an Terminen', () => {
-  it('hängt die Menschen an den RICHTIGEN Termin — die Reihenfolge ist die Zuordnung', async () => {
+describe('Personen an Terminen', () => {
+  it('hängt die Personen an den RICHTIGEN Termin — die Reihenfolge ist die Zuordnung', async () => {
     const d = deps();
     await applyAssistantActions(
       {
@@ -377,10 +377,10 @@ describe('Menschen an Terminen', () => {
       },
       d.deps,
     );
-    expect(d.log.filter((x) => x.startsWith('termin-mensch:'))).toEqual([
-      'termin-mensch:ev-0:p-Anna',
-      'termin-mensch:ev-1:p-Herr Brandt',
-      'termin-mensch:ev-1:p-Anna',
+    expect(d.log.filter((x) => x.startsWith('termin-person:'))).toEqual([
+      'termin-person:ev-0:p-Anna',
+      'termin-person:ev-1:p-Herr Brandt',
+      'termin-person:ev-1:p-Anna',
     ]);
   });
 
@@ -391,12 +391,12 @@ describe('Menschen an Terminen', () => {
       d.deps,
     );
     expect(res.termine).toBe(0);
-    expect(d.log.filter((x) => x.startsWith('termin-mensch:'))).toEqual([]);
-    // Und es wird auch kein Mensch auf Vorrat angelegt.
-    expect(d.log.filter((x) => x.startsWith('mensch:'))).toEqual([]);
+    expect(d.log.filter((x) => x.startsWith('termin-person:'))).toEqual([]);
+    // Und es wird auch keine Person auf Vorrat angelegt.
+    expect(d.log.filter((x) => x.startsWith('person:'))).toEqual([]);
   });
 
-  it('legt einen Menschen nur EINMAL an, auch wenn er an zwei Terminen steht', async () => {
+  it('legt eine Person nur EINMAL an, auch wenn sie an zwei Terminen steht', async () => {
     const d = deps();
     await applyAssistantActions(
       {
@@ -408,7 +408,7 @@ describe('Menschen an Terminen', () => {
       },
       d.deps,
     );
-    expect(d.log.filter((x) => x.startsWith('mensch:'))).toEqual(['mensch:Anna']);
+    expect(d.log.filter((x) => x.startsWith('person:'))).toEqual(['person:Anna']);
   });
 
   it('lässt „personen" folgenlos, wenn der Aufrufer nicht verknüpfen kann', async () => {
@@ -418,6 +418,6 @@ describe('Menschen an Terminen', () => {
       d.deps,
     );
     expect(res.termine).toBe(1);
-    expect(d.log.filter((x) => x.startsWith('termin-mensch:'))).toEqual([]);
+    expect(d.log.filter((x) => x.startsWith('termin-person:'))).toEqual([]);
   });
 });

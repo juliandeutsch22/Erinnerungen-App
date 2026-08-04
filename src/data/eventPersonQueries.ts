@@ -1,6 +1,6 @@
 // eventPersonQueries.ts — Hooks für „wer ist bei diesem Termin dabei".
 // EINE Quelle (['event-people']) mit allen Verknüpfungen; die Ableitungen
-// (pro Termin, pro Mensch) sind reine Filter — wie bei Notizen und Fotos.
+// (pro Termin, pro Person) sind reine Filter — wie bei Notizen und Fotos.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { EventPerson } from './EventPersonRepository';
@@ -12,7 +12,7 @@ export function useEventPeople() {
   return useQuery<EventPerson[]>({ queryKey: eventPeopleKey, queryFn: () => getEventPersonRepository().getAll() });
 }
 
-/** Hängt einen Menschen an einen Termin oder löst ihn wieder — ein Aufruf. */
+/** Hängt eine Person an einen Termin oder löst sie wieder — ein Aufruf. */
 export function useToggleEventPerson() {
   const qc = useQueryClient();
   return useMutation({

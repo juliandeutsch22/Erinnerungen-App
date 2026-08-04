@@ -109,7 +109,7 @@ export function NoteLinkSheet({ noteId, onClose }: { noteId: string; onClose: ()
         </Group>
       )}
 
-      <Type variant="eyebrow" tone="text3" style={{ marginTop: Spacing.lg, marginBottom: Spacing.xs }}>Mensch</Type>
+      <Type variant="eyebrow" tone="text3" style={{ marginTop: Spacing.lg, marginBottom: Spacing.xs }}>Person</Type>
       <PersonWahl selected={note.personId ?? null} onSelect={setPerson} />
 
       <Type variant="eyebrow" tone="text3" style={{ marginTop: Spacing.lg, marginBottom: Spacing.xs }}>Erinnerungen</Type>

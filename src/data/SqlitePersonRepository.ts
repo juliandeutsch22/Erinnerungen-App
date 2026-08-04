@@ -1,4 +1,4 @@
-// SqlitePersonRepository.ts — expo-sqlite-Persistenz der Menschen (nativ).
+// SqlitePersonRepository.ts — expo-sqlite-Persistenz die Personen (nativ).
 import { getDb } from './db';
 import { PersonRepository } from './PersonRepository';
 import type { Person } from './types';

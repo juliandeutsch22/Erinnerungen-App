@@ -1,4 +1,4 @@
-// contacts.ts — der EINE Weg vom iOS-Adressbuch zu einem Menschen in Stoa.
+// contacts.ts — der EINE Weg vom iOS-Adressbuch zu einer Person in Stoa.
 //
 // Muster wie `deviceCalendar.ts`: `require` erst beim Aufruf, ein
 // Verfügbarkeits-Flag davor. Im Web (und wenn das native Modul im Build fehlt)
@@ -15,11 +15,11 @@
 //    zwischen einer Bequemlichkeit und einem Wortbruch.
 //
 // 2. **Einer, nicht alle.** Es gibt bewusst KEINEN Massen-Import. Ein
-//    Adressbuch hat Hunderte Einträge; die Menschen-Liste in Stoa ist für eine
+//    Adressbuch hat Hunderte Einträge; die Personen-Liste in Stoa ist für eine
 //    Handvoll gedacht — die, bei denen gerade etwas liegt. Alles hineinzukippen
 //    machte die Liste und die Auswahl unbrauchbar.
 //
-// Der Assistent rührt das hier NICHT an: er darf Menschen nach Namen zuordnen
+// Der Assistent rührt das hier NICHT an: er darf Personen nach Namen zuordnen
 // und (nach Bestätigung) anlegen, aber nie ins Adressbuch sehen.
 import { Platform } from 'react-native';
 
@@ -48,7 +48,7 @@ export function kontaktName(
   if (voll) return voll;
   const teile = [d.givenName ?? '', d.familyName ?? ''].map((t) => t.trim()).filter(Boolean);
   if (teile.length > 0) return teile.join(' ');
-  // Firmen ohne Personennamen (der Dachdecker-Betrieb) sind auch Menschen im
+  // Firmen ohne Personennamen (der Dachdecker-Betrieb) sind auch Personen im
   // Sinne dieser App — jemand, bei dem etwas liegt.
   return (d.company ?? '').trim();
 }

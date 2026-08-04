@@ -1,6 +1,6 @@
-// EventMenschen.tsx — „Wer ist dabei" im Termin-Editor.
+// EventPersonen.tsx — „Wer ist dabei" im Termin-Editor.
 //
-// Anders als bei Aufgabe, Notiz und Chat sind hier MEHRERE Menschen möglich —
+// Anders als bei Aufgabe, Notiz und Chat sind hier MEHRERE Personen möglich —
 // ein Abendessen hat selten genau einen Teilnehmer. Deshalb Kästchen statt
 // eines Hakens beim einen Gewählten.
 //
@@ -21,7 +21,7 @@ import { webNoOutline } from '@/theme/layout';
 import { useColors } from '@/theme/ThemeProvider';
 import { R, Spacing, T } from '@/theme/theme.tokens';
 
-export function EventMenschen({
+export function EventPersonen({
   eventId,
   gewaehlt,
   onGewaehlt,
@@ -56,7 +56,7 @@ export function EventMenschen({
     [links, eventId, gewaehlt],
   );
 
-  /** Ein Mensch an/aus — am bestehenden Termin sofort, sonst im Entwurf. */
+  /** Eine Person an/aus — am bestehenden Termin sofort, sonst im Entwurf. */
   const umschalten = (personId: string, ist: boolean) => {
     if (eventId) {
       toggle.mutate({ eventId, personId, dran: ist });
@@ -66,18 +66,22 @@ export function EventMenschen({
     onGewaehlt?.(naechste);
   };
 
-  // Wer dabei ist, steht oben — sonst müsste man zum Lösen erst suchen.
-  const sortiert = useMemo(
-    () => [...(people ?? [])].sort((a, b) => Number(dabei.has(b.id)) - Number(dabei.has(a.id))),
-    [people, dabei],
-  );
+  // EINE Ordnung, überall dieselbe: die aus `usePeople()`, also die des
+  // Listen-Tabs.
+  //
+  // Bis v1.75 sortierte dieser Block „wer dabei ist, steht oben" — gut gemeint,
+  // aber `dabei` ändert sich beim Anhaken, und damit sprang die Zeile unter dem
+  // Finger nach oben und beim Lösen wieder zurück. Zweimal hintereinander
+  // dieselbe Zeile zu treffen war unmöglich, und in dieser App springt nichts.
+  // Das Häkchen sagt ohnehin, wer dabei ist; die Reihenfolge muss es nicht
+  // noch einmal sagen. Nebenbei ist sie damit dieselbe wie in `PersonWahl`.
 
   const anlegen = () => {
     const name = entwurf.trim();
     if (!name) return;
     hapticSuccess();
-    // Gleicher Name = derselbe Mensch (siehe `useCreatePerson`), und er ist
-    // sofort dabei — man tippt ihn ja ein, weil er dazugehört.
+    // Gleicher Name = dieselbe Person (siehe `useCreatePerson`), und sie ist
+    // sofort dabei — man tippt den Namen ja ein, weil sie dazugehört.
     createPerson.mutate({ name }, { onSuccess: (p) => umschalten(p.id, false) });
     setEntwurf('');
   };
@@ -85,7 +89,7 @@ export function EventMenschen({
   return (
     <View style={{ gap: Spacing.xs }}>
       <Type variant="eyebrow" tone="text3">Wer ist dabei</Type>
-      {sortiert.map((p) => {
+      {(people ?? []).map((p) => {
         const ist = dabei.has(p.id);
         return (
           <PressableScale
@@ -113,7 +117,14 @@ export function EventMenschen({
               {ist && <Check size={12} color="#FFFFFF" strokeWidth={3} />}
             </View>
             <UserRound size={15} color={colors.text3} strokeWidth={2} />
-            <Type variant="body" numberOfLines={1} style={{ flex: 1 }}>{p.name}</Type>
+            {/* Die Notiz steht mit — sie ist das, was zwei Annas unterscheidet.
+                Im Aufgaben-Editor (`PersonWahl`) und im Listen-Tab stand sie
+                immer schon da; hier fehlte sie, und damit war ausgerechnet der
+                Ort ohne Unterscheidung, an dem man MEHRERE anhakt. */}
+            <View style={{ flex: 1 }}>
+              <Type variant="body" numberOfLines={1}>{p.name}</Type>
+              {p.note && <Type variant="caption" tone="text3" numberOfLines={1}>{p.note}</Type>}
+            </View>
           </PressableScale>
         );
       })}
@@ -132,17 +143,17 @@ export function EventMenschen({
         }}
       >
         <TextInput
-          accessibilityLabel="Neuer Mensch am Termin"
+          accessibilityLabel="Name — direkt anlegen und hinzufügen"
           value={entwurf}
           onChangeText={setEntwurf}
           onSubmitEditing={anlegen}
-          placeholder="Neuer Mensch"
+          placeholder="Name — direkt anlegen"
           placeholderTextColor={colors.text3}
           returnKeyType="done"
           style={[{ flex: 1, fontSize: T.md, color: colors.text, paddingVertical: Spacing.sm + 2, minHeight: 24 }, webNoOutline]}
         />
         <PressableScale
-          accessibilityLabel="Menschen anlegen und hinzufügen"
+          accessibilityLabel="Person anlegen und hinzufügen"
           onPress={anlegen}
           style={{ padding: Spacing.xs, opacity: entwurf.trim() ? 1 : 0.35 }}
         >

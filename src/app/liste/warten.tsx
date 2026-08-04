@@ -1,7 +1,7 @@
 // liste/warten.tsx — „Warten auf": alles, was gerade bei jemand anderem liegt.
 //
 // Ein eigener Bildschirm statt eines fünften Tabs: man schaut hier selten
-// hinein, aber wenn, dann gezielt. Gruppiert nach Mensch — denn die Frage
+// hinein, aber wenn, dann gezielt. Gruppiert nach Person — denn die Frage
 // lautet fast nie „was wartet?", sondern „was liegt bei Anna?".
 //
 // Ausdrücklich OHNE Dauer-Anzeige („seit zwölf Tagen"). Das wäre ein
@@ -31,7 +31,7 @@ import { waitingTasks } from '@/lib/taskLogic';
 import { useColors } from '@/theme/ThemeProvider';
 import { Spacing } from '@/theme/theme.tokens';
 
-/** Ohne Menschen bleibt eine Gruppe übrig: „Sonst". */
+/** Ohne Person bleibt eine Gruppe übrig: „Sonst". */
 const OHNE = '__ohne__';
 
 export default function WartenScreen() {
@@ -52,7 +52,7 @@ export default function WartenScreen() {
   const listById = useMemo(() => new Map((lists ?? []).map((l) => [l.id, l])), [lists]);
   const wartend = useMemo(() => waitingTasks(tasks ?? []), [tasks]);
 
-  // Nach Mensch gruppiert; Namenlose ans Ende.
+  // Nach Person gruppiert; Namenlose ans Ende.
   const gruppen = useMemo(() => {
     const namen = new Map((people ?? []).map((p) => [p.id, p.name]));
     const map = new Map<string, Task[]>();
@@ -61,7 +61,7 @@ export default function WartenScreen() {
       map.set(key, [...(map.get(key) ?? []), t]);
     }
     return [...map.entries()]
-      .map(([key, ts]) => ({ key, titel: key === OHNE ? 'Ohne Menschen' : (namen.get(key) ?? 'Mensch'), tasks: ts }))
+      .map(([key, ts]) => ({ key, titel: key === OHNE ? 'Ohne Person' : (namen.get(key) ?? 'Person'), tasks: ts }))
       .sort((a, b) => (a.key === OHNE ? 1 : b.key === OHNE ? -1 : a.titel.localeCompare(b.titel, 'de')));
   }, [wartend, people]);
 
@@ -98,7 +98,7 @@ export default function WartenScreen() {
               <View key={g.key}>
                 {gi > 0 && <Seam marginVertical={Spacing.md} />}
                 <PressableScale
-                  accessibilityLabel={g.key === OHNE ? 'Ohne Menschen' : `Alles zu ${g.titel} ansehen`}
+                  accessibilityLabel={g.key === OHNE ? 'Ohne Person' : `Alles zu ${g.titel} ansehen`}
                   onPress={() => {
                     if (g.key !== OHNE) router.push(`/person/${g.key}`);
                   }}

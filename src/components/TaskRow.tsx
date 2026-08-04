@@ -59,7 +59,7 @@ export function TaskRow({
   const hasNote = useMemo(() => (notes ?? []).some((n) => n.taskId === task.id && n.deletedAt === null), [notes, task.id]);
   const overdue = isOverdue(task, today);
   const progress = subtaskProgress(task.subtasks);
-  // Der Mensch, an dem die Aufgabe hängt — und, falls gewartet wird, die
+  // Die Person, an der die Aufgabe hängt — und, falls gewartet wird, die
   // ruhige Zeile darunter. Beides ist ausdrücklich OHNE Dauer: „seit zwölf
   // Tagen" wäre ein Schuld-Zähler für etwas, das man nicht in der Hand hat.
   const { data: people } = usePeople();

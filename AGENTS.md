@@ -48,6 +48,9 @@ Achterbahn. Konkret:
   (`SwipeActionSlide`), Labels weiß.
 - **Sprache:** UI-Texte deutsch, ruhig, ohne Ausrufezeichen-Duktus;
   Feature-Namen dürfen antik klingen (Abendbetrachtung, Braindump-Ausnahme).
+  **Personen heißen „Person", nie „Mensch"** (seit v1.76.0 durchgängig
+  umbenannt — in UI, Kommentaren und Bezeichnern; ältere UEBERGABE-Einträge
+  tragen noch das alte Wort, weil sie ein Protokoll sind, kein Sollzustand).
 
 ## Arbeitsweise
 

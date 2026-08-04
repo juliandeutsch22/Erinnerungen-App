@@ -53,7 +53,7 @@ export type BackupBundle = {
   lists: List[];
   tasks: Task[];
   notes: Note[];
-  /** Menschen (v1.73.0) — ältere Backups haben das Feld nicht. */
+  /** Personen (v1.73.0) — ältere Backups haben das Feld nicht. */
   people: Person[];
   /** Wer bei welchem Termin dabei ist (v1.74.0). */
   eventPeople: EventPerson[];
@@ -147,7 +147,7 @@ export type BackupSummary = {
   tasks: number;
   notes: number;
   chats: number;
-  /** Menschen (v1.74.0) — der Bericht soll nennen, was er wirklich sichert. */
+  /** Personen (v1.74.0) — der Bericht soll nennen, was er wirklich sichert. */
   people: number;
   journal: number;
   photos: number;
@@ -178,7 +178,7 @@ export function describeSummary(s: BackupSummary): string {
     `${s.lists} Listen`,
     `${s.notes} Notizen`,
     `${s.chats} Chats`,
-    `${s.people} Menschen`,
+    `${s.people} Personen`,
     `${s.journal} Betrachtungen`,
     `${s.photos} Fotos`,
     `${s.documents} Dokumente`,
@@ -292,7 +292,7 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
   const rawJournal = Array.isArray(parsed.journal) ? parsed.journal : [];
   const rawPeople = Array.isArray(parsed.people) ? parsed.people : [];
 
-  // Menschen zuerst: Aufgaben, Notizen und Chats prüfen ihre Zuordnung gegen
+  // Personen zuerst: Aufgaben, Notizen und Chats prüfen ihre Zuordnung gegen
   // diese Liste. Namen sind eindeutig — zwei „Anna" wären für den Nutzer nicht
   // unterscheidbar und verteilten seine offenen Punkte auf zwei Ansichten.
   const people: Person[] = [];
@@ -374,7 +374,7 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
       evening: t.evening === true,
       waiting: t.waiting === true,
       waitingFor: str(t.waitingFor) ? t.waitingFor : null,
-      // Wie bei listId: eine Zuordnung auf einen Menschen, den es im Backup
+      // Wie bei listId: eine Zuordnung auf eine Person, den es im Backup
       // nicht gibt, ist keine Zuordnung.
       personId: str(t.personId) && personIds.has(t.personId) ? t.personId : null,
       flagged: t.flagged === true,
@@ -519,7 +519,7 @@ export async function importBackup(json: string, sinks: ImportSinks = {}): Promi
   await journalRepo.clearAll();
   await personRepo.clearAll();
   await eventPersonRepo.clearAll();
-  // Menschen vor allem anderen: danach zeigen die Zuordnungen ins Leere nicht.
+  // Personen vor allem anderen: danach zeigen die Zuordnungen ins Leere nicht.
   for (const p of people) await personRepo.create(p);
   await eventPersonRepo.restore(eventPeople);
   for (const l of lists) await listRepo.create(l);

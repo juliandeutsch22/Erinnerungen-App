@@ -489,12 +489,12 @@ export function TaskEditorSheet({
         <RowDivider />
 
         {/* An wem hängt das? Steht VOR „Warten auf", weil das Warten meistens
-            auf genau diesen Menschen zeigt — und weil die Person auch ohne
+            auf genau diese Person zeigt — und weil sie auch ohne
             Warten trägt („mit Anna wegen Urlaub reden"). */}
         <DetailRow
           icon={UserRound}
           iconColor={personId ? colors.teal : colors.text3}
-          label="Mensch"
+          label="Person"
           value={personLabel}
           valueTone={personId ? 'teal' : 'text3'}
           expanded={section === 'person'}
@@ -504,7 +504,7 @@ export function TaskEditorSheet({
           <Expanded>
             <View style={{ gap: Spacing.xs }}>
               <Type variant="caption" tone="text3">
-                Wer hat damit zu tun? Alles zu einem Menschen steht danach an einem Ort.
+                Wer hat damit zu tun? Alles zu einer Person steht danach an einem Ort.
               </Type>
               <PersonWahl selected={personId} onSelect={setPersonId} />
             </View>

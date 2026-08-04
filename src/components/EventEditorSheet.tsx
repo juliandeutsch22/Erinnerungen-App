@@ -10,7 +10,7 @@ import { BottomSheet } from '@/components/BottomSheet';
 import { DisclosureChevron } from '@/components/DisclosureChevron';
 import { Chip } from '@/components/Chip';
 import { GlassButton } from '@/components/GlassButton';
-import { EventMenschen } from '@/components/EventMenschen';
+import { EventPersonen } from '@/components/EventPersonen';
 import { useToggleEventPerson } from '@/data/eventPersonQueries';
 import { LinkedNotes } from '@/components/LinkedNotes';
 import { MiniCalendar } from '@/components/MiniCalendar';
@@ -95,9 +95,9 @@ export function EventEditorSheet({
   const [startTime, setStartTime] = useState(event && !event.allDay ? hm(event.start) : '09:00');
   const [endTime, setEndTime] = useState(event && !event.allDay ? hm(event.end) : '10:00');
   const [confirmDelete, setConfirmDelete] = useState(false);
-  // Menschen für einen NEUEN Termin: es gibt noch keine Event-ID, an der die
+  // Personen für einen NEUEN Termin: es gibt noch keine Event-ID, an der die
   // Verknüpfung hängen könnte — die Auswahl wartet hier, bis der Termin steht.
-  const [neueMenschen, setNeueMenschen] = useState<string[]>([]);
+  const [neuePersonen, setNeuePersonen] = useState<string[]>([]);
   const linkEventPerson = useToggleEventPerson();
   const [section, setSection] = useState<'calendar' | WhenRow | null>(isEdit ? null : 'start');
 
@@ -155,7 +155,7 @@ export function EventEditorSheet({
     if (isEdit) updateEvent.mutate({ event, draft });
     else {
       hapticSuccess();
-      // Erst der Termin, dann die Menschen: die Verknüpfung braucht die ID,
+      // Erst der Termin, dann die Personen: die Verknüpfung braucht die ID,
       // die `createDeviceEvent` seit v1.74.0 zurückgibt. Kommt keine (kein
       // Kalenderzugriff), bleibt die Auswahl folgenlos — es entsteht dann
       // ohnehin kein Termin, an dem sie hängen könnte.
@@ -164,7 +164,7 @@ export function EventEditorSheet({
         {
           onSuccess: (neueId) => {
             if (!neueId) return;
-            for (const personId of neueMenschen) {
+            for (const personId of neuePersonen) {
               linkEventPerson.mutate({ eventId: neueId, personId, dran: false });
             }
           },
@@ -365,9 +365,9 @@ export function EventEditorSheet({
         <Hairline />
         <View style={{ marginTop: Spacing.md }}>
           {isEdit && event ? (
-            <EventMenschen eventId={event.id} />
+            <EventPersonen eventId={event.id} />
           ) : (
-            <EventMenschen gewaehlt={neueMenschen} onGewaehlt={setNeueMenschen} />
+            <EventPersonen gewaehlt={neuePersonen} onGewaehlt={setNeuePersonen} />
           )}
         </View>
       </View>

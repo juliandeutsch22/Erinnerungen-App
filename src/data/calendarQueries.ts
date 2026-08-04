@@ -65,7 +65,7 @@ export function useCreateEvent() {
 export function useCreateAssistantEvents() {
   const invalidate = useInvalidateEvents();
   // Gibt je Termin die EventKit-ID zurück (null, wenn es nicht geklappt hat) —
-  // in DERSELBEN Reihenfolge wie die Eingabe, damit der Aufrufer die Menschen
+  // in DERSELBEN Reihenfolge wie die Eingabe, damit der Aufrufer die Personen
   // dem richtigen Termin zuordnen kann.
   return async (termine: AssistantEventInput[]): Promise<(string | null)[]> => {
     const ids: (string | null)[] = [];

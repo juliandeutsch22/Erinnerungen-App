@@ -1,8 +1,8 @@
-// PersonEditorSheet.tsx — einen Menschen anlegen oder pflegen.
+// PersonEditorSheet.tsx — eine Person anlegen oder pflegen.
 //
-// Bis v1.74 gab es Menschen NUR als Nebenprodukt: man tippte einen Namen in
+// Bis v1.74 gab es Personen NUR als Nebenprodukt: man tippte einen Namen in
 // einer Aufgabe, einer Notiz oder einem Termin, und dabei entstand einer. Der
-// Menschen-Abschnitt im Listen-Tab erschien überdies erst, WENN es welche gab —
+// Personen-Abschnitt im Listen-Tab erschien überdies erst, WENN es welche gab —
 // ein Henne-Ei-Problem, das den einzigen Weg über die Aufgabe erzwang.
 //
 // Hier ist der eigenständige Ort dafür: Name, Notiz, Telefon, E-Mail — und der
@@ -30,10 +30,10 @@ export function PersonEditorSheet({
   onClose,
   onSaved,
 }: {
-  /** null = neuer Mensch. */
+  /** null = neuer Person. */
   person: Person | null;
   onClose: () => void;
-  /** Bekommt den angelegten/gesicherten Menschen — für „gleich zuordnen". */
+  /** Bekommt die angelegte/gesicherte Person — für „gleich zuordnen". */
   onSaved?: (p: Person) => void;
 }) {
   const colors = useColors();
@@ -100,13 +100,13 @@ export function PersonEditorSheet({
 
   const footer = (
     <View>
-      <GlassButton accessibilityLabel={isEdit ? 'Menschen sichern' : 'Menschen anlegen'} onPress={save} disabled={!canSave}>
+      <GlassButton accessibilityLabel={isEdit ? 'Person sichern' : 'Person anlegen'} onPress={save} disabled={!canSave}>
         <Type variant="label" style={{ color: '#FFFFFF' }}>{isEdit ? 'Sichern' : 'Anlegen'}</Type>
       </GlassButton>
       {/* Löschen zweistufig — und ehrlich darüber, was dabei passiert. */}
       {isEdit && (
         <PressableScale
-          accessibilityLabel={confirmDelete ? 'Löschen bestätigen' : 'Menschen löschen'}
+          accessibilityLabel={confirmDelete ? 'Löschen bestätigen' : 'Person löschen'}
           onPress={() => {
             if (!confirmDelete) {
               setConfirmDelete(true);
@@ -127,10 +127,10 @@ export function PersonEditorSheet({
   );
 
   return (
-    <BottomSheet visible title={isEdit ? 'Mensch' : 'Neuer Mensch'} onClose={onClose} footer={footer}>
+    <BottomSheet visible title={isEdit ? 'Person' : 'Neue Person'} onClose={onClose} footer={footer}>
       <View style={{ gap: Spacing.sm }}>
         <TextInput
-          accessibilityLabel="Name des Menschen"
+          accessibilityLabel="Name der Person"
           value={name}
           onChangeText={setName}
           placeholder="Name"
@@ -178,7 +178,7 @@ export function PersonEditorSheet({
           style={[feldStil, webNoOutline]}
         />
         <TextInput
-          accessibilityLabel="Notiz zum Menschen"
+          accessibilityLabel="Notiz zur Person"
           value={note}
           onChangeText={setNote}
           placeholder="Notiz (z. B. Dachdecker, über Kollegin)"

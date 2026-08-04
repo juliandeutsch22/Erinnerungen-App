@@ -95,7 +95,7 @@ export function TaskQuickSheet({
           </>
         )}
         {/* Warten auf — der schnelle Weg. Der ausführliche liegt im Editor
-            (mit „worauf?" und dem Menschen); hier genügt der Zustand, weil man
+            (mit „worauf?" und der Person); hier genügt der Zustand, weil man
             ihn meistens genau in dem Moment setzt, in dem einem auffällt, dass
             man selbst gerade nichts tun kann. */}
         {!done && (

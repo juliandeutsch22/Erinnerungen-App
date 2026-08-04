@@ -1950,6 +1950,57 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
       der Import selbst und der „Wer ist dabei"-Block beim Anlegen eines
       Termins.
 
+79. **„Person" statt „Mensch" — und was der Gleichwertigkeits-Test zutage
+    förderte** (v1.76.0). Julian: „kann man Personen trotzdem direkt in Aufgaben
+    und Terminen anlegen? sollte man das entfernen für eine bessere Übersicht?
+    … außerdem glaube ich, dass ich den Ausdruck ‚Person' besser finde als
+    ‚Mensch'."
+    · **Der schnelle Weg bleibt.** Der Fehler war nie, DASS es ihn gibt, sondern
+      dass er bis v1.74 der EINZIGE war. Ihn jetzt zu streichen hieße, den Zwang
+      nur umzudrehen: statt „erfinde eine Aufgabe, um eine Person anzulegen"
+      dann „verlasse die Aufgabe, um eine Person anzulegen" — und wer das nicht
+      tut, tippt den Namen stattdessen in den Titel, womit die Dimension tot ist.
+    · **Die Wortgleichheit war das eigentliche Problem:** „Neuer Mensch" hieß
+      zwei verschiedene Dinge — im Listen-Tab ein Weg, der einen Editor öffnet,
+      im Aufgaben-Editor ein Feld, das SOFORT anlegt. Beide Felder heißen jetzt
+      „Name — direkt anlegen"; sie sagen damit, was passiert.
+    · **Umbenennung Mensch → Person**, durchgängig: sichtbare Texte,
+      `accessibilityLabels`, Kommentare, Bezeichner (`EventMenschen.tsx` →
+      `EventPersonen.tsx`, `neueMenschen`, `hatMensch`), Tests und Touren. Der
+      Datenlayer hieß immer schon `Person` — die App spricht jetzt dieselbe
+      Sprache wie ihr Code. Achtung beim Nachziehen: „der Mensch" ist männlich,
+      „die Person" weiblich; die mechanische Ersetzung hinterließ ein Dutzend
+      falscher Pronomen („EIN Person, auch wenn ER …"), die einzeln
+      nachgezogen werden mussten. Als Leitplanke jetzt in `AGENTS.md`.
+    · **Der Audit fand drei echte Unterschiede** zwischen den zwei Wegen:
+      1. `EventPersonen` zeigte die Notiz NICHT — ausgerechnet dort, wo man
+         mehrere anhakt, fehlte das, was zwei Annas unterscheidet. Ergänzt.
+      2. `EventPersonen` sortierte „wer dabei ist, steht oben" — aber `dabei`
+         ändert sich beim Anhaken, also sprang die Zeile unter dem Finger nach
+         oben und beim Lösen zurück. Zweimal dieselbe Zeile zu treffen war
+         unmöglich. Die Sortierung ist RAUS: eine Ordnung überall, die aus
+         `usePeople()`. Das Häkchen sagt ohnehin, wer dabei ist.
+         (Erster Anlauf war ein eingefrorenes `useRef` — das kostete vier
+         `react-hooks/refs`-Warnungen für eine Ordnung, die niemand vermisst.
+         Wenn eine Regel schreit, ist meist der Plan falsch, nicht die Regel.)
+      3. Die tragende Behauptung des Audits — „der schnelle Weg ist keine
+         Sackgasse, weil derselbe Name später dieselbe Person FINDET und
+         angereichert wird" — steckte ungetestet in einem Hook. Sie liegt jetzt
+         als `lib/personMerge.ts` (`findePerson`, `personNachtrag`) daneben, mit
+         neun Tests. Eine Behauptung, die eine Architektur trägt, gehört geprüft.
+    · **Was NICHT gleichwertig ist, und bleibt:** der schnelle Weg legt nur
+      einen Namen an — kein Telefon, keine E-Mail, kein Adressbuch. Das ist
+      keine Nachlässigkeit, sondern erzwungen: `PersonEditorSheet` ist ein
+      BottomSheet, der Aufgaben-Editor ebenfalls, und ein Sheet im Sheet ist
+      genau die Absturzklasse aus §8.54/§8.71. Getragen wird die Asymmetrie von
+      `personNachtrag`: was schnell entstand, wird später angereichert statt
+      verdoppelt.
+    · Verifikation: 516 Tests, tsc sauber, eslint 28/0, 21 Touren grün
+      (`kontakt.mjs` um Schritt 5 erweitert: derselbe Name in anderer
+      Schreibweise legt KEINE zweite Person an). **Ehrlich:** die beiden
+      Änderungen an `EventPersonen` sind im Web nicht prüfbar — der
+      Termin-Editor braucht einen echten Gerätekalender.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**

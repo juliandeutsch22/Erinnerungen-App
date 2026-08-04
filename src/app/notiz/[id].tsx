@@ -221,7 +221,7 @@ export default function NotizScreen() {
   // Die Liste, in der diese Notiz liegt (Stoas Ordner-Ersatz). Zeigt sie auf
   // eine gelöschte Liste, findet sich nichts — dann steht auch kein Chip da.
   const { data: lists } = useLists();
-  // Der Mensch, um den es in dieser Notiz geht. Ohne `useMemo`: ein Suchlauf
+  // Die Person, um den es in dieser Notiz geht. Ohne `useMemo`: ein Suchlauf
   // über eine Handvoll Namen kostet nichts, und die Nachbarn hier oben zahlen
   // für ihre Memoisierung bereits mit einer Compiler-Warnung.
   const { data: people } = usePeople();

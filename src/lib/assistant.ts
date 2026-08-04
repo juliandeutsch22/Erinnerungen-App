@@ -88,7 +88,7 @@ const P_AKTIONEN_RUMPF =
   'setze „wartet_auf" auf das, worauf gewartet wird („Angebot", „Rückmeldung"). ' +
   'Die Aufgabe verschwindet dann aus „Heute" und mahnt nicht mehr. ' +
   'Setze es NUR bei einer echten Warte-Aussage — nicht bei allem, was noch offen ist. ' +
-  'Steht ein MENSCH dahinter oder hat die Aufgabe mit jemandem zu tun („mit Anna besprechen", ' +
+  'Steht eine PERSON dahinter oder hat die Aufgabe mit jemandem zu tun („mit Anna besprechen", ' +
   '„Papa Fotos schicken"), gehört dessen Name in „person" — nur der Name, nichts weiter. ' +
   '„listen" legt ein neues Projekt an — NUR wenn der Nutzer ein größeres Vorhaben beschreibt und ' +
   'keine passende Liste existiert. Aufgaben dazu bekommen dann "liste" mit genau diesem Namen. ' +
@@ -152,7 +152,7 @@ const P_AENDERN =
   'und nur Felder angeben, die sich wirklich ändern. „erledigt":true hakt ab, ' +
   '"papierkorb":true legt in den Papierkorb (wiederherstellbar). ' +
   '„wartet_auf" setzt/ändert den Wartezustand, null beendet ihn („ist da", „hat sich gemeldet"); ' +
-  '„person" ordnet einem Menschen zu, null löst die Zuordnung. ' +
+  '„person" ordnet einer Person zu, null löst die Zuordnung. ' +
   'ENDGÜLTIG LÖSCHEN KANNST DU NICHT — biete es auch nicht an. ' +
   'Ohne App-Überblick (keine Handles sichtbar) gibt es keine „aenderungen". ' +
   'Nutze den Block NUR bei einer ausdrücklichen Anlege- oder Änderungs-Bitte, nie ungefragt.';
@@ -285,7 +285,7 @@ export type AssistantAction = {
     notiz?: string;
     /** Liegt bei jemand anderem — Text beschreibt WORAUF gewartet wird. */
     wartet_auf?: string;
-    /** Mensch, an dem die Aufgabe hängt — als NAME. Wird beim Übernehmen auf
+    /** Person, an der die Aufgabe hängt — als NAME. Wird beim Übernehmen auf
      *  eine vorhandene Person aufgelöst oder neu angelegt. */
     person?: string;
   }[];
@@ -299,7 +299,7 @@ export type AssistantAction = {
     ort?: string;
     notiz?: string;
     /** Wer dabei ist — als NAMEN. Werden beim Übernehmen auf vorhandene
-     *  Menschen aufgelöst oder angelegt. Mehrere sind normal. */
+     *  Personen aufgelöst oder angelegt. Mehrere sind normal. */
     personen?: string[];
   }[];
   /** Neue Projekte/Listen. Werden VOR den Aufgaben angelegt, damit deren
@@ -316,7 +316,7 @@ export type AssistantAction = {
     liste?: string;
     /** null = Warten beenden, Text = ab jetzt warten (und worauf). */
     wartet_auf?: string | null;
-    /** null = Zuordnung lösen, Name = diesem Menschen zuordnen. */
+    /** null = Zuordnung lösen, Name = diesem Personen zuordnen. */
     person?: string | null;
     papierkorb?: boolean;
   }[];
@@ -390,9 +390,9 @@ export function describeExtras(a: { wiederholung?: Rrule; tags?: string[]; warte
   const parts = [
     a.wiederholung ? rruleLabel(a.wiederholung) : '',
     // Beides muss VOR dem Übernehmen sichtbar sein: „wartet auf" nimmt die
-    // Aufgabe aus Heute heraus, und „person" legt womöglich einen Menschen an.
+    // Aufgabe aus Heute heraus, und „person" legt womöglich eine Person an.
     a.wartet_auf ? `wartet auf ${a.wartet_auf}` : '',
-    a.person ? `Mensch: ${a.person}` : '',
+    a.person ? `Person: ${a.person}` : '',
     (a.tags ?? []).map((t) => `#${t}`).join(' '),
   ];
   const text = parts.filter(Boolean).join(' · ');
@@ -412,8 +412,8 @@ export function describeAenderung(
   if (c.liste) parts.push(`in die Liste „${c.liste}"`);
   if (c.wartet_auf === null) parts.push('nicht mehr warten');
   else if (c.wartet_auf) parts.push(`wartet auf ${c.wartet_auf}`);
-  if (c.person === null) parts.push('Menschen lösen');
-  else if (c.person) parts.push(`Mensch: ${c.person}`);
+  if (c.person === null) parts.push('Person lösen');
+  else if (c.person) parts.push(`Person: ${c.person}`);
   if (c.datum === null) parts.push('Datum entfernen');
   else if (c.datum) parts.push(`auf ${formatDatum(c.datum)}${c.zeit ? ` · ${c.zeit} Uhr` : ''}`);
   else if (c.zeit === null) parts.push('Uhrzeit entfernen');
@@ -779,7 +779,7 @@ export function buildAppContext(input: {
   tasks: Task[];
   lists: List[];
   notes: Note[];
-  /** Menschen — optional, damit alte Aufrufer gültig bleiben. */
+  /** Personen — optional, damit alte Aufrufer gültig bleiben. */
   people?: Person[];
   today: string; // 'YYYY-MM-DD'
   /** Kein Kalenderzugriff → das Modell soll „unbekannt" sagen, nicht „keine". */
@@ -828,7 +828,7 @@ export function buildAppContext(input: {
     const ln = listName.get(t.listId);
     if (ln && t.listId !== 'default') parts.push(`Liste „${ln}"`);
     const pn = t.personId ? personName.get(t.personId) : undefined;
-    if (pn) parts.push(`Mensch: ${pn}`);
+    if (pn) parts.push(`Person: ${pn}`);
     return `- ${parts.join(' · ')}`;
   };
   const wartendLine = (t: Task) => {
@@ -886,7 +886,7 @@ export function buildAppContext(input: {
     '',
     `Notizen (nur Titel): ${noteTitles.length ? noteTitles.join(', ') : 'keine'}`,
     '',
-    `Menschen: ${(people ?? []).length ? (people ?? []).map((p) => p.name).join(', ') : 'keine'}`,
+    `Personen: ${(people ?? []).length ? (people ?? []).map((p) => p.name).join(', ') : 'keine'}`,
     '',
     'Beantworte Fragen zu Terminen, Aufgaben und Planung direkt aus diesem Überblick. ' +
       'Erfinde keine Einträge dazu; was hier nicht steht, existiert in der App nicht. ' +
@@ -1211,7 +1211,7 @@ export function terminUnter(
   fmt: (d: string) => string,
 ): string {
   const zeit = t.start ? `${t.start}${t.ende ? `–${t.ende}` : ''}` : 'ganztägig';
-  // Die Menschen müssen VOR dem Übernehmen dastehen: sie werden womöglich
+  // Die Personen müssen VOR dem Übernehmen dastehen: sie werden womöglich
   // angelegt, und angelegt wird in dieser App nichts unsichtbar.
   const mit = (t.personen ?? []).length > 0 ? ` · mit ${(t.personen ?? []).join(', ')}` : '';
   return `${terminDatum(t, fmt)} · ${zeit}${ortZusatz(t)}${mit}`;

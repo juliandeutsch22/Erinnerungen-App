@@ -116,7 +116,7 @@ export function getDb(): Promise<SQLiteDatabase> {
       // Migration: neue Spalten nachrüsten (bestehende Installs).
       // ALTER wirft, wenn die Spalte schon existiert → still schlucken.
       // `waiting`/`waiting_for`/`person_id` (v1.73.0) — wartende Aufgaben und
-      // der Mensch, an dem etwas hängt. `person_id` bewusst OHNE REFERENCES:
+      // die Person, an der etwas hängt. `person_id` bewusst OHNE REFERENCES:
       // wird die Person gelöscht, bleibt die Aufgabe (das Lösen der Zuordnung
       // macht SqlitePersonRepository.remove selbst, in einer Transaktion).
       for (const col of ['tags TEXT', 'subtasks TEXT', 'event_id TEXT', 'deleted_at TEXT', 'rrule_until TEXT', 'start_date TEXT', 'expires_on TEXT', 'evening INTEGER NOT NULL DEFAULT 0', 'waiting INTEGER NOT NULL DEFAULT 0', 'waiting_for TEXT', 'person_id TEXT']) {

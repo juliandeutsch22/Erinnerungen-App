@@ -1,13 +1,15 @@
-// personQueries.ts — TanStack-Query-Hooks für Menschen. Eine Quelle
+// personQueries.ts — TanStack-Query-Hooks für Personen. Eine Quelle
 // (['people']); alles Weitere (was hängt an wem) ist ein reiner Filter über
 // Aufgaben, Notizen und Chats.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
+import { findePerson, personNachtrag } from '@/lib/personMerge';
 
 import { eventPeopleKey } from './eventPersonQueries';
 import { getChatRepository, getEventPersonRepository, getNoteRepository, getPersonRepository, getTaskRepository } from './index';
 import { queryKeys } from './queries';
 import type { NewPerson, Person } from './types';
-import { newId, normalizePersonName } from './types';
+import { newId } from './types';
 
 export const peopleKey = ['people'] as const;
 
@@ -27,7 +29,7 @@ function useInvalidatePeople() {
  * offenen Punkte auf zwei Ansichten verteilen.
  *
  * Seit v1.75.0 zählt zusätzlich die Adressbuch-Herkunft: derselbe Kontakt
- * zweimal importiert bleibt EIN Mensch, auch wenn er im Adressbuch inzwischen
+ * zweimal importiert bleibt EINE Person, auch wenn sie im Adressbuch inzwischen
  * anders heißt. Der vorhandene Eintrag bekommt dabei nachgereicht, was ihm
  * fehlt (Nummer, E-Mail, Herkunft) — aber nichts wird überschrieben, was schon
  * dasteht: was von Hand getippt wurde, gehört dem Nutzer.
@@ -38,15 +40,9 @@ export function useCreatePerson() {
     mutationFn: async (input: NewPerson) => {
       const name = input.name.trim();
       const alle = await getPersonRepository().getAll();
-      const vorhanden =
-        (input.contactId ? alle.find((p) => p.contactId === input.contactId) : undefined) ??
-        alle.find((p) => normalizePersonName(p.name) === normalizePersonName(name));
+      const vorhanden = findePerson(alle, { ...input, name });
       if (vorhanden) {
-        const nachtrag: Partial<Omit<Person, 'id'>> = {};
-        if (!vorhanden.phone && input.phone) nachtrag.phone = input.phone;
-        if (!vorhanden.email && input.email) nachtrag.email = input.email;
-        if (!vorhanden.contactId && input.contactId) nachtrag.contactId = input.contactId;
-        if (!vorhanden.note && input.note) nachtrag.note = input.note;
+        const nachtrag = personNachtrag(vorhanden, { ...input, name });
         if (Object.keys(nachtrag).length > 0) {
           await getPersonRepository().update(vorhanden.id, nachtrag);
           return { ...vorhanden, ...nachtrag };
@@ -100,7 +96,7 @@ export function useDeletePerson() {
       for (const n of notes) if (n.personId === id) await getNoteRepository().update(n.id, { personId: null });
       for (const c of chats) if (c.personId === id) await getChatRepository().update(c.id, { personId: null });
       // Termin-Verknüpfungen liegen in einer eigenen Tabelle — sie müssen
-      // ausdrücklich mit weg, sonst bliebe ein Termin an einem Menschen
+      // ausdrücklich mit weg, sonst bliebe ein Termin an einer Person
       // hängen, den es nicht mehr gibt.
       await getEventPersonRepository().removeForPerson(id);
       await getPersonRepository().remove(id);

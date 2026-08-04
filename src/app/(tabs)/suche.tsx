@@ -40,12 +40,12 @@ import { useSettings } from '@/theme/settings.store';
 import { Shadow, Spacing, T } from '@/theme/theme.tokens';
 
 /** Bereichs-Filter: „Alle" oder genau ein Bereich. */
-type Scope = 'alle' | 'aufgaben' | 'listen' | 'menschen' | 'notizen' | 'dokumente' | 'chats' | 'abend';
+type Scope = 'alle' | 'aufgaben' | 'listen' | 'personen' | 'notizen' | 'dokumente' | 'chats' | 'abend';
 const SCOPES: { value: Scope; label: string }[] = [
   { value: 'alle', label: 'Alle' },
   { value: 'aufgaben', label: 'Aufgaben' },
   { value: 'listen', label: 'Listen' },
-  { value: 'menschen', label: 'Menschen' },
+  { value: 'personen', label: 'Personen' },
   { value: 'notizen', label: 'Notizen' },
   { value: 'dokumente', label: 'Dokumente' },
   { value: 'chats', label: 'Chats' },
@@ -95,10 +95,10 @@ export default function SucheScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lists, q, scope]);
 
-  // Menschen: Name UND Notiz - „Dachdecker“ findet ihn auch, wenn er
+  // Personen: Name UND Notiz - „Dachdecker“ findet sie auch, wenn sie
   // „Herr Brandt“ heißt und das Gewerbe nur in der Notiz steht.
   const personHits = useMemo(() => {
-    if (!q || !inScope('menschen')) return [];
+    if (!q || !inScope('personen')) return [];
     return (people ?? []).filter((p) => p.name.toLowerCase().includes(q) || (p.note ?? '').toLowerCase().includes(q));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [people, q, scope]);
@@ -246,7 +246,7 @@ export default function SucheScreen() {
               <EmptyState
                 icon={<Search size={20} color={colors.teal} strokeWidth={2} />}
                 title="Alles auffindbar"
-                body="Ein Begriff genügt — durchsucht werden Aufgaben, Listen, Menschen, Notizen, Dokumente, Chats und die Abendbetrachtung."
+                body="Ein Begriff genügt — durchsucht werden Aufgaben, Listen, Personen, Notizen, Dokumente, Chats und die Abendbetrachtung."
               />
             )}
           </GlassPanel>
@@ -295,7 +295,7 @@ export default function SucheScreen() {
                 )}
                 {personHits.length > 0 && (
                   <>
-                    <Type variant="eyebrow" tone="text3">Menschen</Type>
+                    <Type variant="eyebrow" tone="text3">Personen</Type>
                     <View style={{ marginTop: Spacing.xs }}>
                       {personHits.map((p) => (
                         <PressableScale

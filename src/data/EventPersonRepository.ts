@@ -1,4 +1,4 @@
-// EventPersonRepository.ts — Zuordnung Mensch ↔ Kalendertermin (EventKit-ID).
+// EventPersonRepository.ts — Zuordnung Person ↔ Kalendertermin (EventKit-ID).
 //
 // Warum eine EIGENE Tabelle und nicht die Teilnehmer des Termins: EventKit
 // gibt Teilnehmer nur LESEND heraus — `EKEvent` hat kein Feld, das die App
@@ -6,7 +6,7 @@
 // die verschickt Mails). Stoa macht es deshalb wie bei Fotos und Dokumenten:
 // der Termin gehört dem Gerätekalender, die Verknüpfung gehört uns.
 //
-// Anders als bei Aufgabe/Notiz/Chat sind es MEHRERE Menschen pro Termin — ein
+// Anders als bei Aufgabe/Notiz/Chat sind es MEHRERE Personen pro Termin — ein
 // Abendessen hat selten genau einen Teilnehmer.
 import { newId } from './types';
 
@@ -18,12 +18,12 @@ export type EventPerson = {
 };
 
 export interface EventPersonRepository {
-  /** Alle Verknüpfungen — die Ableitungen (pro Termin, pro Mensch) sind Filter. */
+  /** Alle Verknüpfungen — die Ableitungen (pro Termin, pro Person) sind Filter. */
   getAll(): Promise<EventPerson[]>;
-  /** Hängt einen Menschen an einen Termin. Doppelt anhängen tut nichts. */
+  /** Hängt eine Person an einen Termin. Doppelt anhängen tut nichts. */
   link(eventId: string, personId: string): Promise<EventPerson | null>;
   unlink(eventId: string, personId: string): Promise<void>;
-  /** Löst ALLE Verknüpfungen eines Menschen (beim Löschen der Person). */
+  /** Löst ALLE Verknüpfungen einer Person (beim Löschen der Person). */
   removeForPerson(personId: string): Promise<void>;
   clearAll(): Promise<void>;
   /** Fügt fertige Verknüpfungen ein (Backup — id/addedAt bleiben erhalten). */

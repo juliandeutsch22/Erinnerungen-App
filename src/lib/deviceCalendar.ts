@@ -132,7 +132,7 @@ export type EventDraft = {
 };
 
 /** Legt den Termin an und gibt seine EventKit-ID zurück — an ihr hängen Fotos,
- *  Dokumente und (seit v1.74.0) die Menschen. */
+ *  Dokumente und (seit v1.74.0) die Personen. */
 export async function createDeviceEvent(calendarId: string, draft: EventDraft): Promise<string | null> {
   const Calendar = mod();
   const cal = await Calendar.ExpoCalendar.get(calendarId);
@@ -204,7 +204,7 @@ export function buildEventDraft(input: AssistantEventInput): EventDraft {
  * Legt einen Termin im Standard-Kalender an. Kümmert sich um Berechtigung und
  * Kalender-Wahl; gibt die Event-ID zurück (null = kein Zugriff/Web/Fehler).
  *
- * Die ID zählt seit v1.74.0: an ihr hängen die Menschen, die der Assistent im
+ * Die ID zählt seit v1.74.0: an ihr hängen die Personen, die der Assistent im
  * selben Zug vorgeschlagen hat. Ohne sie wären „Abendessen" und „Anna" ein
  * Termin und eine Person, die einander nicht kennen.
  */

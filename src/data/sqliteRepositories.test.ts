@@ -178,7 +178,7 @@ describe('SqliteTaskRepository', () => {
   });
 });
 
-describe('Warten auf und Menschen (v1.73.0)', () => {
+describe('Warten auf und Personen (v1.73.0)', () => {
   it('trägt Wartezustand, Wartetext und Person an der Aufgabe', async () => {
     const { tasks } = await frisch();
     await tasks.create(aufgabe({ waiting: true, waitingFor: 'Angebot vom Dachdecker', personId: 'p1' }));
@@ -195,7 +195,7 @@ describe('Warten auf und Menschen (v1.73.0)', () => {
     expect(nach.personId).toBeNull();
   });
 
-  it('legt Menschen an, ändert und sortiert sie', async () => {
+  it('legt Personen an, ändert und sortiert sie', async () => {
     const { people } = await frisch();
     await people.create({ id: 'p1', name: 'Anna', note: null, sort: 1, createdAt: 'A' });
     await people.create({ id: 'p2', name: 'Dachdecker', note: 'über Kollegin', sort: 2, createdAt: 'B' });
@@ -229,7 +229,7 @@ describe('Warten auf und Menschen (v1.73.0)', () => {
     expect(nach.note).toBe('Dachdecker');
   });
 
-  it('liest einen Menschen OHNE die neuen Felder als null, nicht als undefined', async () => {
+  it('liest eine Person OHNE die neuen Felder als null, nicht als undefined', async () => {
     const { people } = await frisch();
     await people.create({ id: 'p1', name: 'Anna', note: null, sort: 1, createdAt: 'A' });
     const [p] = await people.getAll();
@@ -262,8 +262,8 @@ describe('Warten auf und Menschen (v1.73.0)', () => {
   });
 });
 
-describe('Menschen an Terminen (v1.74.0)', () => {
-  it('haengt mehrere Menschen an einen Termin und loest sie einzeln', async () => {
+describe('Personen an Terminen (v1.74.0)', () => {
+  it('haengt mehrere Personen an einen Termin und loest sie einzeln', async () => {
     const { eventPeople } = await frisch();
     await eventPeople.link('ev-1', 'p1');
     await eventPeople.link('ev-1', 'p2');
@@ -278,14 +278,14 @@ describe('Menschen an Terminen (v1.74.0)', () => {
     ]);
   });
 
-  it('haengt denselben Menschen NICHT zweimal an denselben Termin', async () => {
+  it('haengt dieselbe Person NICHT zweimal an denselben Termin', async () => {
     const { eventPeople } = await frisch();
     expect(await eventPeople.link('ev-1', 'p1')).not.toBeNull();
     expect(await eventPeople.link('ev-1', 'p1')).toBeNull();
     expect((await eventPeople.getAll()).length).toBe(1);
   });
 
-  it('raeumt beim Loeschen eines Menschen ALLE seine Termine ab', async () => {
+  it('raeumt beim Loeschen einer Person ALLE ihre Termine ab', async () => {
     const { eventPeople } = await frisch();
     await eventPeople.link('ev-1', 'p1');
     await eventPeople.link('ev-2', 'p1');

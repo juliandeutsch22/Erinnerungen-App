@@ -100,7 +100,7 @@ export function ChatLinkSheet({ chatId, onClose }: { chatId: string; onClose: ()
         </Group>
       )}
 
-      <Type variant="eyebrow" tone="text3" style={{ marginTop: Spacing.lg, marginBottom: Spacing.xs }}>Mensch</Type>
+      <Type variant="eyebrow" tone="text3" style={{ marginTop: Spacing.lg, marginBottom: Spacing.xs }}>Person</Type>
       <PersonWahl selected={chat.personId ?? null} onSelect={(personId) => toggle({ personId })} />
 
       <Type variant="eyebrow" tone="text3" style={{ marginTop: Spacing.lg, marginBottom: Spacing.xs }}>Notizen</Type>

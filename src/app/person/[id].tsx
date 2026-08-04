@@ -1,4 +1,4 @@
-// person/[id].tsx — alles zu einem Menschen an einem Ort.
+// person/[id].tsx — alles zu einer Person an einem Ort.
 //
 // Der Moment, in dem dieser Bildschirm trägt, ist der, in dem man jemanden
 // zufällig trifft: „Ach, da war doch was" — und dann steht es hier, statt auf
@@ -111,7 +111,7 @@ export default function PersonScreen() {
       <Screen withTabBar={false} contentContainerStyle={{ paddingBottom: insets.bottom + Spacing.xl }}>
         <Reveal>
           {zurueck}
-          <EmptyState title="Diesen Menschen gibt es nicht mehr" body="Vielleicht wurde er gelöscht — was an ihm hing, ist geblieben." />
+          <EmptyState title="Diese Person gibt es nicht mehr" body="Vielleicht wurde sie gelöscht — was an ihr hing, ist geblieben." />
         </Reveal>
       </Screen>
     );
@@ -148,7 +148,7 @@ export default function PersonScreen() {
               es nur hier gab — mit Telefon, E-Mail und dem Weg ins Adressbuch
               wären das sonst zwei Formulare gewesen, die auseinanderlaufen. */}
           <PressableScale
-            accessibilityLabel="Menschen bearbeiten"
+            accessibilityLabel="Person bearbeiten"
             onPress={() => {
               hapticSelect();
               setBearbeiten(true);
@@ -166,7 +166,7 @@ export default function PersonScreen() {
 
         {/* Nummer und E-Mail sind ANTIPPBAR — das ist der eigentliche Ertrag
             des Imports. „Angebot vom Dachdecker" wartet, man tippt den
-            Menschen an, tippt die Nummer an, und telefoniert. Ohne das wäre
+            Person an, tippt die Nummer an, und telefoniert. Ohne das wäre
             eine gespeicherte Nummer nur Text zum Abschreiben. */}
         {(person.phone || person.email) && (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.sm }}>
@@ -206,7 +206,7 @@ export default function PersonScreen() {
             <EmptyState
               icon={<UserRound size={20} color={colors.teal} strokeWidth={2} />}
               title="Noch nichts zugeordnet"
-              body="Hänge eine Aufgabe, eine Notiz oder einen Chat an diesen Menschen — hier läuft danach alles zusammen."
+              body="Hänge eine Aufgabe, eine Notiz oder einen Chat an diese Person — hier läuft danach alles zusammen."
             />
           ) : (
             <>

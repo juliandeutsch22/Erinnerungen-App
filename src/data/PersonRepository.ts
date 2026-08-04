@@ -1,4 +1,4 @@
-// PersonRepository.ts — Interface + In-Memory-Variante (Web/Tests) für Menschen.
+// PersonRepository.ts — Interface + In-Memory-Variante (Web/Tests) für Personen.
 //
 // Eine Person ist bewusst schlank: ein Name, eine freie Notiz, sonst nichts.
 // Sie ist kein Adressbuch-Eintrag, sondern ein Anker, an dem Aufgaben, Notizen

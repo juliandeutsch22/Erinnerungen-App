@@ -4,7 +4,7 @@
 // selbst schon Sheets, und ein Modal, das aus einem Modal aufgeht, ist auf iOS
 // genau der Weg, der die App reproduzierbar zerlegt hat (§8.54/§8.71). Der
 // Block spricht dieselbe Sprache wie die anderen aufgeklappten Zeilen im
-// Editor: eine Gruppe, eine Zeile je Mensch, ein Haken beim Gewählten.
+// Editor: eine Gruppe, eine Zeile je Person, ein Haken beim Gewählten.
 //
 // Eine Person wird hier auch ANGELEGT — der Moment, in dem man sie braucht,
 // ist der Moment, in dem sie einem einfällt. Ein eigener Verwaltungs-Ort dafür
@@ -90,16 +90,16 @@ export function PersonWahl({
         }}
       >
         <TextInput
-          accessibilityLabel="Neuer Mensch"
+          accessibilityLabel="Name — direkt anlegen"
           value={entwurf}
           onChangeText={setEntwurf}
           onSubmitEditing={anlegen}
-          placeholder="Neuer Mensch"
+          placeholder="Name — direkt anlegen"
           placeholderTextColor={colors.text3}
           returnKeyType="done"
           style={[{ flex: 1, fontSize: T.md, color: colors.text, paddingVertical: Spacing.sm + 2, minHeight: 24 }, webNoOutline]}
         />
-        <PressableScale accessibilityLabel="Menschen anlegen" onPress={anlegen} style={{ padding: Spacing.xs, opacity: entwurf.trim() ? 1 : 0.35 }}>
+        <PressableScale accessibilityLabel="Person anlegen" onPress={anlegen} style={{ padding: Spacing.xs, opacity: entwurf.trim() ? 1 : 0.35 }}>
           <Plus size={18} color={colors.teal} strokeWidth={2.4} />
         </PressableScale>
       </View>

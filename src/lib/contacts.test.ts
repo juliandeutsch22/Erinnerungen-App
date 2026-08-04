@@ -3,7 +3,7 @@
 // Mehr ist an dieser Datei nicht testbar: `Contact.presentPicker()` ist Apples
 // System-Auswahl und existiert nur auf dem Gerät. Genau deshalb steckt die
 // Logik, die schiefgehen KANN, in einer reinen Funktion daneben — ein Kontakt
-// ohne Namen darf keinen Menschen namens „undefined undefined" erzeugen.
+// ohne Namen darf keine Person namens „undefined undefined" erzeugen.
 import { kontaktName } from './contacts';
 
 describe('kontaktName', () => {
@@ -21,13 +21,13 @@ describe('kontaktName', () => {
   });
 
   it('nimmt die Firma, wenn kein Personenname da ist', () => {
-    // Der Dachdecker-Betrieb ist im Sinne dieser App auch ein Mensch:
+    // Der Dachdecker-Betrieb ist im Sinne dieser App auch eine Person:
     // jemand, bei dem etwas liegt.
     expect(kontaktName({ company: 'Bedachungen Brandt' })).toBe('Bedachungen Brandt');
   });
 
   it('gibt einen LEEREN Namen zurück, statt etwas zu erfinden', () => {
-    // Der Aufrufer bricht daraufhin ab — lieber kein Import als ein Mensch
+    // Der Aufrufer bricht daraufhin ab — lieber kein Import als eine Person
     // ohne Namen, den man nie wiederfindet.
     expect(kontaktName({})).toBe('');
     expect(kontaktName({ fullName: '   ', givenName: null, familyName: null })).toBe('');
