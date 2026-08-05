@@ -2,6 +2,9 @@
 // Events werden pro sichtbarem Zeitfenster geladen; Mutationen invalidieren alles.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { eventPeopleKey } from '@/data/eventPersonQueries';
+import { getEventPersonRepository } from '@/data/index';
+
 import {
   type AssistantEventInput,
   createAssistantEvent,
@@ -51,12 +54,40 @@ function useInvalidateEvents() {
   };
 }
 
+/**
+ * Legt einen Termin an — und hängt gleich die gewählten Personen daran.
+ *
+ * Warum das Verknüpfen HIER steckt und nicht beim Aufrufer: der Editor schließt
+ * sich, sobald man „Sichern" tippt. Ein `onSuccess`, das man `mutate()`
+ * mitgibt, läuft dann nicht mehr — TanStack Query ruft es nur, solange der
+ * Beobachter noch Zuhörer hat (`mutationObserver`: `#mutateOptions &&
+ * hasListeners()`), und die verliert er beim Ausbauen der Komponente. Die
+ * Personen waren damit still verloren: ausgewählt, gespeichert, weg. In der
+ * `mutationFn` läuft es unabhängig davon zu Ende.
+ */
 export function useCreateEvent() {
   const invalidate = useInvalidateEvents();
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ calendarId, draft }: { calendarId: string; draft: EventDraft }) =>
-      createDeviceEvent(calendarId, draft),
-    onSuccess: invalidate,
+    mutationFn: async ({
+      calendarId,
+      draft,
+      personIds,
+    }: {
+      calendarId: string;
+      draft: EventDraft;
+      /** Wer ist dabei — nur beim ANLEGEN nötig, danach hat der Termin eine ID. */
+      personIds?: string[];
+    }) => {
+      const eventId = await createDeviceEvent(calendarId, draft);
+      // Ohne ID gibt es nichts zum Anhängen (Web, oder Kalender verweigert).
+      if (eventId) for (const personId of personIds ?? []) await getEventPersonRepository().link(eventId, personId);
+      return eventId;
+    },
+    onSuccess: () => {
+      invalidate();
+      void qc.invalidateQueries({ queryKey: eventPeopleKey });
+    },
   });
 }
 

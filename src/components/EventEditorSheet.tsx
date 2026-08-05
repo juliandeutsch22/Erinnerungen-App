@@ -11,7 +11,6 @@ import { DisclosureChevron } from '@/components/DisclosureChevron';
 import { Chip } from '@/components/Chip';
 import { GlassButton } from '@/components/GlassButton';
 import { EventPersonen } from '@/components/EventPersonen';
-import { useToggleEventPerson } from '@/data/eventPersonQueries';
 import { LinkedNotes } from '@/components/LinkedNotes';
 import { MiniCalendar } from '@/components/MiniCalendar';
 import { DocumentStrip } from '@/components/DocumentStrip';
@@ -98,7 +97,6 @@ export function EventEditorSheet({
   // Personen für einen NEUEN Termin: es gibt noch keine Event-ID, an der die
   // Verknüpfung hängen könnte — die Auswahl wartet hier, bis der Termin steht.
   const [neuePersonen, setNeuePersonen] = useState<string[]>([]);
-  const linkEventPerson = useToggleEventPerson();
   const [section, setSection] = useState<'calendar' | WhenRow | null>(isEdit ? null : 'start');
 
   const canSave = title.trim().length > 0 && calendarId.length > 0;
@@ -155,21 +153,12 @@ export function EventEditorSheet({
     if (isEdit) updateEvent.mutate({ event, draft });
     else {
       hapticSuccess();
-      // Erst der Termin, dann die Personen: die Verknüpfung braucht die ID,
-      // die `createDeviceEvent` seit v1.74.0 zurückgibt. Kommt keine (kein
-      // Kalenderzugriff), bleibt die Auswahl folgenlos — es entsteht dann
-      // ohnehin kein Termin, an dem sie hängen könnte.
-      createEvent.mutate(
-        { calendarId, draft },
-        {
-          onSuccess: (neueId) => {
-            if (!neueId) return;
-            for (const personId of neuePersonen) {
-              linkEventPerson.mutate({ eventId: neueId, personId, dran: false });
-            }
-          },
-        },
-      );
+      // Die gewählten Personen gehen MIT in die Mutation. Bis v1.78.1 hingen
+      // sie an einem `onSuccess`, das `mutate()` mitbekam — und das läuft
+      // nicht mehr, sobald sich dieses Sheet geschlossen hat, was direkt
+      // darunter passiert. Die Auswahl war damit still verloren. Siehe
+      // `useCreateEvent`.
+      createEvent.mutate({ calendarId, draft, personIds: neuePersonen });
     }
     onSaved?.();
     onClose();

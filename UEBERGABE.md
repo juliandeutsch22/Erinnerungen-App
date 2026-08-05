@@ -2082,6 +2082,47 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
       ist schlimmer als keiner — die nächste Sitzung baut darauf auf. **Merke:
       nach einem Rückbau die Kommentare mitziehen, nicht nur den Code.**
 
+83. **Der stille Verlust beim Termin-Anlegen** (v1.78.2). Ein gezielter
+    Debugging-Durchgang durch alles, was seit v1.72 dazugekommen ist.
+    · **Der Fund, teuer und unsichtbar:** wer beim ANLEGEN eines Termins
+      Personen anhakte, verlor sie. Die Verknüpfung hing an einem `onSuccess`,
+      das `mutate()` mitbekam — und TanStack Query ruft solche Callbacks nur,
+      **solange der Beobachter noch Zuhörer hat.** Nachgelesen in der
+      installierten Quelle, nicht aus dem Gedächtnis:
+      `mutationObserver.js:77` — `if (this.#mutateOptions && this.hasListeners())`.
+      Das Sheet schließt sich unmittelbar nach `mutate()`, verliert dabei seine
+      Zuhörer, und die Personen wurden nie angehängt. Kein Fehler, keine
+      Meldung — die Auswahl war einfach weg.
+      **Warum es niemand gemerkt hat:** genau dieser Weg braucht einen echten
+      Gerätekalender und ist im Web strukturell nicht prüfbar. Er stand seit
+      v1.75.0 als „auf dem Gerät ungeprüft" in den offenen Fäden.
+      **Die Behebung:** das Verknüpfen wandert in die `mutationFn` von
+      `useCreateEvent` (neuer Parameter `personIds`). Was dort steht, läuft zu
+      Ende, egal was mit der Komponente passiert.
+      **Die Regel daraus:** Arbeit, die nach einer Mutation noch passieren muss,
+      gehört in die `mutationFn` oder in das `onSuccess` des HOOKS — nie in das
+      Callback von `mutate()`, wenn der Aufrufer sich gleich darauf schließt.
+    · Dieselbe Falle geprüft an allen zehn übrigen Stellen mit
+      `mutate(…, { onSuccess })`: neun sind unbedenklich (die Komponente bleibt
+      stehen oder navigiert erst IM Callback). Die zehnte war das ungenutzte
+      `onSaved` des `PersonEditorSheet` — ein Versprechen, das die Komponente
+      nicht halten kann; es steht jetzt unter Beobachtung, weil es niemand ruft.
+    · **Zweiter Fund:** die neuen Bereichs-Zahlen der Suche zählten nur bis zur
+      Anzeige-Kappung mit („Notizen 30", obwohl 87 passen). Die Kappung sitzt
+      jetzt beim Ableiten statt im Memo; gezeigt wird unverändert dieselbe Menge.
+    · **Zwei Verdachtsfälle ausgeräumt statt behoben** (wichtig, damit sie
+      niemand erneut „repariert"): `usePersonenLast` zählt scheinbar gelöschte
+      Aufgaben mit — tut es nicht, `useTasks()` filtert sie schon weg. Und
+      wartende Aufgaben klingeln scheinbar weiter — tun sie nicht,
+      `selectNotificationWindow` schließt sie ausdrücklich aus.
+    · **Bekannt, aber bewusst NICHT behoben:** löscht man einen Termin, bleiben
+      seine `event_people`-Zeilen liegen. Kein sichtbarer Schaden (die Termine
+      sind weg, die Zeilen finden nichts mehr), und eine saubere Behebung
+      bräuchte eine Schonfrist wie bei `orphanDocuments` — EventKit-IDs
+      flackern bei Sync-Wechseln, sofortiges Löschen wäre der schlimmere
+      Fehler. Steht als offener Faden.
+    · Verifikation: 533 Tests, tsc sauber, eslint 28/0, 23 Touren grün.
+
 ## 9. Fokus der nächsten Session: Design + neue Ideen + Features
 
 **So Ideen entwickeln:**
@@ -2112,4 +2153,6 @@ MiniCalendar/CalendarMonth, ProgressLine, PulseDot, TaskCheck.
   Personen-Screen und der Adressbuch-Import (v1.75.0). Ebenso offen: ob der
   Absturz aus v1.71.0 wirklich weg ist — falls nicht, wird der Exception-Name
   aus Xcode gebraucht.
+- Verwaiste `event_people`-Zeilen nach dem Löschen eines Termins (siehe §8.83).
+  Behebung bräuchte eine Schonfrist wie `orphanDocuments`.
 - TestFlight-Frage (99 €/Jahr) — beendet den 7-Tage-Zyklus, Entscheidung offen.

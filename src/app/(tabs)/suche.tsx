@@ -84,8 +84,7 @@ export default function SucheScreen() {
     // Volltext (Titel, Notiz, Tags, Unteraufgaben) — reine Logik in taskFilters.
     return (tasks ?? [])
       .filter((t) => taskMatchesQuery(t, q))
-      .sort((a, b) => Number(a.completedAt !== null) - Number(b.completedAt !== null))
-      .slice(0, 50);
+      .sort((a, b) => Number(a.completedAt !== null) - Number(b.completedAt !== null));
   }, [tasks, q]);
 
   const listHitsAlle = useMemo(() => {
@@ -102,20 +101,20 @@ export default function SucheScreen() {
 
   const noteHitsAlle = useMemo(() => {
     if (!q) return [];
-    return (notes ?? []).filter((n) => n.deletedAt === null && n.body.toLowerCase().includes(q)).slice(0, 30);
+    return (notes ?? []).filter((n) => n.deletedAt === null && n.body.toLowerCase().includes(q));
   }, [notes, q]);
 
   // Dokumente: Dateinamen durchsuchbar, Tippen öffnet die iOS-Vorschau.
   const { data: docs } = useDocuments();
   const docHitsAlle = useMemo(() => {
     if (!q) return [];
-    return (docs ?? []).filter((d) => d.name.toLowerCase().includes(q)).slice(0, 20);
+    return (docs ?? []).filter((d) => d.name.toLowerCase().includes(q));
   }, [docs, q]);
 
   const { data: journalEntries } = useJournal();
   const journalHitsAlle = useMemo(() => {
     if (!q) return [];
-    return (journalEntries ?? []).filter((e) => e.text.toLowerCase().includes(q)).slice(0, 20);
+    return (journalEntries ?? []).filter((e) => e.text.toLowerCase().includes(q));
   }, [journalEntries, q]);
 
   const { data: chats } = useChats();
@@ -126,21 +125,24 @@ export default function SucheScreen() {
       (allChatMessages ?? []).filter((m) => m.content.toLowerCase().includes(q)).map((m) => m.chatId),
     );
     return (chats ?? [])
-      .filter((c) => c.deletedAt === null && (c.title.toLowerCase().includes(q) || matchingChatIds.has(c.id)))
-      .slice(0, 20);
+      .filter((c) => c.deletedAt === null && (c.title.toLowerCase().includes(q) || matchingChatIds.has(c.id)));
   }, [chats, allChatMessages, q]);
 
   // Erst gesucht, dann gefiltert. Bis v1.77 rechnete jede Trefferliste den
   // Bereich schon mit ein und lieferte sonst nichts — damit ließ sich nicht
   // sagen, WIE VIEL in den anderen Bereichen läge, und die Chip-Reihe musste
   // alle acht Bereiche anbieten, auch die leeren.
-  const taskHits = inScope('aufgaben') ? taskHitsAlle : [];
+  //
+  // Die Kappung sitzt HIER, nicht in den Memos: sonst zählte der Chip nur bis
+  // zur Kappungsgrenze mit („Notizen 30", obwohl 87 passen). Gezeigt wird
+  // weiterhin dieselbe Menge wie vorher.
+  const taskHits = inScope('aufgaben') ? taskHitsAlle.slice(0, 50) : [];
   const listHits = inScope('listen') ? listHitsAlle : [];
   const personHits = inScope('personen') ? personHitsAlle : [];
-  const noteHits = inScope('notizen') ? noteHitsAlle : [];
-  const docHits = inScope('dokumente') ? docHitsAlle : [];
-  const journalHits = inScope('abend') ? journalHitsAlle : [];
-  const chatHits = inScope('chats') ? chatHitsAlle : [];
+  const noteHits = inScope('notizen') ? noteHitsAlle.slice(0, 30) : [];
+  const docHits = inScope('dokumente') ? docHitsAlle.slice(0, 20) : [];
+  const journalHits = inScope('abend') ? journalHitsAlle.slice(0, 20) : [];
+  const chatHits = inScope('chats') ? chatHitsAlle.slice(0, 20) : [];
 
   /** Wie viel liegt in jedem Bereich? Grundlage der Chip-Reihe. */
   const proBereich = useMemo(() => {
